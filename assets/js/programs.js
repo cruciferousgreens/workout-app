@@ -15,9 +15,23 @@
     function programMuscles(program){const counts={};(program.workouts||[]).forEach(workout=>(workout.template?.exercises||[]).forEach(item=>{const ex=exercises.find(row=>row.id===item.exerciseId);[...(ex?.primary||[]),...(ex?.secondary||[])].forEach(m=>counts[m]=(counts[m]||0)+1);}));return Object.entries(counts).sort((a,b)=>b[1]-a[1]);}
     let pendingRepeatWorkout=null;
     function repeatWorkout(workout,confirmed=false){if(!workout)return;if(workoutState.draft&&!confirmed){pendingRepeatWorkout=workout;$('#replaceDraftDialog').showModal();return;}showWorkouts();workoutState.draft={name:workout.name,date:localIsoDate(),programId:null,programWorkoutUid:null,editingId:null,exercises:workout.exercises.map(item=>({uid:uid('exercise'),exerciseId:item.exerciseId,tracking:item.tracking||'reps',note:item.note||'',noteOpen:false,exerciseTags:[...(item.exerciseTags||[])],supersetId:item.supersetId||null,progression:item.progression||null,sets:item.sets.map(set=>({uid:uid('set'),w:'',r:set.r==null?'':String(set.r),seconds:set.seconds==null?'':String(set.seconds),rpe:'',tags:[...(set.tags||[])],complete:false}))}))};prepareDraftProgression(workoutState.draft,{...progressionSetup,stallDetection:false});schedulePersist();renderWorkoutScreen();}
-    function saveCurrentTemplate() {
-      const d=workoutState.draft; if(!d||!d.exercises.length){$('#workoutSaveStatus').textContent='Add at least one exercise first.';return;}
-      const template={id:uid('template'),name:($('#workoutName').value.trim()||'Workout template'),exercises:d.exercises.map(x=>({exerciseId:x.exerciseId,tracking:exerciseTracking(x,exercises.find(ex=>ex.id===x.exerciseId)),note:x.note||'',exerciseTags:[...(x.exerciseTags||[])],supersetId:x.supersetId||null,progression:x.progression||null,sets:x.sets.map(set=>({w:set.w,r:set.r,seconds:set.seconds,rpe:set.rpe,tags:[...(set.tags||[])],complete:false}))}))}; workoutState.templates.unshift(template); $('#workoutSaveStatus').textContent=`Saved “${template.name}” as a template.`; schedulePersist();
+    function templateExercisesFromCompleted(workout) {
+      return workout.exercises.map(item=>({exerciseId:item.exerciseId,tracking:item.tracking||'reps',note:item.note||'',exerciseTags:[...(item.exerciseTags||[])],supersetId:item.supersetId||null,progression:item.progression?{...item.progression}:null,sets:item.sets.map(set=>({w:set.w==null?'':String(set.w),r:set.r==null?'':String(set.r),seconds:set.seconds==null?'':String(set.seconds),rpe:set.rpe==null?'':String(set.rpe),tags:[...(set.tags||[])],complete:false}))}));
+    }
+    function saveCompletedAsTemplate(workout,statusEl) {
+      if(!workout?.exercises?.length)return;
+      const template={id:uid('template'),name:workout.name||'Workout template',exercises:templateExercisesFromCompleted(workout)};
+      workoutState.templates.unshift(template); schedulePersist();
+      const message=`Saved “${template.name}” as a template.`;
+      if(statusEl)statusEl.textContent=message; showToast(message);
+    }
+    function addCompletedWorkoutToProgram(workout,statusEl) {
+      if(!workout?.exercises?.length)return;
+      if(!workoutState.activeProgram){if(statusEl)statusEl.textContent='Create an active program first.';return;}
+      workoutState.activeProgram.workouts.push({uid:uid('program-workout'),name:workout.name,template:{name:workout.name,exercises:templateExercisesFromCompleted(workout)}});
+      schedulePersist(); renderProgram(); renderDashboard();
+      const message=`Added “${workout.name}” to ${workoutState.activeProgram.name}.`;
+      if(statusEl)statusEl.textContent=message; showToast(message);
     }
     function startWorkoutFromTemplate(id) {
       const t=workoutState.templates.find(x=>x.id===id);if(!t)return;
@@ -29,10 +43,6 @@
       host.innerHTML=workoutState.templates.length?`<div class="picker-list">${workoutState.templates.map(t=>`<button class="picker-item start-template" type="button" data-template-id="${escapeHtml(t.id)}"><span><strong>${escapeHtml(t.name)} ${t.builtIn?'<span class="built-in-label">Built-in</span>':''}</strong><span>${t.exercises.length} exercise${t.exercises.length===1?'':'s'}</span></span><span class="picker-state">›</span></button>`).join('')}</div>`:'<div class="dialog-empty"><strong>No templates yet.</strong><br>Build a workout, then choose Save as template.</div>';
       host.querySelectorAll('.start-template').forEach(b=>b.addEventListener('click',()=>startWorkoutFromTemplate(b.dataset.templateId)));
     }
-    function addCurrentWorkoutToProgram() {
-      const d=workoutState.draft;if(!d||!d.exercises.length){$('#workoutSaveStatus').textContent='Add at least one exercise first.';return;} if(!workoutState.activeProgram){$('#workoutSaveStatus').textContent='Create an active program first.';return;} const name=$('#workoutName').value.trim()||'Workout'; workoutState.activeProgram.workouts.push({uid:uid('program-workout'),name,template:{name,exercises:d.exercises.map(x=>({exerciseId:x.exerciseId,tracking:exerciseTracking(x,exercises.find(ex=>ex.id===x.exerciseId)),note:x.note||'',exerciseTags:[...(x.exerciseTags||[])],supersetId:x.supersetId||null,progression:x.progression||null,sets:x.sets.map(set=>({w:set.w,r:set.r,seconds:set.seconds,rpe:set.rpe,tags:[...(set.tags||[])],complete:false}))}))}}); $('#workoutSaveStatus').textContent=`Added “${name}” to ${workoutState.activeProgram.name}.`; schedulePersist(); renderProgram();renderDashboard();
-    }
-
     function activateBuiltInProgram(id) {
       if(workoutState.activeProgram)return;
       const source=builtInPrograms.find(program=>program.id===id); if(!source)return;

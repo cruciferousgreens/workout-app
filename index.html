@@ -80,7 +80,7 @@
         <div class="topline training-topline">
           <div>
             <h1 id="workoutTitle">Training</h1>
-            <p class="lede">Start a session or revisit your recent work.</p>
+            <p class="lede" id="workoutLede">Start a session or revisit your recent work.</p>
           </div>
         </div>
         <div id="workoutStart" class="training-home">
@@ -106,19 +106,14 @@
           <div class="progression-banner" id="workoutProgression" hidden></div>
           <div class="workout-meta">
             <div class="field"><label for="workoutName">WORKOUT NAME</label><input id="workoutName" type="text" value="Workout" autocomplete="off" aria-label="Workout name" /></div>
-            <div class="field"><label for="workoutDate">DATE</label><input id="workoutDate" type="date" aria-label="Workout date" /></div>
+            <div class="field date-field"><label id="workoutDateLabel">DATE</label><button class="date-display" id="workoutDateDisplay" type="button" aria-labelledby="workoutDateLabel">Thu, Sep 10, 2026</button><input id="workoutDate" type="date" class="date-input-hidden" aria-label="Workout date" tabindex="-1" /></div>
           </div>
           <div class="workout-toolbar">
             <h2>Exercises</h2>
-            <div class="workout-toolbar-actions"><button class="secondary-button" id="openPlateCalculator" type="button">Plate calculator</button><button class="secondary-button" id="addWorkoutExercise" type="button">+ Add exercises</button></div>
+            <div class="workout-toolbar-actions"><button class="secondary-button" id="addWorkoutExercise" type="button">+ Add exercises</button></div>
           </div>
           <div class="draft-status" id="draftStatus" role="status">Changes are saved on this device</div>
           <div class="workout-exercises" id="workoutExercises"></div>
-          <div class="workout-secondary-actions">
-            <button class="small-button" id="saveWorkoutTemplate" type="button">Save as template</button>
-            <button class="small-button" id="addWorkoutToProgram" type="button">Add to active program</button>
-          </div>
-          <p class="status-note" id="workoutSaveStatus" role="status"></p>
           <div class="workout-footer">
             <p class="workout-error" id="workoutError" role="alert"></p>
             <div class="workout-actions">
@@ -195,11 +190,11 @@
       <section id="settingsView" class="stats-view" aria-labelledby="settingsTitle">
         <div class="topline"><div><h1 id="settingsTitle">Settings</h1><p class="lede">Defaults and data for this device.</p></div></div>
         <section class="dashboard-card">
-          <div class="section-head"><h2>Appearance</h2></div>
+          <div class="section-head settings-head"><h2>Appearance</h2></div>
           <div class="switch-row wide"><span class="switch-copy"><strong>Dark mode</strong><span>Easier on the eyes for evening sessions.</span></span><button class="switch" id="darkModeToggle" type="button" role="switch" aria-pressed="false" aria-label="Dark mode off"></button></div>
         </section>
         <section class="dashboard-card">
-          <div class="section-head"><h2>Progression defaults</h2><p class="section-note">Used for new exercises and programs.</p></div>
+          <div class="section-head settings-head"><h2>Progression defaults</h2><p class="section-note">Used for new exercises and programs.</p></div>
           <div class="settings-grid">
             <label class="rule-field"><span>RPE trigger threshold</span><input id="settingsRpeThreshold" type="number" min="1" max="10" step="1" value="8"></label>
             <label class="rule-field"><span>Increment type</span><select id="settingsIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
@@ -211,14 +206,16 @@
           <div class="switch-row wide"><span class="switch-copy"><strong>Stall detection</strong><span>Suggest a separate deload week after repeated flat sessions with rising RPE. Never changes the program automatically.</span></span><button class="switch" id="settingsStallToggle" type="button" role="switch" aria-pressed="true" aria-label="Stall detector on"></button></div>
         </section>
         <section class="dashboard-card">
-          <div class="section-head"><h2>Data</h2><p class="section-note">Backups and storage on this device.</p></div>
+          <div class="section-head settings-head"><h2>Data</h2><p class="section-note">Backups and storage on this device.</p></div>
           <div class="settings-actions">
             <button class="small-button" id="exportDataButton" type="button">Export data (JSON)</button>
+            <button class="small-button" id="addSampleDataButton" type="button">Add sample data</button>
+            <button class="small-button" id="clearSampleDataButton" type="button">Clear sample data</button>
             <button class="small-button danger" id="deleteAllDataButton" type="button">Delete all data</button>
           </div>
         </section>
         <section class="dashboard-card">
-          <div class="section-head"><h2>Attributions</h2></div>
+          <div class="section-head settings-head"><h2>Attributions</h2></div>
           <ul class="attribution-list">
             <li>Muscle heat map uses an anatomical front/back body SVG in the style of Sasha-s-Body-Map, with named muscle regions.</li>
             <li>Exercise library: free-exercise-db — 876 exercises, public domain (Unlicense).</li>
@@ -226,8 +223,7 @@
           </ul>
         </section>
         <section class="dashboard-card">
-          <div class="section-head"><h2>About</h2></div>
-          <p class="section-note">Workout Tracker — an offline-first, free workout logging app. Your data stays on this device.</p>
+          <div class="section-head settings-head"><h2>About</h2><p class="section-note">Workout Tracker — an offline-first, free workout logging app. Your data stays on this device.</p></div>
         </section>
       </section>
 
@@ -279,14 +275,6 @@
     </main>
 
     <div class="app-toast" id="appToast" role="status" aria-live="polite" hidden></div>
-    <dialog class="custom-dialog compact-dialog" id="plateCalculatorDialog" aria-labelledby="plateCalculatorTitle">
-      <div class="custom-form">
-        <div class="custom-form-head"><div><h2 id="plateCalculatorTitle">Plate calculator</h2><p>Enter the total barbell weight. Plates are shown for one side.</p></div><button class="dialog-close" id="closePlateCalculator" type="button" aria-label="Close">×</button></div>
-        <div class="plate-fields"><label class="field"><span>Total weight (lb)</span><input id="plateTargetWeight" type="number" min="45" step="5" inputmode="decimal" value="135"></label><label class="field"><span>Bar weight (lb)</span><input id="plateBarWeight" type="number" min="0" step="5" inputmode="decimal" value="45"></label></div>
-        <div class="plate-result" id="plateResult" aria-live="polite"></div>
-      </div>
-    </dialog>
-
     <dialog class="custom-dialog compact-dialog" id="replaceDraftDialog" aria-labelledby="replaceDraftTitle">
       <div class="custom-form"><div class="custom-form-head"><div><h2 id="replaceDraftTitle">Replace current workout?</h2><p>Your in-progress workout will be discarded and replaced with the selected session.</p></div><button class="dialog-close" id="closeReplaceDraft" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepCurrentDraft" type="button">Keep current</button><button class="primary-button" id="confirmReplaceDraft" type="button">Replace workout</button></div></div>
     </dialog>
@@ -432,6 +420,7 @@
 <script src="assets/js/program-templates.js"></script>
 <script src="assets/js/state.js"></script>
 <script src="assets/js/persistence.js"></script>
+<script src="assets/js/sample-data.js"></script>
 <script src="assets/js/exercise-library.js"></script>
 <script src="assets/js/exercise-detail.js"></script>
 <script src="assets/js/navigation.js"></script>

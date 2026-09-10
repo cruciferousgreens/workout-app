@@ -32,6 +32,16 @@ function mergeCustomExercises(){
   exercises=exercises.filter(ex=>!ids.has(ex.id));
   exercises=[...state.customExercises,...exercises];
 }
+/** Merge saved tag strings onto defaults: defaults first, then saved customs, deduped case-insensitively. */
+function mergeTagLists(defaults,saved){
+  const seen=new Set(defaults.map(tag=>String(tag).toLowerCase()));
+  const merged=[...defaults];
+  (Array.isArray(saved)?saved:[]).forEach(tag=>{
+    if(typeof tag!=='string'||!tag.trim()||seen.has(tag.toLowerCase()))return;
+    seen.add(tag.toLowerCase());merged.push(tag);
+  });
+  return merged;
+}
 function restorePersisted(){
   let raw=null;
   try{raw=localStorage.getItem(PERSIST_KEY);}catch(_){return;}
@@ -40,9 +50,15 @@ function restorePersisted(){
   try{data=JSON.parse(raw);}catch(_){return;}
   if(!data||data.version!==1||typeof data!=='object')return;
   if(Array.isArray(data.completed))workoutState.completed=data.completed;
-  if(Array.isArray(data.templates))workoutState.templates=data.templates;
-  if(Array.isArray(data.tags)&&data.tags.length)workoutState.tags=data.tags;
-  if(Array.isArray(data.exerciseTagPresets)&&data.exerciseTagPresets.length)workoutState.exerciseTagPresets=data.exerciseTagPresets;
+  /* Templates: built-ins are always present; restore only merges in the user's own saved templates. */
+  if(Array.isArray(data.templates)){
+    const savedUser=data.templates.filter(t=>t&&!t.builtIn);
+    const ids=new Set(savedUser.map(t=>t.id));
+    workoutState.templates=[...savedUser,...cloneWorkoutTemplates().filter(t=>!ids.has(t.id))];
+  }
+  /* Tags: merge saved customs onto the defaults (defaults first, deduped) — never a wholesale replace. */
+  if(Array.isArray(data.tags))workoutState.tags=mergeTagLists(DEFAULT_SET_TAGS,data.tags);
+  if(Array.isArray(data.exerciseTagPresets))workoutState.exerciseTagPresets=mergeTagLists(DEFAULT_EXERCISE_TAG_PRESETS,data.exerciseTagPresets);
   if(data.activeProgram&&typeof data.activeProgram==='object')workoutState.activeProgram=data.activeProgram;
   if(Array.isArray(data.archivedPrograms))workoutState.archivedPrograms=data.archivedPrograms;
   if(data.draft&&typeof data.draft==='object'&&data.draft!==null)workoutState.draft=data.draft;

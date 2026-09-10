@@ -23,18 +23,19 @@
       }
     });
 
+    /** Refreshes the pretty date button from the hidden native date input. */
+    function renderWorkoutDateDisplay() {
+      const input=$('#workoutDate'),display=$('#workoutDateDisplay');
+      if(!input||!display)return;
+      display.textContent=formatPrettyDate(input.value||localIsoDate());
+    }
+
     function applyTheme(theme) {
       const dark=theme==='dark';document.documentElement.dataset.theme=dark?'dark':'light';
       const toggle=$('#darkModeToggle');
       if(toggle){toggle.setAttribute('aria-pressed',String(dark));toggle.setAttribute('aria-label',`Dark mode ${dark?'on':'off'}`);}
       const color=getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();document.querySelector('meta[name="theme-color"]').setAttribute('content',color);document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').setAttribute('content',dark?'black-translucent':'default');
       try{localStorage.setItem('workout-theme',dark?'dark':'light');}catch(_){}
-    }
-    function renderPlateCalculator(){
-      const target=Number($('#plateTargetWeight').value),bar=Number($('#plateBarWeight').value),host=$('#plateResult');
-      if(!Number.isFinite(target)||!Number.isFinite(bar)||target<bar||bar<0){host.innerHTML='<strong>Check the weights.</strong><p class="section-note">Total weight must be at least the bar weight.</p>';return;}
-      let side=(target-bar)/2;const plates=[];[45,35,25,10,5,2.5].forEach(size=>{while(side+0.001>=size){plates.push(size);side-=size;}});
-      host.innerHTML=side>.01?`<strong>${target} lb cannot be loaded exactly with the listed plates.</strong><p class="section-note">Nearest lower setup leaves ${side.toFixed(1)} lb per side.</p>`:`<strong>${plates.length?`${plates.join(' + ')} lb per side`:'Empty bar'}</strong><div class="plate-stack">${plates.map(value=>`<span class="plate-chip">${value}</span>`).join('')}</div><p class="section-note">${bar} lb bar · ${target} lb total</p>`;
     }
 
     $('#customExerciseForm').addEventListener('submit', event => {
@@ -97,9 +98,6 @@
       location.reload();
     });
     applyTheme(document.documentElement.dataset.theme==='dark'?'dark':'light');
-    $('#openPlateCalculator').addEventListener('click',()=>{renderPlateCalculator();$('#plateCalculatorDialog').showModal();});
-    $('#closePlateCalculator').addEventListener('click',()=>$('#plateCalculatorDialog').close());
-    $('#plateTargetWeight').addEventListener('input',renderPlateCalculator);$('#plateBarWeight').addEventListener('input',renderPlateCalculator);
     $('#discardDraftBanner').addEventListener('click',()=>{workoutState.draft=null;$('#workoutError').textContent='';renderWorkoutScreen();showToast('Workout draft discarded.');});
     $('#closeReplaceDraft').addEventListener('click',()=>{pendingRepeatWorkout=null;$('#replaceDraftDialog').close();});
     $('#keepCurrentDraft').addEventListener('click',()=>{pendingRepeatWorkout=null;$('#replaceDraftDialog').close();});
@@ -137,7 +135,8 @@
     $('#doneExercisePicker').addEventListener('click', () => {$('#exercisePickerDialog').close();if(workoutState.pickerMode==='program')renderProgram();});
     $('#exercisePickerSearch').addEventListener('input', renderExercisePicker);
     $('#workoutName').addEventListener('input', event => { if (workoutState.draft) { workoutState.draft.name = event.target.value; markDraftSaved(); } });
-    $('#workoutDate').addEventListener('input', event => { if (workoutState.draft) { workoutState.draft.date = event.target.value; markDraftSaved(); } });
+    $('#workoutDateDisplay').addEventListener('click', () => { const input=$('#workoutDate'); if(input.showPicker)input.showPicker(); else input.focus(); });
+    $('#workoutDate').addEventListener('input', event => { if (workoutState.draft) { workoutState.draft.date = event.target.value; markDraftSaved(); } renderWorkoutDateDisplay(); });
     $('#closeSetTags').addEventListener('click', () => $('#setTagsDialog').close());
     $('#doneSetTags').addEventListener('click', () => $('#setTagsDialog').close());
     $('#closeExerciseTags').addEventListener('click', () => $('#exerciseTagsDialog').close());
@@ -148,8 +147,6 @@
     $('#doneSuperset').addEventListener('click', () => $('#supersetDialog').close());
     $('#addTagButton').addEventListener('click', addTag);
     $('#newTagInput').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); addTag(); } });
-    $('#saveWorkoutTemplate').addEventListener('click', saveCurrentTemplate);
-    $('#addWorkoutToProgram').addEventListener('click', addCurrentWorkoutToProgram);
     $('#cancelWorkout').addEventListener('click', () => {
       workoutState.draft = null;
       $('#workoutComplete').hidden = true;

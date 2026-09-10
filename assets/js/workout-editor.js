@@ -73,8 +73,17 @@
     }
     function renderWorkoutScreen() {
       const hasDraft = !!workoutState.draft;
-      $('#workoutStart').hidden = hasDraft || !$('#workoutComplete').hidden;
+      // Exactly one sub-pane is ever visible: a live draft wins over everything, a completed
+      // workout under review wins over the start screen, otherwise the start screen shows.
+      if (hasDraft) $('#workoutComplete').hidden = true;
+      const viewingComplete = !hasDraft && !$('#workoutComplete').hidden;
+      $('#workoutStart').hidden = hasDraft || viewingComplete;
       $('#workoutEditor').hidden = !hasDraft;
+      const lede = $('#workoutLede');
+      if (lede) lede.textContent = hasDraft ? 'Workout in progress — log your sets below.'
+        : viewingComplete ? 'Reviewing a completed session.'
+        : 'Start a session or revisit your recent work.';
+      updateLiveWorkoutIndicator();
       renderWorkoutProgramSuggestion();
       renderWorkoutTemplateList();
       const latestReal=workoutState.completed.slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
@@ -84,6 +93,7 @@
       $('#resumeDraftMeta').textContent=`${workoutState.draft.name || 'Workout'} · ${workoutState.draft.exercises.length} exercise${workoutState.draft.exercises.length===1?'':'s'} · ${formatLogDate(workoutState.draft.date)}`;
       $('#workoutName').value = workoutState.draft.name;
       $('#workoutDate').value = workoutState.draft.date;
+      renderWorkoutDateDisplay();
       renderWorkoutExercises();
       renderWorkoutProgression();
     }
@@ -137,6 +147,8 @@
     function renderWorkoutExercises() {
       const draft = workoutState.draft;
       if (!draft) return;
+      const meta=$('#resumeDraftMeta');
+      if(meta)meta.textContent=`${draft.name || 'Workout'} · ${draft.exercises.length} exercise${draft.exercises.length===1?'':'s'} · ${formatLogDate(draft.date)}`;
       draft.exercises.forEach(item=>{if(!item.uid)item.uid=uid('exercise');item.sets=(item.sets||[]).map(set=>({...set,uid:set.uid||uid('set'),tags:[...(set.tags||[])]}));});
       $('#workoutExercises').innerHTML = draft.exercises.length ? draft.exercises.map((item,itemIndex) => {
         const ex = exercises.find(x => x.id === item.exerciseId); if (!ex) return '';
@@ -146,9 +158,14 @@
         const lastWeight = lastUsedWeight(item.exerciseId);
         const lastSummary = lastSessionSetSummary(item.exerciseId);
         const grouped = item.supersetId && draft.exercises.filter(x => x.supersetId === item.supersetId).length > 1;
+        const doneSets=item.sets.filter(set=>set.complete).length;
+        const topWeight=Math.max(0,...item.sets.map(set=>Number(set.w)||0));
+        const cardSummary=`${item.sets.length} set${item.sets.length===1?'':'s'}${topWeight?` · ${topWeight} lb`:''}${doneSets?` · ${doneSets}/${item.sets.length} complete`:''}`;
         return `<div class="swipe-item exercise-swipe" data-exercise-wrapper="${escapeHtml(item.uid)}">
           <button class="swipe-delete-action remove-workout-exercise" type="button" data-uid="${escapeHtml(item.uid)}" aria-label="Remove ${escapeHtml(ex.name)}">Delete</button>
-          <section class="workout-exercise swipe-content" data-workout-exercise="${escapeHtml(item.uid)}">
+          <details class="exercise-accordion workout-exercise swipe-content" data-workout-exercise="${escapeHtml(item.uid)}" ${item.cardOpen===false?'':'open'}>
+            <summary class="exercise-accordion-head"><span class="exercise-accordion-title"><strong>${escapeHtml(ex.name)}</strong><small>${escapeHtml(cardSummary)}</small></span><span class="exercise-accordion-chevron" aria-hidden="true">›</span></summary>
+            <div class="exercise-accordion-body">
             ${grouped ? `<div class="superset-band">Superset ${draft.exercises.filter((row, index) => row.supersetId && draft.exercises.findIndex(first => first.supersetId === row.supersetId) === index).findIndex(row => row.supersetId === item.supersetId) + 1}</div>` : ''}
             <div class="workout-exercise-head"><div class="exercise-title-copy"><h3>${escapeHtml(ex.name)}</h3><p>${escapeHtml((ex.primary||[]).map(titleCase).join(', ') || 'Unspecified muscle')} · ${escapeHtml(titleCase(ex.equipment || 'No equipment'))}</p><div class="exercise-meta-row"><span class="set-count-badge">${item.sets.length} set${item.sets.length===1?'':'s'}</span></div></div><button class="drag-handle" type="button" data-drag-uid="${escapeHtml(item.uid)}" aria-label="Drag to reorder ${escapeHtml(ex.name)}">⋮⋮</button></div>
             <details class="advanced-options" ${item.optionsOpen?'open':''}><summary>Exercise options</summary><div class="advanced-options-body"><div class="exercise-tools"><button class="tracking-toggle ${tracking === 'time' ? 'time' : ''}" type="button" data-tracking-uid="${escapeHtml(item.uid)}" aria-label="Switch to ${tracking === 'time' ? 'rep' : 'time'} tracking">Track ${tracking === 'time' ? 'seconds' : 'reps'}</button>${draft.exercises.length > 1 ? `<button class="superset-button ${grouped ? 'active' : ''}" type="button" data-superset-uid="${escapeHtml(item.uid)}">${grouped ? 'Edit superset' : 'Create superset'}</button>` : ''}</div><div class="exercise-tag-row">${(item.exerciseTags||[]).map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}<button class="exercise-tag-button" type="button" data-draft-exercise-tags="${escapeHtml(item.uid)}">${item.exerciseTags?.length?'Edit exercise tags':'+ Exercise tags'}</button></div></div></details>
@@ -168,7 +185,8 @@
               </div></div>`).join('')}</div>
             <div class="set-utility-row"><button class="add-set" type="button" data-uid="${escapeHtml(item.uid)}">+ Add set</button><button class="copy-first-set" type="button" data-copy-first-set="${escapeHtml(item.uid)}" ${item.sets.length<2?'disabled':''}>Apply set 1 to all</button><span class="inline-feedback" data-copy-feedback="${escapeHtml(item.uid)}" aria-live="polite"></span></div>
             <div class="exercise-note">${item.noteOpen || item.note ? `<textarea id="note-${escapeHtml(item.uid)}" data-exercise-note="${escapeHtml(item.uid)}" aria-label="Exercise notes" placeholder="Cues, setup, pain, or anything to remember">${escapeHtml(item.note || '')}</textarea>` : `<button class="add-note-toggle" type="button" data-add-note="${escapeHtml(item.uid)}">+ Add notes</button>`}</div>
-          </section></div>`;
+            </div>
+          </details></div>`;
       }).join('') : '<div class="history-empty">No exercises yet. Add your first movement to begin logging.</div>';
 
       document.querySelectorAll('.remove-workout-exercise').forEach(button => button.addEventListener('click', () => { draft.exercises = draft.exercises.filter(item => item.uid !== button.dataset.uid); prepareDraftProgression(draft, workoutState.activeProgram?.id===draft.programId?workoutState.activeProgram.progression:{...progressionSetup,stallDetection:false}); renderWorkoutExercises(); renderWorkoutProgression(); markDraftSaved(); }));
@@ -202,6 +220,7 @@
         set.complete = !set.complete; button.setAttribute('aria-pressed', String(set.complete)); button.setAttribute('aria-label', set.complete ? 'Mark set incomplete' : 'Mark set complete'); button.closest('.log-set').classList.toggle('is-complete', set.complete); $('#workoutError').textContent = ''; if(pr)showToast(`PR · ${pr}`,'pr-toast'); markDraftSaved();
       }));
       document.querySelectorAll('.advanced-options').forEach(details => details.addEventListener('toggle', () => { const item=draft.exercises.find(row=>row.uid===details.closest('.workout-exercise')?.dataset.workoutExercise); if(item)item.optionsOpen=details.open; }));
+      document.querySelectorAll(".exercise-accordion").forEach(card => card.addEventListener('toggle', () => { const item=draft.exercises.find(row=>row.uid===card.dataset.workoutExercise); if(item){item.cardOpen=card.open;markDraftSaved();} }));
       document.querySelectorAll('[data-tag-set-uid]').forEach(button => button.addEventListener('click', () => openTagDialog(button.dataset.tagExerciseUid, button.dataset.tagSetUid)));
       document.querySelectorAll('[data-draft-exercise-tags]').forEach(button => button.addEventListener('click', () => openExerciseTagDialog({mode:'draft',exerciseUid:button.dataset.draftExerciseTags})));
       document.querySelectorAll('[data-add-note]').forEach(button => button.addEventListener('click', () => { const item = draft.exercises.find(x => x.uid === button.dataset.addNote); if (!item) return; item.noteOpen = true; renderWorkoutExercises(); requestAnimationFrame(() => document.querySelector(`[data-exercise-note="${CSS.escape(item.uid)}"]`)?.focus()); }));

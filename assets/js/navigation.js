@@ -39,5 +39,13 @@
       $('#settingsView').classList.add('active'); setActiveNav('settings'); renderSettings(); restoreScroll('settings');
       if (push) history.pushState({view:'settings'}, '', '#settings');
     }
+    /** Tints the Workout tab and adds a dot badge while a draft is live. Called on every
+     *  render of the workout screen, after finish/discard, and once at boot (restored drafts). */
+    function updateLiveWorkoutIndicator() {
+      const nav = $('#workoutsNav'); if (!nav) return;
+      const live = !!workoutState.draft;
+      nav.classList.toggle('has-live-draft', live);
+      nav.setAttribute('aria-label', live ? 'Workout — session in progress' : 'Workout');
+    }
 
     

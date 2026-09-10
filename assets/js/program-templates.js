@@ -28,4 +28,9 @@
     /* StrongLifts remains available only as reusable Workout A/B templates. */
     const builtInPrograms = [];
 
+    /** Fresh deep copies of the built-in workout templates (safe to mutate per session). */
+    function cloneWorkoutTemplates() {
+      return strongLiftsWorkoutTemplates.map(template=>({...template,exercises:template.exercises.map(item=>({...item,exerciseTags:[...(item.exerciseTags||[])],progression:{...item.progression},sets:item.sets.map(set=>({...set,tags:[...(set.tags||[])]}))}))}));
+    }
+
     
