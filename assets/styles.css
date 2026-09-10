@@ -649,6 +649,11 @@
       .program-workout { grid-template-columns: 30px minmax(0,1fr); }
       .program-row-actions { grid-column: 2; justify-content: flex-start; }
     }
+    .tracking-toggle { min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 750; }
+    .tracking-toggle.time { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .sample-pr-note { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; color: #8c4c13; font-size: 10px; font-weight: 750; }
+    .suggestion-card.applied .suggestion-change strong::after { content: ' · applied'; color: var(--accent); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+    .time-range-fields { display: contents; }
     @media (max-width: 520px) {
       .completed-set-head { display: none; }
       .completed-set-row { grid-template-columns: 34px repeat(2,minmax(0,1fr)); gap: 6px; }
