@@ -1,4 +1,5 @@
 
+/* ===== module: custom-exercises.js ===== */
     /** Creates, edits, and deletes session-scoped custom exercises with pill controls. */
     function customOptions() {
       return {

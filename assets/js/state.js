@@ -18,4 +18,4 @@ const workoutState = {
   activeProgram: null,
   archivedPrograms: []
 };
-const progressionSetup = { threshold:8, incrementType:'lb', incrementValue:5, timeStep:5, treatment:'suggestions', stallDetection:true, defaultRange:{preset:'hypertrophy',min:6,max:12,openTop:false,amrap:false}, undulating:false, weeklyRanges:[] };
+const progressionSetup = { threshold:8, incrementType:'lb', incrementValue:5, timeStep:5, treatment:'suggestions', stallDetection:true, defaultRange:{preset:'hypertrophy',min:6,max:12,openTop:false,amrap:false}, undulating:false, weeklyRanges:[], units:'imperial' };

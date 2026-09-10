@@ -1,4 +1,5 @@
 
+/* ===== module: supersets.js ===== */
     /** Groups and reorders workout exercises without changing their logging data. */
     function normalizeSupersets() {
       const draft = workoutState.draft;

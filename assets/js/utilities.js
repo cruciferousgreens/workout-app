@@ -1,4 +1,5 @@
 
+/* ===== module: utilities.js ===== */
     /** Shared DOM, formatting, ID, and date helpers used by the feature modules below. */
     const $ = (s) => document.querySelector(s);
     const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -55,6 +56,25 @@
     }
     /** Logged weight is already the total external load, including for dumbbells. Never multiply by implement count. */
     function setVolume(set) { return (Number(set.w) || 0) * (Number(set.r) || 0); }
+    /* Units (2026-09-10): weights are stored canonically in pounds; the metric
+       setting only changes display and input. 1 lb = 0.45359237 kg. */
+    const LB_TO_KG=0.45359237;
+    function isMetric(){return progressionSetup.units==='metric';}
+    function weightUnit(){return isMetric()?'kg':'lb';}
+    function displayWeight(lb){
+      if(lb==null||String(lb).trim()==='')return '';
+      const n=Number(lb); if(!isFinite(n))return '';
+      return isMetric()?String(Math.round(n*LB_TO_KG*10)/10):String(n);
+    }
+    function storageWeight(val){
+      if(val==null||String(val).trim()==='')return '';
+      const n=Number(val); if(!isFinite(n))return '';
+      return isMetric()?String(Math.round(n/LB_TO_KG*10)/10):String(val);
+    }
+    function displayVolume(lbReps){
+      const n=Number(lbReps)||0;
+      return isMetric()?n*LB_TO_KG:n;
+    }
     function escapeHtml(text) {
       const div = document.createElement('div'); div.textContent = text; return div.innerHTML;
     }

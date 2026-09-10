@@ -1,4 +1,5 @@
 
+/* ===== module: program-templates.js ===== */
     /** Defines permanent built-in program templates and their reusable workout templates. */
     function programTemplateExercise(exerciseId, setCount, reps, exerciseTags = ['Straight sets']) {
       return {

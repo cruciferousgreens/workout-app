@@ -1,4 +1,5 @@
 
+/* ===== module: navigation.js ===== */
     /** Coordinates view routing, bottom navigation state, and per-view scroll restoration. */
     function hideAllViews() {
       $('#dashboardView').classList.remove('active');

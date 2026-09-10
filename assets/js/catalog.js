@@ -1,4 +1,5 @@
 
+/* ===== module: catalog.js ===== */
     /** Normalizes the bundled exercise database into the app's lightweight exercise model. */
     const SOURCE_URL = 'https://github.com/yuhonas/free-exercise-db';
     const coreExercises = [

@@ -1,4 +1,5 @@
 
+/* ===== module: exercise-library.js ===== */
     /** Renders searchable exercise cards and the multi-muscle AND filter. */
     function populateFilters() {
       const muscles = [...new Set(exercises.flatMap(x => [...x.primary, ...x.secondary]))].sort();
@@ -62,8 +63,9 @@
       const rest = rows.filter(x => !recentSet.has(x.id));
       const exactQuery=normalize(state.query),hasLiteral=!state.query||rows.some(x=>normalize([x.name,x.id].join(' ')).includes(exactQuery));
       $('#resultCount').innerHTML = `${rows.length} of ${exercises.length} movements${state.query ? ` ${hasLiteral?'matching':'closest to'} <span class="active-query">“${escapeHtml(state.query)}”</span>` : ''}`;
-      $('#exerciseResults').innerHTML = rows.length ? `${recent.length ? `<section class="library-section" aria-labelledby="recentHeading"><h2 class="library-heading" id="recentHeading">Recent</h2><div class="exercise-grid">${recent.map(exerciseCard).join('')}</div></section>` : ''}<section class="library-section" aria-labelledby="allHeading"><h2 class="library-heading" id="allHeading">${recent.length ? 'All exercises' : 'Exercises'}</h2><div class="exercise-grid">${rest.map(exerciseCard).join('')}</div></section>` : `<div class="exercise-grid"><div class="empty"><strong>No movements found</strong>Try a broader name or clear one of the filters.</div></div>`;
+      $('#exerciseResults').innerHTML = rows.length ? `${recent.length ? `<section class="library-section" aria-labelledby="recentHeading"><div class="library-heading-row"><h2 class="library-heading" id="recentHeading">Recent</h2></div><div class="exercise-grid">${recent.map(exerciseCard).join('')}</div></section>` : ''}<section class="library-section" aria-labelledby="allHeading"><div class="library-heading-row"><h2 class="library-heading" id="allHeading">${recent.length ? 'All exercises' : 'Exercises'}</h2><button class="text-link" id="newExerciseLink" type="button">+ New exercise</button></div><div class="exercise-grid">${rest.map(exerciseCard).join('')}</div></section>` : `<div class="exercise-grid"><div class="empty"><strong>No movements found</strong>Try a broader name or clear one of the filters.</div></div>`;
       document.querySelectorAll('.exercise-card').forEach(btn => btn.addEventListener('click', () => openExercise(btn.dataset.id)));
+      $('#newExerciseLink')?.addEventListener('click', () => openCustomDialog());
     }
 
     

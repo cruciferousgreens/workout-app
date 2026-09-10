@@ -37,7 +37,7 @@ Newest first. Dates are release dates (America/New_York).
 - Took over the code directly (`staging/` is now the source of truth) so saving actually works.
 - **Durable localStorage persistence** (`workout-app:v1`): completed workouts, templates, set tags, exercise-tag presets, active/archived programs, the in-progress draft, custom exercises, progression defaults, and dashboard/stats periods all survive reloads. Auto-saves on every change, plus a 5-second safety flush and a page-hide flush.
 - **Sample data removed entirely.** No more seeded workouts or templates.
-- **New Settings tab** (sixth nav tab): dark mode toggle (moved out of the header), progression defaults (RPE threshold, load step type/value, default rep range, time step, stall detector), data tools (one-tap JSON export, two-step delete-all), attributions, and about.
+- **New Settings page** (gear in the top bar): dark mode toggle (moved out of the header), progression defaults (RPE threshold, load step type/value, default rep range, time step, stall detector), data tools (one-tap JSON export, two-step delete-all), attributions, and about.
 - **Templates moved** out of the Program tab into a collapsed “From template” list under Start training.
 - **Continue-program option** on the Training screen when a program is active.
 - **Anatomical heat map restored** (Sasha-style front/back SVG) everywhere; the minimal abstract map is gone.
