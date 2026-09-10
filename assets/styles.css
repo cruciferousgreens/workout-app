@@ -630,9 +630,18 @@
     .reps-only-toggle { min-height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 800; white-space: nowrap; }
     .reps-only-toggle[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .load-progression.is-disabled select, .load-progression.is-disabled input { opacity: .45; pointer-events: none; }
-    /* Prototype (2026-09-10): legend labels integrated into the field border on builder cards. */
-    .exercise-rule-accordion .rule-field { position: relative; display: block; margin-top: 10px; }
-    .exercise-rule-accordion .rule-field > span { position: absolute; top: -6px; left: 8px; z-index: 1; padding: 0 5px; background: var(--surface); border-radius: 4px; line-height: 1.3; }
+    /* Integrated legend labels (2026-09-10, Justin: one consistent field-label language app-wide).
+       The tiny label notches into the field's top border instead of floating above it. */
+    .rule-field { position: relative; display: block; margin-top: 10px; }
+    .rule-field > span { position: absolute; top: -6px; left: 8px; z-index: 1; padding: 0 5px; background: var(--surface); border-radius: 4px; line-height: 1.3; }
+    .field { position: relative; display: block; margin-top: 10px; }
+    .field > label { position: absolute; top: -6px; left: 8px; z-index: 1; padding: 0 5px; background: var(--bg); border-radius: 4px; line-height: 1.3; }
+    .field select { margin-top: 0; }
+    .progression-setup .field > label { background: var(--surface-raised); }
+    .custom-dialog .field > label { background: var(--surface); }
+    .filter-group > label { position: absolute; top: -6px; left: 8px; z-index: 1; padding: 0 5px; background: var(--bg); border-radius: 4px; line-height: 1.3; }
+    .filter-group:has(> label) { position: relative; margin-top: 10px; }
+    .filter-group > label + select { margin-top: 0; }
     @media (max-width: 700px) {
       .exercise-rule-controls { grid-template-columns: 1fr 1fr 1fr; }
       .load-progression { grid-column: 1 / -1; }
