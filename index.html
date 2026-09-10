@@ -126,6 +126,10 @@
             <p class="lede">Keep an ordered training block ready to run.</p>
           </div>
         </div>
+        <section class="dashboard-card built-in-programs" aria-labelledby="builtInProgramsTitle">
+          <div class="section-head"><h2 id="builtInProgramsTitle">Built-in programs</h2><p class="section-note">Always available</p></div>
+          <div id="builtInProgramList"></div>
+        </section>
         <div id="programSetup" class="program-setup">
           <h2>Create your active program.</h2>
           <p>Give the block a name, length, and a short focus. You can add its workouts in order next.</p>
@@ -313,6 +317,20 @@
       </div>
     </dialog>
 
+    <dialog class="custom-dialog tag-dialog" id="exerciseTagsDialog" aria-labelledby="exerciseTagsTitle">
+      <div class="custom-form">
+        <div class="custom-form-head">
+          <div><h2 id="exerciseTagsTitle">Exercise tags</h2><p>These labels stay with this exercise in the live workout and its history.</p></div>
+          <button class="dialog-close" id="closeExerciseTags" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="tag-picker-options" id="exerciseTagPickerOptions" role="group" aria-label="Exercise tags"></div>
+        <div class="tag-list-editor">
+          <div class="tag-editor"><label class="sr-only" for="newExerciseTagInput">New exercise tag</label><input id="newExerciseTagInput" type="text" autocomplete="off" placeholder="Add a custom exercise tag"><button class="secondary-button" id="addExerciseTagButton" type="button">Add</button></div>
+        </div>
+        <div class="form-actions"><button class="form-action primary" id="doneExerciseTags" type="button">Done</button></div>
+      </div>
+    </dialog>
+
     <dialog class="custom-dialog tag-dialog" id="supersetDialog" aria-labelledby="supersetTitle">
       <div class="custom-form">
         <div class="custom-form-head">
@@ -353,6 +371,23 @@
   </div>
 
   <script src="data/exercises-db.js"></script>
-  <script src="assets/app.js"></script>
+  <script src="assets/js/catalog.js"></script>
+<script src="assets/js/utilities.js"></script>
+<script src="assets/js/sample-data.js"></script>
+<script src="assets/js/program-templates.js"></script>
+<script src="assets/js/state.js"></script>
+<script src="assets/js/exercise-library.js"></script>
+<script src="assets/js/exercise-detail.js"></script>
+<script src="assets/js/navigation.js"></script>
+<script src="assets/js/workout-editor.js"></script>
+<script src="assets/js/progression.js"></script>
+<script src="assets/js/supersets.js"></script>
+<script src="assets/js/workout-builder.js"></script>
+<script src="assets/js/set-tags.js"></script>
+<script src="assets/js/workout-history.js"></script>
+<script src="assets/js/dashboard-stats.js"></script>
+<script src="assets/js/programs.js"></script>
+<script src="assets/js/custom-exercises.js"></script>
+<script src="assets/js/app-bootstrap.js"></script>
 </body>
 </html>
