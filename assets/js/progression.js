@@ -3,10 +3,12 @@
     function topSetForSession(session) {
       if (!session?.sets?.length) return null;
       const mode=session.tracking==='time'||session.sets.some(set=>set.seconds!=null)?'time':'reps';
-      return session.sets.reduce((best,set,index) => {
+      const failureSets=session.sets.filter(set=>(set.tags||[]).some(tag=>tag.toLowerCase()==='to failure'));
+      const candidates=failureSets.length?failureSets:session.sets;
+      return candidates.reduce((best,set,index) => {
         const weight=Number(set.w)||0, reps=Number(set.r)||0, seconds=Number(set.seconds)||0;
         const performance=mode==='time'?seconds:reps;
-        if(!best || weight>best.weight || (weight===best.weight && performance>best.performance)) return {weight,reps,seconds,performance,mode,rpe:set.rpe==null?null:Number(set.rpe),index};
+        if(!best || weight>best.weight || (weight===best.weight && performance>best.performance)) return {weight,reps,seconds,performance,mode,rpe:set.rpe==null?null:Number(set.rpe),index,toFailure:failureSets.length>0};
         return best;
       },null);
     }
@@ -33,7 +35,9 @@
           if(latest.seconds<timeMax){nextSeconds=Math.min(timeMax,Math.max(timeMin,latest.seconds+timeStep));kind='time';reason=`Top set was at or below RPE ${threshold}; add ${timeStep} seconds inside the ${timeMin}–${timeMax}s range.`;}
           else if(repsOnly){kind='hold';reason=`Time ceiling reached. Load progression is off, so hold ${timeMax} seconds.`;}
           else{nextWeight=roundedIncrement(latest.weight,incrementType,incrementValue);nextSeconds=timeMin;kind='load';reason=`Time ceiling reached at RPE ${latest.rpe}; add ${incrementType==='percent'?`${incrementValue}%`:`${incrementValue} lb`} and reset to ${timeMin} seconds.`;}
-        } else if(latest.reps<max){nextReps=Math.max(min,latest.reps+1);kind='reps';reason=`Top set was at or below RPE ${threshold}; add one rep inside the ${min}–${max} range.`;}
+        } else if(profile?.amrap){nextReps=Math.max(min,latest.reps);kind='hold';reason=`AMRAP target: keep the load and stop when the set reaches the program effort target.`;}
+        else if(profile?.openTop){nextReps=Math.max(min,latest.reps+1);kind='reps';reason=`Open-ended range: add one rep while the top set stays at or below RPE ${threshold}.`;}
+        else if(latest.reps<max){nextReps=Math.max(min,latest.reps+1);kind='reps';reason=`Top set was at or below RPE ${threshold}; add one rep inside the ${min}–${max} range.`;}
         else if(repsOnly){kind='hold';reason=`Rep ceiling reached. Load progression is off, so hold ${latest.weight||0} lb.`;}
         else{nextWeight=roundedIncrement(latest.weight,incrementType,incrementValue);nextReps=min;kind='load';reason=`Rep ceiling reached at RPE ${latest.rpe}; add ${incrementType==='percent'?`${incrementValue}%`:`${incrementValue} lb`} and reset to ${min} reps.`;}
       } else if(latest.rpe==null){reason='No RPE on the latest top set, so the engine holds the target.';}
@@ -72,7 +76,8 @@
 
     function progressionProfileForDraftItem(item) {
       const ex=exercises.find(row=>row.id===item.exerciseId),mode=exerciseTracking(item,ex);
-      return item.progression || sampleProgressionProfiles[item.exerciseId] || {mode,min:5,max:8,timeMin:30,timeMax:60,timeStep:5,incrementType:workoutState.activeProgram?.progression?.incrementType||'lb',incrementValue:workoutState.activeProgram?.progression?.incrementValue||5,repsOnly:false};
+      const config=workoutState.activeProgram?.progression||progressionSetup,range=config.defaultRange||progressionSetup.defaultRange;
+      return item.progression || {mode,min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:config.timeStep||5,incrementType:config.incrementType||'lb',incrementValue:config.incrementValue||5,repsOnly:false};
     }
 
     function prepareDraftProgression(draft,programConfig) {

@@ -48,11 +48,12 @@
       $('#historyList').innerHTML = logs.length ? logs.map(session => {
         const top = Math.round(Math.max(...session.sets.map(estimate1RM)));
         return `<div class="history-session">
-          <div class="session-head"><span class="session-date">${escapeHtml(session.date)} ${session.sample ? '<span class="sample-label">Sample</span>' : ''}</span><span class="session-est">${session.sample ? 'Illustrative estimate' : `Best estimate ${top} lb`}</span></div>
+          <div class="session-head"><span class="session-date">${escapeHtml(session.date)} ${session.sample ? '<span class="sample-label">Sample</span>' : ''}</span><span class="session-est">${session.sample ? 'Illustrative estimate' : `Best estimate ${top} lb`} · <button class="filter-clear" type="button" data-history-workout="${escapeHtml(session.workoutId)}">View workout</button></span></div>
           ${session.exerciseTags?.length?`<div class="exercise-tag-row">${session.exerciseTags.map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}</div>`:''}
           <div class="sets">${session.sets.map((s,i) => `<div class="set-row"><span class="set-num">SET ${i+1}</span><span class="set-cell"><strong>${s.w ?? '—'}</strong>${s.w == null ? '' : ' lb'}</span><span class="set-cell"><strong>${session.tracking === 'time' ? (s.seconds ?? '—') : s.r}</strong> ${session.tracking === 'time' ? 'sec' : 'reps'}</span><span class="set-cell">${s.rpe == null ? '—' : `RPE <strong>${s.rpe}</strong>`}${s.tags?.length ? `<br><small>${s.tags.map(escapeHtml).join(' · ')}</small>` : ''}</span></div>`).join('')}</div>
         </div>`;
       }).join('') : `<div class="history-empty">No history for this movement yet.</div>`;
+      document.querySelectorAll('[data-history-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=workoutState.completed.find(row=>row.id===button.dataset.historyWorkout);if(workout){showWorkouts();renderCompletedWorkout(workout);}}));
       $('#formulaNote').textContent = logs.length ? 'Real workouts replace sample-derived PRs automatically. Sample values stay separate, remain labeled, and disappear when sample data is cleared.' : '';
     }
 

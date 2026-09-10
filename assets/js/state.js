@@ -6,7 +6,7 @@
       draft: null,
       completed: initialSampleWorkouts,
       templates: strongLiftsWorkoutTemplates.map(template=>({...template,exercises:template.exercises.map(item=>({...item,exerciseTags:[...(item.exerciseTags||[])],progression:{...item.progression},sets:item.sets.map(set=>({...set,tags:[...(set.tags||[])]}))}))})),
-      tags: ['Warmup','Dropset','Full ROM','Slow and controlled','Cheat set','Paused','Assisted'],
+      tags: ['Warmup','Dropset','Full ROM','Slow and controlled','Cheat set','Paused','Assisted','To failure'],
       exerciseTagPresets: ['Main lift','Accessory','Unilateral','Straight sets','Tempo','Technique','Rehab'],
       tagTarget: null,
       exerciseTagTarget: null,
@@ -16,7 +16,7 @@
       activeProgram: null,
       archivedPrograms: [sampleHistoricalProgram]
     };
-    const progressionSetup = { threshold:8, incrementType:'lb', incrementValue:5, treatment:'suggestions', stallDetection:true };
+    const progressionSetup = { threshold:8, incrementType:'lb', incrementValue:5, timeStep:5, treatment:'suggestions', stallDetection:true, defaultRange:{preset:'hypertrophy',min:6,max:12,openTop:false,amrap:false}, undulating:false, weeklyRanges:[] };
     const sampleProgressionProfiles = {
       'Barbell_Deadlift': {mode:'reps',min:2,max:4,incrementType:'lb',incrementValue:5,repsOnly:false},
       'Barbell_Bench_Press_-_Medium_Grip': {mode:'reps',min:5,max:8,incrementType:'lb',incrementValue:5,repsOnly:false},

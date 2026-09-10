@@ -48,11 +48,19 @@
     $('#progressionThreshold').addEventListener('input',e=>progressionSetup.threshold=Number(e.target.value)||8);
     $('#progressionIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;});
     $('#progressionIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Number(e.target.value)||5;});
+    $('#programTimeStep').addEventListener('input',e=>{progressionSetup.timeStep=Math.max(1,Number(e.target.value)||5);});
+    $('#programRepMin').addEventListener('input',e=>{progressionSetup.defaultRange.min=Math.max(1,Number(e.target.value)||1);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));});
+    $('#programRepMax').addEventListener('input',e=>{progressionSetup.defaultRange.max=Math.max(progressionSetup.defaultRange.min,Number(e.target.value)||progressionSetup.defaultRange.min);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));});
+    document.querySelectorAll('[data-rep-preset]').forEach(button=>button.addEventListener('click',()=>applyRepPreset(button.dataset.repPreset)));
+    $('#undulatingToggle').addEventListener('click',()=>{progressionSetup.undulating=!progressionSetup.undulating;$('#undulatingToggle').setAttribute('aria-pressed',String(progressionSetup.undulating));$('#undulatingToggle').setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);renderWeekRanges();});
+    $('#programLength').addEventListener('input',renderWeekRanges);
+    $('#manageProgramOverrides').addEventListener('click',()=>{if(workoutState.activeProgram){$('#programSetup').hidden=true;document.querySelector('#programWorkouts')?.scrollIntoView({behavior:'smooth'});}else{$('#programError').textContent='Create the program first, then edit overrides inside each workout.';}});
     document.querySelectorAll('[data-treatment]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.treatment=button.dataset.treatment;document.querySelectorAll('[data-treatment]').forEach(row=>row.setAttribute('aria-pressed',String(row===button)));}));
     $('#stallDetectorToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;$('#stallDetectorToggle').setAttribute('aria-pressed',String(progressionSetup.stallDetection));$('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);});
     $('#createProgram').addEventListener('click', createProgram);
     $('#startBlankWorkout').addEventListener('click', () => startBlankWorkout());
     $('#startSavedWorkout').addEventListener('click', () => { renderSavedWorkouts(); $('#savedWorkoutDialog').showModal(); });
+    $('#repeatLastWorkout').addEventListener('click',()=>repeatWorkout(workoutState.completed.find(workout=>!workout.sample)));
     $('#closeSavedWorkout').addEventListener('click', () => $('#savedWorkoutDialog').close());
     $('#savedStartBlank').addEventListener('click', () => { $('#savedWorkoutDialog').close(); startBlankWorkout(); });
     $('#addWorkoutExercise').addEventListener('click', () => {

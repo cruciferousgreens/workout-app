@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#f6f7f4" />
+  <meta name="theme-color" content="#faf4ed" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -83,11 +83,12 @@
           </div>
         </div>
         <div id="workoutStart" class="workout-start">
-          <h2>Ready when you are.</h2>
-          <p>Begin with an empty workout and add movements as you go. Saved workouts will appear here once you create them.</p>
-          <div class="start-actions">
-            <button class="primary-button" id="startBlankWorkout" type="button">Start blank workout</button>
-            <button class="secondary-button" id="startSavedWorkout" type="button">Start saved workout</button>
+          <h2>Start training.</h2>
+          <p>Choose a clean starting point. Any completed workout can also be repeated from its detail view.</p>
+          <div class="workout-start-options">
+            <button class="start-option primary" id="startBlankWorkout" type="button"><strong>Blank workout</strong><span>Add exercises and set targets as you go.</span></button>
+            <button class="start-option" id="startSavedWorkout" type="button"><strong>From template</strong><span>Use a saved or built-in workout.</span></button>
+            <button class="start-option" id="repeatLastWorkout" type="button"><strong>Repeat last</strong><span>Copy your latest completed workout into a new session.</span></button>
           </div>
         </div>
         <div id="workoutEditor" hidden>
@@ -138,17 +139,27 @@
             <div class="field"><label for="programLength">LENGTH (WEEKS)</label><input id="programLength" type="number" inputmode="numeric" min="1" max="52" value="8" aria-label="Program length in weeks" /></div>
             <div class="field wide"><label for="programFocus">FOCUS / NOTES</label><textarea id="programFocus" placeholder="What this block is meant to build"></textarea></div>
           </div>
-          <div class="progression-setup" aria-labelledby="progressionSetupTitle">
-            <h3 id="progressionSetupTitle">Progression rules</h3>
-            <p>Defaults for this program. Each exercise can use a rep range or a time range with its own step and optional load progression.</p>
-            <div class="progression-fields">
-              <div class="field"><label for="progressionThreshold">TOP-SET RPE TRIGGER</label><input id="progressionThreshold" type="number" inputmode="decimal" min="1" max="10" step="0.5" value="8"></div>
-              <div class="field"><label for="progressionIncrementType">LOAD STEP TYPE</label><select id="progressionIncrementType"><option value="lb">Pounds</option><option value="percent">Percent</option></select></div>
-              <div class="field"><label for="progressionIncrementValue">LOAD STEP VALUE</label><input id="progressionIncrementValue" type="number" inputmode="decimal" min="0.5" step="0.5" value="5"></div>
-              <div class="progression-choice"><span class="filter-label">NEXT-SESSION SUGGESTIONS</span><p class="field-help">Targets appear as cards you can tap to apply. Nothing changes until you choose a suggestion.</p></div>
-              <div class="switch-row"><span class="switch-copy"><strong>Stall detector</strong><span>After 2–3 flat sessions with rising RPE, suggest scheduling a deload week. Never schedules one automatically.</span></span><button class="switch" id="stallDetectorToggle" type="button" role="switch" aria-pressed="true" aria-label="Stall detector on"></button></div>
-            </div>
+          <div class="field wide">
+            <span class="filter-label">DEFAULT REP RANGE</span>
+            <div class="rep-preset-row" id="programRepPresets"><button class="rep-preset" type="button" data-rep-preset="strength" aria-pressed="false">Strength · 1–5</button><button class="rep-preset" type="button" data-rep-preset="hypertrophy" aria-pressed="true">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-rep-preset="endurance" aria-pressed="false">Endurance · 12–20</button><button class="rep-preset" type="button" data-rep-preset="open" aria-pressed="false">15+</button><button class="rep-preset" type="button" data-rep-preset="amrap" aria-pressed="false">AMRAP</button></div>
+            <div class="range-fields"><div class="field"><label for="programRepMin">MIN REPS</label><input id="programRepMin" type="number" min="1" value="6"></div><div class="field"><label for="programRepMax">MAX REPS</label><input id="programRepMax" type="number" min="1" value="12"></div><div class="field"><label for="programTimeStep">TIME STEP</label><input id="programTimeStep" type="number" min="1" value="5" aria-label="Default seconds added for timed exercises"></div></div>
           </div>
+          <div class="switch-row wide"><span class="switch-copy"><strong>Vary rep ranges by week</strong><span>Optional undulating periodization. Each program week can inherit its own range.</span></span><button class="switch" id="undulatingToggle" type="button" role="switch" aria-pressed="false" aria-label="Vary rep ranges by week off"></button></div>
+          <div class="undulating-panel wide" id="undulatingPanel" hidden><span class="filter-label">WEEKLY REP RANGE</span><div class="week-range-list" id="weekRangeList"></div></div>
+          <details class="program-rules wide">
+            <summary id="progressionSetupTitle">Progression rules</summary>
+            <div class="progression-setup" aria-labelledby="progressionSetupTitle">
+              <p>Defaults for this program. Exercise-level overrides remain editable inside each workout.</p>
+              <div class="progression-fields">
+                <div class="field"><label for="progressionThreshold">TOP-SET RPE TRIGGER</label><input id="progressionThreshold" type="number" inputmode="decimal" min="1" max="10" step="0.5" value="8"></div>
+                <div class="field"><label for="progressionIncrementType">LOAD STEP TYPE</label><select id="progressionIncrementType"><option value="lb">Pounds</option><option value="percent">Percent</option></select></div>
+                <div class="field"><label for="progressionIncrementValue">LOAD STEP VALUE</label><input id="progressionIncrementValue" type="number" inputmode="decimal" min="0.5" step="0.5" value="5"></div>
+                <div class="progression-choice"><span class="filter-label">NEXT-SESSION SUGGESTIONS</span><p class="field-help">Targets appear as cards you can tap to apply. Nothing changes until you choose a suggestion.</p></div>
+                <div class="switch-row"><span class="switch-copy"><strong>Stall detector</strong><span>Suggest a separate deload week after repeated flat sessions with rising RPE. Never changes the program automatically.</span></span><button class="switch" id="stallDetectorToggle" type="button" role="switch" aria-pressed="true" aria-label="Stall detector on"></button></div>
+                <button class="small-button" id="manageProgramOverrides" type="button">Manage exercise overrides in workouts</button>
+              </div>
+            </div>
+          </details>
           <p class="form-error" id="programError" role="alert"></p>
           <button class="primary-button" id="createProgram" type="button">Create active program</button>
           <p class="session-note">Program edits are kept while this preview remains open.</p>
@@ -162,7 +173,7 @@
         <div class="period-tabs" id="statsPeriodTabs" aria-label="Stats period"></div>
         <div class="stats-sample-note" id="statsSampleNote"><span><strong>Sample</strong> workouts power the demo views and labeled sample-derived PRs. They never affect real progression.</span><button class="clear-sample-data" type="button">Clear sample data</button></div>
         <div class="stats-grid" id="statsGrid"></div>
-        <section class="dashboard-card"><div class="section-head"><h2>Muscle heat map</h2><p class="section-note" id="muscleHeatmapNote">Training volume by primary muscle</p></div><div id="muscleHeatmap"></div><div id="muscleStats"></div></section>
+        <section class="dashboard-card minimal-map"><div class="section-head"><h2>Muscle map</h2><p class="section-note" id="muscleHeatmapNote">Training volume by primary muscle</p></div><div id="muscleHeatmap"></div><div id="muscleStats"></div></section>
         <div class="muscle-analysis-grid">
           <section class="analysis-panel"><h2>Volume by muscle</h2><p>Weighted volume. Secondary muscles receive 45% of the set’s volume.</p><div class="muscle-volume-list" id="muscleVolumeBreakdown"></div></section>
           <section class="analysis-panel"><h2>Training balance</h2><p>Share of muscle volume across push, pull, lower body, and core.</p><div class="balance-list" id="muscleBalance"></div></section>

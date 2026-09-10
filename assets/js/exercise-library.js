@@ -19,12 +19,11 @@
     }
 
     function filteredExercises() {
-      const q = normalize(state.query);
-      return exercises.filter(x => {
-        const haystack = normalize([x.name, x.id, x.primary.join(' '), x.secondary.join(' '), x.equipment].join(' '));
+      const ranked = state.query ? rankedExerciseMatches(state.query, exercises.length) : exercises;
+      return ranked.filter(x => {
         const allMuscles = [...x.primary, ...x.secondary];
         const muscleMatch = !state.muscles.size || [...state.muscles].every(muscle => allMuscles.includes(muscle));
-        return (!q || haystack.includes(q)) && muscleMatch && (!state.equipment || x.equipment === state.equipment);
+        return muscleMatch && (!state.equipment || x.equipment === state.equipment);
       });
     }
 
@@ -40,7 +39,7 @@
     function getExerciseLogs(id, includeSamples = true) {
       return workoutState.completed.filter(workout => includeSamples || !workout.sample).flatMap(workout => workout.exercises
         .filter(item => item.exerciseId === id)
-        .map(item => ({date: formatLogDate(workout.date), isoDate:workout.date, tracking:item.tracking || (item.sets.some(set => set.seconds != null) ? 'time' : 'reps'), exerciseTags:[...(item.exerciseTags||[])], sets:item.sets.map(set => ({w:set.w,r:set.r,seconds:set.seconds,rpe:set.rpe,tags:[...(set.tags || [])]})), name:workout.name, sample:!!workout.sample})));
+        .map(item => ({workoutId:workout.id,date: formatLogDate(workout.date), isoDate:workout.date, tracking:item.tracking || (item.sets.some(set => set.seconds != null) ? 'time' : 'reps'), exerciseTags:[...(item.exerciseTags||[])], sets:item.sets.map(set => ({w:set.w,r:set.r,seconds:set.seconds,rpe:set.rpe,tags:[...(set.tags || [])]})), name:workout.name, sample:!!workout.sample})));
     }
 
     function recentExerciseIds() {
@@ -60,7 +59,8 @@
       const recent = filtered ? [] : recentIds.map(id => rows.find(x => x.id === id)).filter(Boolean);
       const recentSet = new Set(recent.map(x => x.id));
       const rest = rows.filter(x => !recentSet.has(x.id));
-      $('#resultCount').innerHTML = `${rows.length} of ${exercises.length} movements${state.query ? ` matching <span class="active-query">“${escapeHtml(state.query)}”</span>` : ''}`;
+      const exactQuery=normalize(state.query),hasLiteral=!state.query||rows.some(x=>normalize([x.name,x.id].join(' ')).includes(exactQuery));
+      $('#resultCount').innerHTML = `${rows.length} of ${exercises.length} movements${state.query ? ` ${hasLiteral?'matching':'closest to'} <span class="active-query">“${escapeHtml(state.query)}”</span>` : ''}`;
       $('#exerciseResults').innerHTML = rows.length ? `${recent.length ? `<section class="library-section" aria-labelledby="recentHeading"><h2 class="library-heading" id="recentHeading">Recent</h2><div class="exercise-grid">${recent.map(exerciseCard).join('')}</div></section>` : ''}<section class="library-section" aria-labelledby="allHeading"><h2 class="library-heading" id="allHeading">${recent.length ? 'All exercises' : 'Exercises'}</h2><div class="exercise-grid">${rest.map(exerciseCard).join('')}</div></section>` : `<div class="exercise-grid"><div class="empty"><strong>No movements found</strong>Try a broader name or clear one of the filters.</div></div>`;
       document.querySelectorAll('.exercise-card').forEach(btn => btn.addEventListener('click', () => openExercise(btn.dataset.id)));
     }

@@ -31,7 +31,7 @@
       length:12,
       focus:'Alternating full-body strength sessions three days per week.',
       schedule:'A / B / A, then B / A / B',
-      progression:{threshold:8,incrementType:'lb',incrementValue:5,treatment:'suggestions',stallDetection:true},
+      progression:{threshold:8,incrementType:'lb',incrementValue:5,timeStep:5,treatment:'suggestions',stallDetection:true,defaultRange:{preset:'strength',min:1,max:5,openTop:false,amrap:false},undulating:false,weeklyRanges:[]},
       workouts:[
         {uid:'builtin-sl-a',name:'Workout A',template:{name:'Workout A',exercises:strongLiftsWorkoutTemplates[0].exercises}},
         {uid:'builtin-sl-b',name:'Workout B',template:{name:'Workout B',exercises:strongLiftsWorkoutTemplates[1].exercises}}
@@ -53,7 +53,7 @@
       focus:'A completed four-week example program for testing program history and audit views.',
       startedAt:historicalProgramLogs.at(-1)?.date || localIsoDate(),
       archivedAt:historicalProgramLogs[0]?.date || localIsoDate(),
-      progression:{threshold:8,incrementType:'lb',incrementValue:5,treatment:'suggestions',stallDetection:true},
+      progression:{threshold:8,incrementType:'lb',incrementValue:5,timeStep:5,treatment:'suggestions',stallDetection:true,defaultRange:{preset:'hypertrophy',min:6,max:12,openTop:false,amrap:false},undulating:false,weeklyRanges:[]},
       workouts:[
         {uid:'sample-upper-a',name:'Upper A'}, {uid:'sample-lower-a',name:'Lower A'},
         {uid:'sample-upper-b',name:'Upper B'}, {uid:'sample-lower-b',name:'Lower B'}
