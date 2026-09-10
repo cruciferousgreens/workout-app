@@ -106,15 +106,30 @@
         ${front?`<ellipse class="body-region" data-muscle="shoulders" cx="37" cy="57" rx="11" ry="9"></ellipse><ellipse class="body-region" data-muscle="shoulders" cx="83" cy="57" rx="11" ry="9"></ellipse><path class="body-region" data-muscle="chest" d="M45 54 Q60 47 59 75 Q46 77 42 66Z"></path><path class="body-region" data-muscle="chest" d="M75 54 Q60 47 61 75 Q74 77 78 66Z"></path><rect class="body-region" data-muscle="biceps" x="29" y="70" width="9" height="30" rx="4"></rect><rect class="body-region" data-muscle="biceps" x="82" y="70" width="9" height="30" rx="4"></rect><rect class="body-region" data-muscle="forearms" x="25" y="101" width="8" height="28" rx="4"></rect><rect class="body-region" data-muscle="forearms" x="87" y="101" width="8" height="28" rx="4"></rect><rect class="body-region" data-muscle="abdominals" x="49" y="78" width="22" height="49" rx="8"></rect><path class="body-region" data-muscle="quadriceps" d="M44 139 Q57 135 57 170 L53 204 39 202Z"></path><path class="body-region" data-muscle="quadriceps" d="M76 139 Q63 135 63 170 L67 204 81 202Z"></path><path class="body-region" data-muscle="calves" d="M39 205 53 207 50 239 38 239Z"></path><path class="body-region" data-muscle="calves" d="M81 205 67 207 70 239 82 239Z"></path>`:`<path class="body-region" data-muscle="traps" d="M46 43 60 38 74 43 68 61 52 61Z"></path><path class="body-region" data-muscle="lats" d="M42 61 Q51 57 58 67 L54 108 40 116 35 78Z"></path><path class="body-region" data-muscle="lats" d="M78 61 Q69 57 62 67 L66 108 80 116 85 78Z"></path><rect class="body-region" data-muscle="triceps" x="29" y="69" width="9" height="31" rx="4"></rect><rect class="body-region" data-muscle="triceps" x="82" y="69" width="9" height="31" rx="4"></rect><rect class="body-region" data-muscle="lower back" x="47" y="99" width="26" height="30" rx="8"></rect><ellipse class="body-region" data-muscle="glutes" cx="49" cy="143" rx="12" ry="13"></ellipse><ellipse class="body-region" data-muscle="glutes" cx="71" cy="143" rx="12" ry="13"></ellipse><path class="body-region" data-muscle="hamstrings" d="M41 157 Q53 153 57 163 L53 203 39 201Z"></path><path class="body-region" data-muscle="hamstrings" d="M79 157 Q67 153 63 163 L67 203 81 201Z"></path><path class="body-region" data-muscle="calves" d="M39 205 53 207 50 239 38 239Z"></path><path class="body-region" data-muscle="calves" d="M81 205 67 207 70 239 82 239Z"></path>`}
       </svg><figcaption>${front?'Front':'Back'}</figcaption></figure>`;
     }
+    function abstractBodyMapSvg() {
+      return `<figure class="abstract-body-figure"><svg viewBox="0 0 150 250" role="img" aria-label="Abstract body showing training volume by broad muscle group">
+        <circle class="body-silhouette" cx="75" cy="24" r="15"></circle>
+        <path class="body-region" data-muscle-group="shoulders|chest|triceps" data-group-label="Upper push" d="M49 48 Q75 36 101 48 L112 76 97 94 91 75 88 100 62 100 59 75 53 94 38 76Z"></path>
+        <path class="body-region" data-muscle-group="lats|middle back|traps|biceps|forearms" data-group-label="Upper pull" d="M42 79 55 66 62 102 54 134 38 126 30 93Z M108 79 95 66 88 102 96 134 112 126 120 93Z"></path>
+        <path class="body-region" data-muscle-group="abdominals|lower back" data-group-label="Core" d="M62 102 Q75 108 88 102 L91 139 Q75 151 59 139Z"></path>
+        <path class="body-region" data-muscle-group="glutes|adductors|abductors" data-group-label="Hips" d="M58 141 Q75 148 92 141 L94 166 75 176 56 166Z"></path>
+        <path class="body-region" data-muscle-group="quadriceps|hamstrings" data-group-label="Thighs" d="M57 166 73 176 68 216 48 215Z M93 166 77 176 82 216 102 215Z"></path>
+        <path class="body-region" data-muscle-group="calves" data-group-label="Calves" d="M48 217 68 218 65 244 50 244Z M102 217 82 218 85 244 100 244Z"></path>
+      </svg><figcaption>Broad training regions</figcaption></figure>`;
+    }
     function hydrateBodyMaps(){
       document.querySelectorAll('.anatomy-map[data-volumes]').forEach(host=>{
         if(host.dataset.hydrated)return;
         const volumes=JSON.parse(decodeURIComponent(host.dataset.volumes));
-        const max=Math.max(1,...Object.values(volumes));
-        host.querySelectorAll('[data-muscle]').forEach(region=>{
-          const muscle=region.dataset.muscle,value=Number(volumes[muscle]||0);
+        const regions=[...host.querySelectorAll('[data-muscle], [data-muscle-group]')];
+        const regionValue=region=>(region.dataset.muscleGroup||region.dataset.muscle||'').split('|').filter(Boolean).reduce((sum,muscle)=>sum+Number(volumes[muscle]||0),0);
+        const max=Math.max(1,...regions.map(regionValue));
+        regions.forEach(region=>{
+          const muscles=(region.dataset.muscleGroup||region.dataset.muscle||'').split('|').filter(Boolean);
+          const value=regionValue(region);
+          const label=region.dataset.groupLabel||titleCase(muscles[0]);
           region.classList.add(`heat-${heatLevel(value,max)}`);
-          const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=`${titleCase(muscle)} · ${formatVolume(value)}`;region.prepend(title);
+          const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=`${label} · ${formatVolume(value)}`;region.prepend(title);
         });
         host.dataset.hydrated='true';
       });
@@ -124,7 +139,8 @@
       if(!rows.length)return '<div class="chart-empty">No weighted training volume in this period.</div>';
       const max=Math.max(...rows.map(([,v])=>v)),shown=compact?rows.slice(0,4):rows;
       const encoded=encodeURIComponent(JSON.stringify(volumes));
-      return `<div class="heatmap-shell"><div class="anatomy-map" data-volumes="${encoded}"><div class="body-map-grid">${bodyMapSvg('front')}${bodyMapSvg('back')}</div></div><div><div class="heatmap-list">${shown.map(([muscle,value])=>`<div class="heatmap-row"><i class="heatmap-swatch heat-${heatLevel(value,max)}"></i><span>${escapeHtml(titleCase(muscle))}</span><strong>${formatVolume(value)}</strong></div>`).join('')}</div>${compact?'':`<div class="heatmap-legend"><span>Less</span><i class="heatmap-gradient"></i><span>More volume</span></div>`}</div></div>`;
+      const body=compact?`<div class="abstract-body-map">${abstractBodyMapSvg()}</div>`:`<div class="body-map-grid">${bodyMapSvg('front')}${bodyMapSvg('back')}</div>`;
+      return `<div class="heatmap-shell"><div class="anatomy-map" data-volumes="${encoded}">${body}</div><div><div class="heatmap-list">${shown.map(([muscle,value])=>`<div class="heatmap-row"><i class="heatmap-swatch heat-${heatLevel(value,max)}"></i><span>${escapeHtml(titleCase(muscle))}</span><strong>${formatVolume(value)}</strong></div>`).join('')}</div>${compact?'':`<div class="heatmap-legend"><span>Less</span><i class="heatmap-gradient"></i><span>More volume</span></div>`}</div></div>`;
     }
     function sampleWorkoutsPresent() { return workoutState.completed.some(workout=>workout.sample); }
     function clearSampleData() {

@@ -56,7 +56,6 @@
       document.querySelectorAll('#tagPickerOptions .form-pill').forEach(button => button.addEventListener('click', () => {
         const tag = button.dataset.tag;
         set.tags = set.tags.includes(tag) ? set.tags.filter(item => item !== tag) : [...set.tags, tag];
-        set.complete = false;
         renderTagDialog();
         renderWorkoutExercises();
         markDraftSaved();
@@ -64,7 +63,7 @@
       document.querySelectorAll('[data-delete-tag]').forEach(button => button.addEventListener('click', () => {
         const tag = button.dataset.deleteTag;
         workoutState.tags = workoutState.tags.filter(item => item !== tag);
-        workoutState.draft?.exercises.forEach(item => item.sets.forEach(row => { row.tags = row.tags.filter(value => value !== tag); row.complete = false; }));
+        workoutState.draft?.exercises.forEach(item => item.sets.forEach(row => { row.tags = row.tags.filter(value => value !== tag); }));
         renderTagDialog();
         renderWorkoutExercises();
         markDraftSaved();
@@ -79,7 +78,7 @@
       const target = workoutState.tagTarget;
       const set = target ? findDraftSet(target.exerciseUid, target.setUid) : null;
       const selected = existing || tag;
-      if (set && !set.tags.includes(selected)) { set.tags.push(selected); set.complete = false; }
+      if (set && !set.tags.includes(selected)) set.tags.push(selected);
       $('#newTagInput').value = '';
       renderTagDialog();
       renderWorkoutExercises();
