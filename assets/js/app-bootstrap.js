@@ -1,5 +1,11 @@
 
     /** Connects static controls to feature modules and performs initial rendering. */
+    window.addEventListener('load', () => {
+      if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      }
+    });
+
     function applyTheme(theme) {
       const dark=theme==='dark';document.documentElement.dataset.theme=dark?'dark':'light';
       $('#themeToggle').setAttribute('aria-pressed',String(dark));$('#themeToggle').setAttribute('aria-label',`Switch to ${dark?'light':'dark'} theme`);$('#themeToggleLabel').textContent=dark?'Light':'Dark';
