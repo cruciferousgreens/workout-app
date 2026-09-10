@@ -103,6 +103,16 @@
       const progressionContext={...program.progression,currentWeek:programWeek(program)};
       prepareDraftProgression(workoutState.draft,progressionContext);
       workoutState.draft.progressionSuggestions.forEach(suggestion=>applyProgressionSuggestion(workoutState.draft,suggestion,false));
+      // Exercises with no completed history get the program rep/time range as a ghosted
+      // hint rather than a prefilled value.
+      workoutState.draft.exercises.forEach(item=>{
+        if(item.suggestedTarget)return;
+        const profile=item.progression||{}, isTime=item.tracking==='time';
+        const hint=isTime?String(profile.timeMin??''):String(profile.min??'');
+        if(!hint)return;
+        item.suggestedTarget={w:'',r:isTime?'':hint,seconds:isTime?hint:''};
+        item.sets.forEach(set=>{set.r='';set.seconds='';});
+      });
       schedulePersist();
       workoutState.draft.autoAppliedProgression=workoutState.draft.progressionSuggestions.length>0;
       renderWorkoutScreen();

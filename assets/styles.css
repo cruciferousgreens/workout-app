@@ -192,6 +192,13 @@
     .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
     .section h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
     .section-note { margin: 0; color: var(--muted); font-size: 12px; }
+    /* Exercise detail: stack section heads so notes never crowd the title on narrow screens. */
+    .detail .section-head { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .detail .chart-empty { min-height: 0; padding: 30px 18px; }
+    .detail .chart-wrap { min-height: 0; }
+    .detail .chart-card { margin-bottom: 28px; }
+    .history-list.is-empty { border-top: none; }
+    .detail .history-empty { background: none; border-radius: 0; padding: 6px 2px 0; font-size: 13px; }
     .history-list { border-top: 1px solid var(--line); }
     .history-session { padding: 15px 0; border-bottom: 1px solid var(--line); }
     .session-head { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
@@ -623,6 +630,9 @@
     .reps-only-toggle { min-height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 800; white-space: nowrap; }
     .reps-only-toggle[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .load-progression.is-disabled select, .load-progression.is-disabled input { opacity: .45; pointer-events: none; }
+    /* Prototype (2026-09-10): legend labels integrated into the field border on builder cards. */
+    .exercise-rule-accordion .rule-field { position: relative; display: block; margin-top: 10px; }
+    .exercise-rule-accordion .rule-field > span { position: absolute; top: -6px; left: 8px; z-index: 1; padding: 0 5px; background: var(--surface); border-radius: 4px; line-height: 1.3; }
     @media (max-width: 700px) {
       .exercise-rule-controls { grid-template-columns: 1fr 1fr 1fr; }
       .load-progression { grid-column: 1 / -1; }
@@ -1155,13 +1165,6 @@
       .workout-toolbar-actions { width: 100%; justify-content: stretch; }
       .workout-toolbar-actions button { flex: 1 1 140px; }
       .log-labels { display: none; }
-      .log-set { grid-template-columns: 34px minmax(0,1fr) minmax(0,1fr); gap: 8px; align-items: start; padding: 10px 8px; }
-      .log-set-number { grid-column: 1; grid-row: 1 / span 2; }
-      .weight-entry { grid-column: 2; grid-row: 1; }
-      .reps-input { grid-column: 3; grid-row: 1; }
-      .rpe-input { grid-column: 2; grid-row: 2; }
-      .set-actions { grid-column: 3; grid-row: 2; justify-content: flex-end; }
-      .selected-set-tags { grid-column: 2 / -1; }
       .progression-banner-head { flex-wrap: wrap; }
       .real-data-label { font-size: 8px; }
       .calendar-toolbar { gap: 12px; }

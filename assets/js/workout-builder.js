@@ -26,7 +26,7 @@
         return `<details class="exercise-rule-accordion" data-program-rule-id="${escapeHtml(item.exerciseId)}" data-rule-uid="${escapeHtml(item.uid||'')}" open>
           <summary class="exercise-rule-accordion-head"><span class="exercise-rule-accordion-title"><strong>${escapeHtml(ex?.name||'Exercise')}</strong><small>${setCount} set${setCount===1?'':'s'} · ${escapeHtml(rangeSummary)}</small></span><span class="exercise-accordion-chevron" aria-hidden="true">›</span></summary>
           <div class="exercise-rule-accordion-body"><div class="exercise-rule-row">
-          <div class="exercise-rule-head"><strong>${escapeHtml(ex?.name||'Exercise')}</strong><label class="rule-field set-count-field"><span>Sets</span><input type="number" inputmode="numeric" min="1" max="20" step="1" value="${setCount}" data-program-rule="setCount" aria-label="Number of sets for ${escapeHtml(ex?.name||'exercise')}"></label></div>
+          <div class="exercise-rule-head"><label class="rule-field set-count-field"><span>Sets</span><input type="number" inputmode="numeric" min="1" max="20" step="1" value="${setCount}" data-program-rule="setCount" aria-label="Number of sets for ${escapeHtml(ex?.name||'exercise')}"></label></div>
           <div class="exercise-rule-controls">
             <label class="rule-field"><span>Track</span><select data-program-rule="mode"><option value="reps" ${time?'':'selected'}>Reps</option><option value="time" ${time?'selected':''}>Seconds</option></select></label>
             <label class="rule-field"><span>${time?'Min sec':'Min reps'}</span><input type="number" min="1" value="${time?profile.timeMin:profile.min}" data-program-rule="${time?'timeMin':'min'}"></label>

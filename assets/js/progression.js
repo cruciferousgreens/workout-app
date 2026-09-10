@@ -90,7 +90,11 @@
     function applyProgressionSuggestion(draft,suggestion,rerender=true) {
       const item=draft?.exercises.find(row=>row.exerciseId===suggestion.exerciseId); if(!item)return;
       item.tracking=suggestion.mode;
-      item.sets.forEach(set=>{set.w=suggestion.nextWeight?String(suggestion.nextWeight):'';if(suggestion.mode==='time'){set.seconds=String(suggestion.nextSeconds);set.r='';}else{set.r=String(suggestion.nextReps);set.seconds='';}set.complete=false;});
+      item.sets.forEach(set=>{set.w='';set.r='';set.seconds='';set.complete=false;});
+      // Suggested targets are hints, not values: they render as true HTML placeholders
+      // (ghosted text, empty value, cleared on focus) and are saved only when a set is
+      // completed with its field untouched.
+      item.suggestedTarget={w:suggestion.nextWeight?String(suggestion.nextWeight):'',r:suggestion.mode==='time'?'':String(suggestion.nextReps),seconds:suggestion.mode==='time'?String(suggestion.nextSeconds):''};
       suggestion.applied=true;
       if(rerender){renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();}
     }
@@ -103,7 +107,7 @@
       if(!draft?.exercises?.length){box.hidden=true;return;}
       box.hidden=false;
       if(!suggestions.length){box.innerHTML=`<div class="progression-banner-head"><div><h3>No progression suggestions yet</h3><p>Suggestions appear for exercises in this workout once you have completed history.</p></div></div>`;return;}
-      box.innerHTML=`<div class="progression-banner-head"><div><h3>${draft.autoAppliedProgression?'Progression targets applied':'Suggestions for this workout'}</h3><p>${draft.autoAppliedProgression?'Targets below were filled from your most recent performance and this week’s rep range. Every field remains editable.':'Only exercises below with completed history appear. Tap a card to apply its target to every set.'}</p></div></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
+      box.innerHTML=`<div class="progression-banner-head"><div><h3>${draft.autoAppliedProgression?'Progression targets applied':'Suggestions for this workout'}</h3><p>${draft.autoAppliedProgression?'Targets below appear as ghosted hints in each set. Type to override — completing a set untouched saves the hinted value.':'Only exercises below with completed history appear. Tap a card to apply its target to every set.'}</p></div></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
       document.querySelectorAll('[data-real-suggestion]').forEach(button=>button.addEventListener('click',()=>applyProgressionSuggestion(draft,suggestions[Number(button.dataset.realSuggestion)])));
     }
 

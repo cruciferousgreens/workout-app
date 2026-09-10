@@ -63,7 +63,11 @@
     function renderWorkoutProgramSuggestion() {
       const host=$('#programStartSuggestion'),program=workoutState.activeProgram;
       if(!host)return;
-      if(!program){host.innerHTML='';return;}
+      if(!program){
+        host.innerHTML=`<div class="program-next-wrap"><button class="program-next-main" id="gotoProgramSetup" type="button"><span><span class="program-next-kicker">PROGRAM</span><strong>Next in program</strong><small>No active training block — set one up to train from it.</small></span><span class="program-next-arrow" aria-hidden="true">›</span></button></div>`;
+        host.querySelector('#gotoProgramSetup').addEventListener('click',()=>showProgram());
+        return;
+      }
       const ready=(program.workouts||[]).filter(workout=>workout.template?.exercises?.length);
       const next=suggestedProgramWorkout(program),week=programWeek(program),range=programRangeForWeek(program,week);
       if(!next){host.innerHTML=`<div class="program-next-wrap"><div class="program-next-main"><span><span class="program-next-kicker">ACTIVE PROGRAM · ${escapeHtml(program.name)}</span><strong>Set up your first workout</strong><small>Week ${week} · ${escapeHtml(programRangeLabel(range))}</small></span><span class="program-next-arrow" aria-hidden="true">›</span></div></div>`;host.querySelector('.program-next-main').addEventListener('click',()=>showProgram());return;}
@@ -156,6 +160,9 @@
         const isDumbbell = ex.equipment === 'dumbbell';
         const tracking = exerciseTracking(item, ex);
         const lastWeight = lastUsedWeight(item.exerciseId);
+        const target = item.suggestedTarget || {};
+        const weightHint = target.w || lastWeight || '';
+        const perfHint = tracking === 'time' ? (target.seconds || '') : (target.r || '');
         const lastSummary = lastSessionSetSummary(item.exerciseId);
         const grouped = item.supersetId && draft.exercises.filter(x => x.supersetId === item.supersetId).length > 1;
         const doneSets=item.sets.filter(set=>set.complete).length;
@@ -174,8 +181,8 @@
             <div>${item.sets.map((set,index) => `<div class="set-swipe" data-set-wrapper="${escapeHtml(set.uid)}">
               <div class="log-set ${set.complete ? 'is-complete' : ''}" data-set-uid="${escapeHtml(set.uid)}">
                 <button class="log-set-number ${set.tags.length ? 'has-tags' : ''}" type="button" data-tag-exercise-uid="${escapeHtml(item.uid)}" data-tag-set-uid="${escapeHtml(set.uid)}" aria-label="Choose tags for set ${index + 1}" aria-haspopup="dialog">${index + 1}</button>
-                <label class="weight-entry"><input class="log-input weight-input" data-field="w" data-placeholder-weight="${escapeHtml(lastWeight)}" type="number" min="0" step="0.5" inputmode="decimal" value="${escapeHtml(set.w)}" placeholder="${lastWeight?escapeHtml(lastWeight):(isBodyweight?'Optional':'Weight')}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : isDumbbell ? 'total dumbbell weight' : 'weight'} in pounds${lastWeight ? `; last used ${escapeHtml(lastWeight)}` : ''}" />${isDumbbell ? '<small class="weight-total-hint">Total</small>' : ''}</label>
-                <input class="log-input reps-input" data-field="${tracking === 'time' ? 'seconds' : 'r'}" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(tracking === 'time' ? (set.seconds ?? '') : (set.r ?? ''))}" placeholder="${tracking === 'time' ? 'Seconds' : 'Reps'}" aria-label="Set ${index + 1} ${tracking === 'time' ? 'seconds' : 'reps'}" />
+                <label class="weight-entry"><input class="log-input weight-input" data-field="w" data-placeholder-weight="${escapeHtml(weightHint)}" type="number" min="0" step="0.5" inputmode="decimal" value="${escapeHtml(set.w)}" placeholder="${weightHint?escapeHtml(weightHint):(isBodyweight?'Optional':'Weight')}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : isDumbbell ? 'total dumbbell weight' : 'weight'} in pounds${weightHint ? (target.w ? `; suggested ${escapeHtml(weightHint)}` : `; last used ${escapeHtml(weightHint)}`) : ''}" />${isDumbbell ? '<small class="weight-total-hint">Total</small>' : ''}</label>
+                <input class="log-input reps-input" data-field="${tracking === 'time' ? 'seconds' : 'r'}" data-placeholder-perf="${escapeHtml(perfHint)}" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(tracking === 'time' ? (set.seconds ?? '') : (set.r ?? ''))}" placeholder="${tracking === 'time' ? (perfHint || 'Seconds') : (perfHint || 'Reps')}" aria-label="Set ${index + 1} ${tracking === 'time' ? 'seconds' : 'reps'}${perfHint ? `; suggested ${escapeHtml(perfHint)}` : ''}" />
                 <input class="log-input rpe-input" data-field="rpe" type="number" min="1" max="10" step="0.5" inputmode="decimal" value="${escapeHtml(set.rpe)}" placeholder="RPE" aria-label="Set ${index + 1} optional RPE" />
                 <div class="set-actions">
                   <button class="complete-set" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-pressed="${set.complete}" aria-label="${set.complete ? 'Mark set incomplete' : 'Mark set complete'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
@@ -206,10 +213,17 @@
         const ex=exercises.find(row=>row.id===item?.exerciseId);
         const tracking=exerciseTracking(item,ex), weightOptional=ex?.equipment==='body only';
         if (!set) return;
-        const weightInput=button.closest('.log-set').querySelector('.weight-input');
+        const setRow=button.closest('.log-set');
+        const weightInput=setRow.querySelector('.weight-input');
+        const perfInput=setRow.querySelector('.reps-input');
+        const perfField=tracking==='time'?'seconds':'r';
         if (!set.complete && set.w === '' && weightInput?.dataset.placeholderWeight) {
           set.w=weightInput.dataset.placeholderWeight;
           weightInput.value=set.w;
+        }
+        if (!set.complete && (set[perfField]==null||set[perfField]==='') && perfInput?.dataset.placeholderPerf) {
+          set[perfField]=perfInput.dataset.placeholderPerf;
+          perfInput.value=set[perfField];
         }
         const performanceValue=tracking==='time'?set.seconds:set.r;
         if (!set.complete && ((!weightOptional && set.w === '') || performanceValue === '' || Number(set.w||0) < 0 || Number(performanceValue) < 1 || (set.rpe !== '' && (Number(set.rpe) < 1 || Number(set.rpe) > 10)))) {

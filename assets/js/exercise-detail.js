@@ -43,7 +43,8 @@
 
     function renderHistory(id) {
       const logs = getExerciseLogs(id);
-      $('#historyCount').textContent = logs.length ? `${logs.length} completed workout${logs.length===1?'':'s'}` : 'No completed workouts';
+      $('#historyCount').textContent = logs.length ? `${logs.length} completed workout${logs.length===1?'':'s'}` : '';
+      $('#historyList').classList.toggle('is-empty', !logs.length);
       $('#historyList').innerHTML = logs.length ? logs.map(session => {
         const top = Math.round(Math.max(...session.sets.map(estimate1RM)));
         return `<div class="history-session">
