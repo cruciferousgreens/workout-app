@@ -2,6 +2,20 @@
 
 Newest first. Dates are release dates (America/New_York).
 
+## 2026-09-10 — Nav fixes follow-up
+
+- **Sample-derived PRs are labeled.** “Recent PRs” on the dashboard now shows a “Sample” tag on any record that came from sample data, so demo numbers never masquerade as your real PRs.
+- **Exercise info from the live workout.** Each exercise card header now has a small “i” button that opens that exercise’s detail view (history, PRs, projected 1RM); Back returns you to the live workout exactly where you left off.
+- **Re-tap the Workout tab to go back.** Tapping the active Workout tab while reviewing a completed workout returns to the Training start screen; otherwise it just scrolls to top. A live draft is never disturbed.
+
+## 2026-09-10 — Navigation, live-state & sample data batch
+
+- **Smoother workout navigation.** The Training tab now switches atomically between exactly one of Start / Editor / Completed-workout panes — no more overlapping content, and leaving mid-workout and coming back restores the editor exactly (scroll position and open exercise cards preserved).
+- **Better Back buttons.** Exercise detail now remembers where you opened it from and takes you back there: a drill-down from a completed workout returns to that workout, from Stats returns to Stats, and so on. The Back button names its destination.
+- **Live-workout tab marker.** While a session is in progress, the Workout tab gets a rose tint and a dot badge so you can see at a glance that a draft is live.
+- **Sample data (opt-in).** Settings → Data now has “Add sample data” and “Clear sample data”. Adding creates 8 labeled sample workouts across the last ~3 weeks (push/pull/legs with progressive overload) so charts and lists can be explored; clearing removes only the sample workouts, never your real data. Sample rows are labeled “Sample” wherever they’re listed.
+- **Samples never drive progression.** The progression engine, exercise history, and suggestion cards use real completed history only. Sample workouts can still surface in record lists (e.g. Recent PRs), where they’re clearly labeled “Sample”.
+
 ## 2026-09-10 — Workout UI batch
 
 - **Nixed the plate calculator.** The Plate calculator button and dialog are gone from the workout builder.

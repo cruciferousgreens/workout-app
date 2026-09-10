@@ -70,7 +70,7 @@
 
     function renderProgressionPreview() {
       const host=$('#progressionPreview'); if(!host)return;
-      const ids=[...new Set(workoutState.completed.flatMap(workout=>workout.exercises.map(item=>item.exerciseId)))];
+      const ids=[...new Set(realWorkouts().flatMap(workout=>workout.exercises.map(item=>item.exerciseId)))];
       const suggestions=ids.map(id=>progressionForExercise(id,progressionProfileForDraftItem({exerciseId:id}),{...progressionSetup})).filter(Boolean).slice(0,4);
       const fallback='<div class="chart-empty">Complete workouts to generate progression targets.</div>';
       host.innerHTML=`<div class="progression-preview-head"><div><h2 id="progressionPreviewTitle">Next-session suggestions</h2><p>Based on your completed history. Rep- and time-range progression use the same RPE trigger.</p></div></div>${suggestions.length?`<div class="suggestion-list">${suggestions.map((item,i)=>suggestionCardMarkup(item,i,false)).join('')}</div>`:fallback}<p class="progression-footnote">The engine never schedules a deload automatically.</p>`;

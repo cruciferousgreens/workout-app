@@ -56,11 +56,18 @@
       $('#formulaNote').textContent = '';
     }
 
-    function openExercise(id, push = true) {
+    /** Opens the exercise detail. returnTo ({view, workoutId}) records where Back should go;
+     *  when omitted it is derived from the current tab (library, stats, dashboard, ...). */
+    function openExercise(id, push = true, returnTo) {
       const ex = exercises.find(x => x.id === id);
       if (!ex) return;
       rememberScroll();
       state.selected = id;
+      if (returnTo !== undefined) {
+        state.exerciseDetailReturn = returnTo;
+      } else if (state.activeView !== 'detail') {
+        state.exerciseDetailReturn = {view: state.activeView};
+      }
       $('#detailTitle').textContent = ex.name;
       $('#detailTags').innerHTML = [...ex.primary.map(x => `<span class="tag primary">${escapeHtml(x)}</span>`), ...ex.secondary.map(x => `<span class="tag">${escapeHtml(x)}</span>`), `<span class="tag">${escapeHtml(ex.equipment || 'no equipment')}</span>`, ...(ex.custom ? ['<span class="tag custom">Custom</span>'] : [])].join('');
       $('#sourceId').innerHTML = ex.custom ? 'Created in this session' : `Source record <strong>${escapeHtml(ex.id)}</strong><br><a href="${SOURCE_URL}" target="_blank" rel="noreferrer">View dataset ↗</a>`;
@@ -102,7 +109,29 @@
       $('#detailView').classList.add('active');
       setActiveNav('library');
       restoreScroll('detail');
+      updateExerciseBackLabel();
       if (push) history.pushState({exercise:id}, '', `#${encodeURIComponent(id)}`);
     }
+    /** Names the destination on the Back button's accessible label. */
+    function updateExerciseBackLabel() {
+      const back = $('#backButton'); if (!back) return;
+      const names = {'completed-workout':'workout', workout:'training', stats:'stats', dashboard:'home', program:'program', library:'library'};
+      const dest = names[state.exerciseDetailReturn?.view] || 'library';
+      back.setAttribute('aria-label', `Back to ${dest}`);
+    }
 
+    /** Returns from the exercise detail to the recorded origin (library, stats, dashboard,
+     *  the workout tab, or the completed workout it was drilled into). */
+    function backFromExerciseDetail() {
+      const ret = state.exerciseDetailReturn;
+      if (ret && ret.view === 'completed-workout' && ret.workoutId) {
+        const workout = workoutState.completed.find(w => w.id === ret.workoutId);
+        if (workout) { showWorkouts(false); renderCompletedWorkout(workout); return; }
+      }
+      if (ret && ret.view === 'stats') { showStats(); return; }
+      if (ret && ret.view === 'dashboard') { showDashboard(); return; }
+      if (ret && ret.view === 'program') { showProgram(); return; }
+      if (ret && ret.view === 'workout') { showWorkouts(); return; }
+      showLibrary();
+    }
     

@@ -16,6 +16,10 @@
       stall.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);
       const del=$('#deleteAllDataButton');
       del.classList.remove('armed');del.textContent='Delete all data';deleteArmed=false;
+      const hasSamples=hasSampleData();
+      const addBtn=$('#addSampleDataButton'),clearBtn=$('#clearSampleDataButton');
+      if(addBtn){addBtn.disabled=hasSamples;addBtn.textContent=hasSamples?'Sample data added':'Add sample data';addBtn.title=hasSamples?'Sample workouts are already in your history':'Add 8 labeled sample workouts across the last ~3 weeks';}
+      if(clearBtn){clearBtn.disabled=!hasSamples;clearBtn.title=hasSamples?'Remove all sample workouts (your real workouts stay)':'No sample data to clear';}
     }
     window.addEventListener('load', () => {
       if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
@@ -89,6 +93,8 @@
     $('#settingsTimeStep').addEventListener('input',e=>{progressionSetup.timeStep=Math.max(1,Number(e.target.value)||5);schedulePersist();});
     $('#settingsStallToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;const toggle=$('#settingsStallToggle');toggle.setAttribute('aria-pressed',String(progressionSetup.stallDetection));toggle.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);schedulePersist();});
     $('#exportDataButton').addEventListener('click',()=>{downloadWorkoutBackup();showToast('Backup downloaded.');});
+    $('#addSampleDataButton').addEventListener('click',()=>{addSampleData();});
+    $('#clearSampleDataButton').addEventListener('click',()=>{clearSampleData();});
     $('#deleteAllDataButton').addEventListener('click',()=>{
       const button=$('#deleteAllDataButton');
       if(!deleteArmed){deleteArmed=true;button.classList.add('armed');button.textContent='Tap again to confirm — erases everything';return;}
@@ -103,7 +109,15 @@
     $('#keepCurrentDraft').addEventListener('click',()=>{pendingRepeatWorkout=null;$('#replaceDraftDialog').close();});
     $('#confirmReplaceDraft').addEventListener('click',()=>{const workout=pendingRepeatWorkout;pendingRepeatWorkout=null;$('#replaceDraftDialog').close();if(workout)repeatWorkout(workout,true);});
     $('#dashboardNav').addEventListener('click', () => showDashboard());
-    $('#workoutsNav').addEventListener('click', () => showWorkouts());
+    $('#workoutsNav').addEventListener('click', () => {
+      // Re-tapping the active Workout tab pops a completed-workout review back to the
+      // start screen; otherwise it just scrolls to top. A live draft is never disturbed.
+      if (state.activeView === 'workout' && !workoutState.draft && !$('#workoutComplete').hidden) {
+        $('#workoutComplete').hidden = true; renderWorkoutScreen(); window.scrollTo({top:0}); return;
+      }
+      if (state.activeView === 'workout') { window.scrollTo({top:0, behavior:'smooth'}); return; }
+      showWorkouts();
+    });
     $('#programNav').addEventListener('click', () => showProgram());
     $('#statsNav').addEventListener('click', () => showStats());
     $('#settingsNav').addEventListener('click', () => showSettings());
@@ -171,7 +185,7 @@
     });
     $('#clearMuscles').addEventListener('click', () => { state.muscles.clear(); renderMuscleSelection(); renderLibrary(); });
     $('#equipmentFilter').addEventListener('change', e => { state.equipment = e.target.value; renderLibrary(); });
-    $('#backButton').addEventListener('click', () => showLibrary());
+    $('#backButton').addEventListener('click', () => backFromExerciseDetail());
     $('#libraryNav').addEventListener('click', () => showLibrary());
     window.addEventListener('popstate', e => {
       const hash = decodeURIComponent(location.hash.slice(1)); const id = e.state?.exercise || hash;
@@ -185,6 +199,7 @@
     });
 
     restorePersisted();
+    updateLiveWorkoutIndicator();
     populateFilters(); renderLibrary(); renderDashboard(); renderStats();
     const initialId = decodeURIComponent(location.hash.slice(1));
     if (initialId === 'library') showLibrary(false); else if (initialId === 'workout') showWorkouts(false); else if (initialId === 'program') showProgram(false); else if (initialId === 'stats') showStats(false); else if (initialId === 'settings') showSettings(false); else if (initialId && exercises.some(x => x.id === initialId)) openExercise(initialId, false); else showDashboard(false);
