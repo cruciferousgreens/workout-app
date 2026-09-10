@@ -53,7 +53,7 @@
           <div class="sets">${session.sets.map((s,i) => `<div class="set-row"><span class="set-num">SET ${i+1}</span><span class="set-cell"><strong>${s.w ?? '—'}</strong>${s.w == null ? '' : ' lb'}</span><span class="set-cell"><strong>${session.tracking === 'time' ? (s.seconds ?? '—') : s.r}</strong> ${session.tracking === 'time' ? 'sec' : 'reps'}</span><span class="set-cell">${s.rpe == null ? '—' : `RPE <strong>${s.rpe}</strong>`}${s.tags?.length ? `<br><small>${s.tags.map(escapeHtml).join(' · ')}</small>` : ''}</span></div>`).join('')}</div>
         </div>`;
       }).join('') : `<div class="history-empty">No history for this movement yet.</div>`;
-      document.querySelectorAll('[data-history-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=workoutState.completed.find(row=>row.id===button.dataset.historyWorkout);if(workout){showWorkouts();renderCompletedWorkout(workout);}}));
+      document.querySelectorAll('[data-history-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=workoutState.completed.find(row=>row.id===button.dataset.historyWorkout);if(workout){state.workoutDetailReturn='library';showWorkouts();renderCompletedWorkout(workout);}}));
       $('#formulaNote').textContent = logs.length ? 'Real workouts replace sample-derived PRs automatically. Sample values stay separate, remain labeled, and disappear when sample data is cleared.' : '';
     }
 

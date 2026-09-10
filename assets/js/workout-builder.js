@@ -47,7 +47,7 @@
           if(field==='setCount'){
             const count=Math.max(1,Math.min(20,Number(control.value)||1));
             const existing=item.sets||[];
-            item.sets=Array.from({length:count},(_,index)=>existing[index]||{w:'',r:'',seconds:'',rpe:'',tags:[],complete:false});
+            item.sets=Array.from({length:count},(_,index)=>existing[index]||newSet());
           }else if(field==='mode'){
             profile.mode=control.value; item.tracking=control.value;
           }else if(field==='incrementType'){
@@ -55,7 +55,9 @@
           }else{
             profile[field]=Number(control.value);
           }
-          item.progression=profile; if(!programMode){prepareDraftProgression(workoutState.draft,{...progressionSetup,stallDetection:false});renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();} renderExercisePicker();
+          item.progression=profile;
+          if(!programMode){prepareDraftProgression(workoutState.draft,{...progressionSetup,stallDetection:false});renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();}
+          if(field==='setCount'||field==='mode'||field==='incrementType')renderExercisePicker();
         }));
         row.querySelector('[data-program-reps-only]')?.addEventListener('click',()=>{
           const item=getItem(); if(!item)return;

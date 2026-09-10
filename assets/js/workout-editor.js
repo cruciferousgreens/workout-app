@@ -13,6 +13,33 @@
       }
       return {value:'',sampleDerived:false};
     }
+    function lastSessionSetSummary(exerciseId) {
+      const logs=getExerciseLogs(exerciseId,false).filter(log=>!log.sample).sort((a,b)=>b.isoDate.localeCompare(a.isoDate));
+      const latest=logs[0]; if(!latest?.sets?.length)return '';
+      const set=latest.sets.slice().sort((a,b)=>estimate1RM(b)-estimate1RM(a))[0];
+      const timed=latest.tracking==='time'||set.seconds!=null;
+      const load=Number(set.w)>0?`${set.w} lb${timed?' · ':' × '}`:'';
+      const performance=timed?`${set.seconds} sec`:`${set.r} reps`;
+      return `Last: ${load}${performance}${set.rpe==null?'':` @ RPE ${set.rpe}`} · ${formatLogDate(latest.isoDate)}`;
+    }
+
+    function livePRLabel(item,set) {
+      if(!item||!set||exerciseTracking(item,exercises.find(ex=>ex.id===item.exerciseId))!=='reps'||Number(set.w)<=0)return '';
+      const prior=getExerciseLogs(item.exerciseId,false).filter(log=>!log.sample).flatMap(log=>log.sets).filter(row=>Number(row.w)>0);
+      if(!prior.length)return '';
+      const bestEstimate=Math.max(...prior.map(estimate1RM)),bestWeight=Math.max(...prior.map(row=>Number(row.w)||0));
+      const ex=exercises.find(row=>row.id===item.exerciseId);
+      if(estimate1RM(set)>bestEstimate+.5)return `${ex?.name||'Exercise'} · new estimated 1RM PR`;
+      if(Number(set.w)>bestWeight)return `${ex?.name||'Exercise'} · new heaviest set PR`;
+      return '';
+    }
+
+    let toastTimer;
+    function showToast(message,kind='') {
+      const toast=$('#appToast'); if(!toast)return;
+      toast.textContent=message; toast.className=`app-toast ${kind}`.trim(); toast.hidden=false;
+      clearTimeout(toastTimer); toastTimer=setTimeout(()=>{toast.hidden=true;},3600);
+    }
 
     let saveStatusTimer;
     function markDraftSaved() {
@@ -29,13 +56,33 @@
       renderWorkoutScreen();
     }
 
+    function renderWorkoutRecent() {
+      const host=$('#workoutRecent'); if(!host)return;
+      const recent=workoutState.completed.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+      host.innerHTML=recent.length?recent.map(workout=>{const summary=workoutSummary(workout);return `<button class="recent-workout" type="button" data-training-workout="${escapeHtml(workout.id)}"><span><strong>${escapeHtml(workout.name)} ${workout.sample?'<span class="sample-label">Sample</span>':''}</strong><small>${escapeHtml(formatLogDate(workout.date))} · ${summary.sets} sets · ${formatVolume(summary.volume)}</small></span><span aria-hidden="true">›</span></button>`;}).join(''):'<p class="section-note">Your completed workouts will appear here.</p>';
+      document.querySelectorAll('[data-training-workout]').forEach(button=>button.addEventListener('click',()=>{state.workoutDetailReturn='workout';renderCompletedWorkout(workoutState.completed.find(workout=>workout.id===button.dataset.trainingWorkout));}));
+    }
+    function renderWorkoutProgramSuggestion() {
+      const host=$('#programStartSuggestion'),program=workoutState.activeProgram;
+      if(!host)return;
+      if(!program){host.innerHTML='';return;}
+      const ready=(program.workouts||[]).filter(workout=>workout.template?.exercises?.length);
+      const next=suggestedProgramWorkout(program),week=programWeek(program),range=programRangeForWeek(program,week);
+      if(!next){host.innerHTML=`<div class="program-next-wrap"><div class="program-next-main"><span><span class="program-next-kicker">ACTIVE PROGRAM · ${escapeHtml(program.name)}</span><strong>Set up your first workout</strong><small>Week ${week} · ${escapeHtml(programRangeLabel(range))}</small></span><span class="program-next-arrow" aria-hidden="true">›</span></div></div>`;host.querySelector('.program-next-main').addEventListener('click',()=>showProgram());return;}
+      host.innerHTML=`<div class="program-next-wrap"><button class="program-next-main" id="startSuggestedProgramWorkout" type="button"><span><span class="program-next-kicker">NEXT IN ${escapeHtml(program.name)}</span><strong>Week ${week} · ${escapeHtml(next.name)}</strong><small>${next.template.exercises.length} exercise${next.template.exercises.length===1?'':'s'} · ${escapeHtml(programRangeLabel(range))}</small></span><span class="program-next-arrow" aria-hidden="true">›</span></button>${ready.length>1?`<details class="program-next-flexibility"><summary>Choose a different program workout</summary><div class="program-next-alternatives">${ready.filter(workout=>workout.uid!==next.uid).map(workout=>`<button type="button" data-start-program-alternative="${escapeHtml(workout.uid)}">${escapeHtml(workout.name)}</button>`).join('')}</div></details>`:'<p class="program-next-flexibility section-note">Suggested, not required. Blank and template starts remain available below.</p>'}</div>`;
+      $('#startSuggestedProgramWorkout').addEventListener('click',()=>startProgramWorkout(program,next));
+      document.querySelectorAll('[data-start-program-alternative]').forEach(button=>button.addEventListener('click',()=>{const workout=ready.find(row=>row.uid===button.dataset.startProgramAlternative);if(workout)startProgramWorkout(program,workout);}));
+    }
     function renderWorkoutScreen() {
       const hasDraft = !!workoutState.draft;
       $('#workoutStart').hidden = hasDraft || !$('#workoutComplete').hidden;
       $('#workoutEditor').hidden = !hasDraft;
+      renderWorkoutProgramSuggestion();
       const latestReal=workoutState.completed.find(workout=>!workout.sample);
-      if($('#repeatLastWorkout')){$('#repeatLastWorkout').disabled=!latestReal;$('#repeatLastWorkout').querySelector('span').textContent=latestReal?`Repeat ${latestReal.name}.`:'Complete a workout to enable this.';}
+      if($('#repeatLastWorkout')){$('#repeatLastWorkout').disabled=!latestReal;$('#repeatLastWorkoutMeta').textContent=latestReal?`${latestReal.name} · ${formatLogDate(latestReal.date)}`:'Complete a workout to enable this.';}
+      renderWorkoutRecent();
       if (!hasDraft) return;
+      $('#resumeDraftMeta').textContent=`${workoutState.draft.name || 'Workout'} · ${workoutState.draft.exercises.length} exercise${workoutState.draft.exercises.length===1?'':'s'} · ${formatLogDate(workoutState.draft.date)}`;
       $('#workoutName').value = workoutState.draft.name;
       $('#workoutDate').value = workoutState.draft.date;
       renderWorkoutExercises();
@@ -57,7 +104,7 @@
           if (!interactiveStart) content.setPointerCapture?.(event.pointerId);
         });
         content.addEventListener('pointermove', event => {
-          if (!tracking || event.pointerId !== pointerId) return;
+          if (!tracking || event.pointerId !== pointerId || interactiveStart) return;
           const dx = event.clientX - startX, dy = event.clientY - startY;
           if (!horizontal && Math.abs(dx) < 7 && Math.abs(dy) < 7) return;
           if (!horizontal && Math.abs(dy) > Math.abs(dx)) { tracking = false; return; }
@@ -91,6 +138,7 @@
     function renderWorkoutExercises() {
       const draft = workoutState.draft;
       if (!draft) return;
+      draft.exercises.forEach(item=>{if(!item.uid)item.uid=uid('exercise');item.sets=(item.sets||[]).map(set=>({...set,uid:set.uid||uid('set'),tags:[...(set.tags||[])]}));});
       $('#workoutExercises').innerHTML = draft.exercises.length ? draft.exercises.map((item,itemIndex) => {
         const ex = exercises.find(x => x.id === item.exerciseId); if (!ex) return '';
         const isBodyweight = ex.equipment === 'body only';
@@ -98,21 +146,22 @@
         const tracking = exerciseTracking(item, ex);
         const lastWeightInfo = lastUsedWeight(item.exerciseId);
         const lastWeight = lastWeightInfo.value;
+        const lastSummary = lastSessionSetSummary(item.exerciseId);
         const grouped = item.supersetId && draft.exercises.filter(x => x.supersetId === item.supersetId).length > 1;
         return `<div class="swipe-item exercise-swipe" data-exercise-wrapper="${escapeHtml(item.uid)}">
           <button class="swipe-delete-action remove-workout-exercise" type="button" data-uid="${escapeHtml(item.uid)}" aria-label="Remove ${escapeHtml(ex.name)}">Delete</button>
           <section class="workout-exercise swipe-content" data-workout-exercise="${escapeHtml(item.uid)}">
             ${grouped ? `<div class="superset-band">Superset ${draft.exercises.filter((row, index) => row.supersetId && draft.exercises.findIndex(first => first.supersetId === row.supersetId) === index).findIndex(row => row.supersetId === item.supersetId) + 1}</div>` : ''}
-            <div class="workout-exercise-head"><div><h3>${escapeHtml(ex.name)}</h3><p>${escapeHtml(ex.primary.join(', ') || 'Unspecified muscle')} · ${escapeHtml(ex.equipment || 'No equipment')}</p><span class="set-count-badge">${item.sets.length} set${item.sets.length===1?'':'s'}</span>${lastWeightInfo.sampleDerived?'<span class="sample-placeholder-note">Weight placeholder comes from sample history</span>':''}</div><button class="drag-handle" type="button" data-drag-uid="${escapeHtml(item.uid)}" aria-label="Drag to reorder ${escapeHtml(ex.name)}">⋮⋮</button></div>
+            <div class="workout-exercise-head"><div class="exercise-title-copy"><h3>${escapeHtml(ex.name)}</h3><p>${escapeHtml((ex.primary||[]).map(titleCase).join(', ') || 'Unspecified muscle')} · ${escapeHtml(titleCase(ex.equipment || 'No equipment'))}</p><div class="exercise-meta-row"><span class="set-count-badge">${item.sets.length} set${item.sets.length===1?'':'s'}</span></div>${lastWeightInfo.sampleDerived?'<span class="sample-placeholder-note">Sample history shown as reference only</span>':''}</div><button class="drag-handle" type="button" data-drag-uid="${escapeHtml(item.uid)}" aria-label="Drag to reorder ${escapeHtml(ex.name)}">⋮⋮</button></div>
             <details class="advanced-options"><summary>Exercise options</summary><div class="advanced-options-body"><div class="exercise-tools"><button class="tracking-toggle ${tracking === 'time' ? 'time' : ''}" type="button" data-tracking-uid="${escapeHtml(item.uid)}" aria-label="Switch to ${tracking === 'time' ? 'rep' : 'time'} tracking">Track ${tracking === 'time' ? 'seconds' : 'reps'}</button>${draft.exercises.length > 1 ? `<button class="superset-button ${grouped ? 'active' : ''}" type="button" data-superset-uid="${escapeHtml(item.uid)}">${grouped ? 'Edit superset' : 'Create superset'}</button>` : ''}</div><div class="exercise-tag-row">${(item.exerciseTags||[]).map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}<button class="exercise-tag-button" type="button" data-draft-exercise-tags="${escapeHtml(item.uid)}">${item.exerciseTags?.length?'Edit exercise tags':'+ Exercise tags'}</button></div></div></details>
-            <div class="log-labels"><span>SET</span><span>${isBodyweight ? 'ADDED LB' : 'WEIGHT (LB)'}</span><span>${tracking === 'time' ? 'SECONDS' : 'REPS'}</span><span>RPE</span><span>ACTIONS</span></div>
-            <div>${item.sets.map((set,index) => `<div class="swipe-item set-swipe" data-set-wrapper="${escapeHtml(set.uid)}">
-              <button class="swipe-delete-action delete-set" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-label="Delete set ${index + 1}">Delete</button>
-              <div class="log-set swipe-content ${set.complete ? 'is-complete' : ''}" data-set-uid="${escapeHtml(set.uid)}">
+            ${lastSummary?`<p class="last-session-line"><strong>${escapeHtml(lastSummary)}</strong></p>`:'<p class="last-session-line">No previous real session for this exercise yet.</p>'}
+            <div class="log-labels"><span>SET</span><span>${isBodyweight ? 'ADDED LB' : 'WEIGHT (LB)'}</span><span>${tracking === 'time' ? 'SECONDS' : 'REPS'}</span><span>RPE (OPT)</span><span>ACTIONS</span></div>
+            <div>${item.sets.map((set,index) => `<div class="set-swipe" data-set-wrapper="${escapeHtml(set.uid)}">
+              <div class="log-set ${set.complete ? 'is-complete' : ''}" data-set-uid="${escapeHtml(set.uid)}">
                 <button class="log-set-number ${set.tags.length ? 'has-tags' : ''}" type="button" data-tag-exercise-uid="${escapeHtml(item.uid)}" data-tag-set-uid="${escapeHtml(set.uid)}" aria-label="Choose tags for set ${index + 1}" aria-haspopup="dialog">${index + 1}</button>
-                <label class="weight-entry"><input class="log-input weight-input" data-field="w" data-placeholder-weight="${escapeHtml(lastWeight)}" data-placeholder-sample="${lastWeightInfo.sampleDerived}" type="number" min="0" step="0.5" inputmode="decimal" value="${escapeHtml(set.w)}" placeholder="${isBodyweight ? (lastWeight ? `Last +${escapeHtml(lastWeight)}${lastWeightInfo.sampleDerived?' sample':''}` : 'Optional') : (lastWeight ? `${escapeHtml(lastWeight)}${lastWeightInfo.sampleDerived?' sample':' last'}` : 'Weight')}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : isDumbbell ? 'total dumbbell weight' : 'weight'} in pounds${lastWeight ? `; last used ${escapeHtml(lastWeight)}${lastWeightInfo.sampleDerived?', from sample data':''}` : ''}" />${isDumbbell ? '<small class="weight-total-hint">Total</small>' : ''}</label>
+                <label class="weight-entry"><input class="log-input weight-input" data-field="w" data-placeholder-weight="${escapeHtml(lastWeight)}" data-placeholder-sample="${lastWeightInfo.sampleDerived}" type="number" min="0" step="0.5" inputmode="decimal" value="${escapeHtml(set.w)}" placeholder="${lastWeight?escapeHtml(lastWeight):(isBodyweight?'Optional':'Weight')}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : isDumbbell ? 'total dumbbell weight' : 'weight'} in pounds${lastWeight ? `; last used ${escapeHtml(lastWeight)}${lastWeightInfo.sampleDerived?', from sample data':''}` : ''}" />${isDumbbell ? '<small class="weight-total-hint">Total</small>' : ''}${lastWeightInfo.sampleDerived?'<small class="sample-weight-badge">sample reference</small>':''}</label>
                 <input class="log-input reps-input" data-field="${tracking === 'time' ? 'seconds' : 'r'}" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(tracking === 'time' ? (set.seconds ?? '') : (set.r ?? ''))}" placeholder="${tracking === 'time' ? 'Seconds' : 'Reps'}" aria-label="Set ${index + 1} ${tracking === 'time' ? 'seconds' : 'reps'}" />
-                <input class="log-input rpe-input" data-field="rpe" type="number" min="1" max="10" step="0.5" inputmode="decimal" value="${escapeHtml(set.rpe)}" placeholder="RPE optional" aria-label="Set ${index + 1} optional RPE" />
+                <input class="log-input rpe-input" data-field="rpe" type="number" min="1" max="10" step="0.5" inputmode="decimal" value="${escapeHtml(set.rpe)}" placeholder="RPE" aria-label="Set ${index + 1} optional RPE" />
                 <div class="set-actions">
                   <button class="complete-set" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-pressed="${set.complete}" aria-label="${set.complete ? 'Mark set incomplete' : 'Mark set complete'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
                   <button class="delete-set delete-set-inline" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-label="Delete set ${index + 1}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
@@ -128,8 +177,8 @@
       document.querySelectorAll('.add-set').forEach(button => button.addEventListener('click', () => { draft.exercises.find(item => item.uid === button.dataset.uid)?.sets.push(newSet()); renderWorkoutExercises(); markDraftSaved(); }));
       document.querySelectorAll('[data-copy-first-set]').forEach(button => button.addEventListener('click', () => {
         const item=draft.exercises.find(row=>row.uid===button.dataset.copyFirstSet); if(!item||item.sets.length<2)return;
-        const first=item.sets[0], fallback=lastUsedWeight(item.exerciseId).value;
-        item.sets.slice(1).forEach(set=>{set.w=first.w!==''?first.w:fallback;set.r=first.r;set.seconds=first.seconds;set.complete=false;});
+        const first=item.sets[0], last=lastUsedWeight(item.exerciseId), fallback=last.sampleDerived?'':last.value;
+        item.sets.slice(1).forEach(set=>{set.w=first.w!==''?first.w:fallback;set.r=first.r;set.seconds=first.seconds;set.rpe=first.rpe;});
         renderWorkoutExercises(); markDraftSaved();
         requestAnimationFrame(()=>{const feedback=document.querySelector(`[data-copy-feedback="${CSS.escape(item.uid)}"]`);if(feedback)feedback.textContent='Applied';});
       }));
@@ -142,7 +191,7 @@
         const tracking=exerciseTracking(item,ex), weightOptional=ex?.equipment==='body only';
         if (!set) return;
         const weightInput=button.closest('.log-set').querySelector('.weight-input');
-        if (!set.complete && set.w === '' && weightInput?.dataset.placeholderWeight) {
+        if (!set.complete && set.w === '' && weightInput?.dataset.placeholderWeight && weightInput.dataset.placeholderSample !== 'true') {
           set.w=weightInput.dataset.placeholderWeight;
           weightInput.value=set.w;
         }
@@ -151,7 +200,8 @@
           $('#workoutError').textContent = weightOptional ? `Enter ${tracking==='time'?'seconds':'reps'} before marking this set complete. Added weight and RPE are optional.` : `Enter weight and ${tracking==='time'?'seconds':'reps'} before marking this set complete. RPE is optional.`;
           button.closest('.log-set').querySelector((!weightOptional&&set.w==='')?'.weight-input':'.reps-input')?.focus(); return;
         }
-        set.complete = !set.complete; button.setAttribute('aria-pressed', String(set.complete)); button.setAttribute('aria-label', set.complete ? 'Mark set incomplete' : 'Mark set complete'); button.closest('.log-set').classList.toggle('is-complete', set.complete); $('#workoutError').textContent = ''; markDraftSaved();
+        const pr=!set.complete?livePRLabel(item,set):'';
+        set.complete = !set.complete; button.setAttribute('aria-pressed', String(set.complete)); button.setAttribute('aria-label', set.complete ? 'Mark set incomplete' : 'Mark set complete'); button.closest('.log-set').classList.toggle('is-complete', set.complete); $('#workoutError').textContent = ''; if(pr)showToast(`PR · ${pr}`,'pr-toast'); markDraftSaved();
       }));
       document.querySelectorAll('[data-tag-set-uid]').forEach(button => button.addEventListener('click', () => openTagDialog(button.dataset.tagExerciseUid, button.dataset.tagSetUid)));
       document.querySelectorAll('[data-draft-exercise-tags]').forEach(button => button.addEventListener('click', () => openExerciseTagDialog({mode:'draft',exerciseUid:button.dataset.draftExerciseTags})));

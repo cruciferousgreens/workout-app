@@ -39,7 +39,7 @@
     function getExerciseLogs(id, includeSamples = true) {
       return workoutState.completed.filter(workout => includeSamples || !workout.sample).flatMap(workout => workout.exercises
         .filter(item => item.exerciseId === id)
-        .map(item => ({workoutId:workout.id,date: formatLogDate(workout.date), isoDate:workout.date, tracking:item.tracking || (item.sets.some(set => set.seconds != null) ? 'time' : 'reps'), exerciseTags:[...(item.exerciseTags||[])], sets:item.sets.map(set => ({w:set.w,r:set.r,seconds:set.seconds,rpe:set.rpe,tags:[...(set.tags || [])]})), name:workout.name, sample:!!workout.sample})));
+        .map(item => ({workoutId:workout.id,date: formatLogDate(workout.date), isoDate:workout.date, tracking:item.tracking || (item.sets.some(set => set.seconds != null) ? 'time' : 'reps'), progression:item.progression?{...item.progression}:null, exerciseTags:[...(item.exerciseTags||[])], sets:item.sets.map(set => ({w:set.w,r:set.r,seconds:set.seconds,rpe:set.rpe,tags:[...(set.tags || [])]})), name:workout.name, sample:!!workout.sample})));
     }
 
     function recentExerciseIds() {

@@ -22,15 +22,25 @@
       const programConfig=config || workoutState.activeProgram?.progression || progressionSetup;
       const logs=getExerciseLogs(exerciseId,includeSamples).filter(log=>includeSamples?log.sample:!log.sample).sort((a,b)=>b.isoDate.localeCompare(a.isoDate));
       if(!logs.length)return null;
-      const latest=topSetForSession(logs[0]); if(!latest)return null;
+      const latestLog=logs[0],latest=topSetForSession(latestLog); if(!latest)return null;
       const mode=profile?.mode || latest.mode || 'reps';
       const threshold=Number(programConfig.threshold ?? 8), min=Number(profile?.min ?? 5), max=Number(profile?.max ?? 8);
       const timeMin=Number(profile?.timeMin ?? 30), timeMax=Number(profile?.timeMax ?? 60), timeStep=Number(profile?.timeStep ?? 5);
       const incrementType=profile?.incrementType || programConfig.incrementType || 'lb';
       const incrementValue=Number(profile?.incrementValue ?? programConfig.incrementValue ?? 5);
       const repsOnly=!!profile?.repsOnly;
-      let nextWeight=latest.weight,nextReps=latest.reps,nextSeconds=latest.seconds,kind='hold',reason='Top-set RPE is above the progression trigger.';
-      if(latest.rpe!=null && latest.rpe<=threshold){
+      const previousProfile=latestLog.progression;
+      const previousMin=Number(previousProfile?.min),previousMax=Number(previousProfile?.max);
+      const hasStoredRange=Number.isFinite(previousMin)&&Number.isFinite(previousMax),outsideNewRange=latest.reps<min||(!profile?.openTop&&!profile?.amrap&&latest.reps>max);
+      const repRangeChanged=mode==='reps'&&previousProfile?.mode!=='time'&&((hasStoredRange&&(previousMin!==min||previousMax!==max))||(!hasStoredRange&&outsideNewRange));
+      let nextWeight=latest.weight,nextReps=latest.reps,nextSeconds=latest.seconds,kind='hold',reason='Top-set RPE is above the progression trigger.',estimated1RM=0;
+      if(repRangeChanged&&latest.weight>0){
+        estimated1RM=estimate1RM({w:latest.weight,r:latest.reps,rpe:latest.rpe});
+        const targetReps=profile?.openTop?min:Math.max(min,max),rawTarget=estimated1RM/(1+targetReps/30);
+        nextWeight=Math.max(0,Math.round(rawTarget/2.5)*2.5);nextReps=min;kind='range';
+        const week=Number(programConfig.currentWeek)||null,weekPrefix=week?`Week ${week} is `:'This block is ';
+        reason=`${weekPrefix}${programRangeLabel(profile)}; suggesting ${nextWeight} lb from your estimated 1RM of ${Math.round(estimated1RM)} lb so the new rep target starts at a sensible load.`;
+      } else if(latest.rpe!=null && latest.rpe<=threshold){
         if(mode==='time'){
           if(latest.seconds<timeMax){nextSeconds=Math.min(timeMax,Math.max(timeMin,latest.seconds+timeStep));kind='time';reason=`Top set was at or below RPE ${threshold}; add ${timeStep} seconds inside the ${timeMin}–${timeMax}s range.`;}
           else if(repsOnly){kind='hold';reason=`Time ceiling reached. Load progression is off, so hold ${timeMax} seconds.`;}
@@ -45,7 +55,7 @@
       const flat=recent.length>=3 && recent.every((row,i)=>i===0 || (row.weight<=recent[i-1].weight && row.performance<=recent[i-1].performance));
       const rising=recent.length>=3 && recent.every((row,i)=>i===0 || row.rpe==null || recent[i-1].rpe==null || row.rpe>=recent[i-1].rpe);
       const stall=!!programConfig.stallDetection && flat && rising;
-      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,sourceDate:logs[0].isoDate,sourceWorkout:logs[0].name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall,sampleDerived:includeSamples};
+      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog.isoDate,sourceWorkout:latestLog.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall,sampleDerived:includeSamples};
     }
 
     function sampleSuggestions() {
@@ -57,7 +67,7 @@
       const formatTarget=(weight,performance)=>`${weight ? `${weight} lb · ` : ''}${performance} ${suggestion.mode==='time'?'sec':'reps'}`;
       const oldTarget=formatTarget(suggestion.latest.weight,suggestion.mode==='time'?suggestion.latest.seconds:suggestion.latest.reps);
       const nextTarget=formatTarget(suggestion.nextWeight,suggestion.mode==='time'?suggestion.nextSeconds:suggestion.nextReps);
-      const label=suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='time'?'Time +':'Rep +';
+      const label=suggestion.applied?'Applied ✓':suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='range'?'Week range':suggestion.kind==='time'?'Time +':'Rep +';
       const basis=suggestion.sampleDerived?'':`<div class="suggestion-basis">Based on ${escapeHtml(suggestion.sourceWorkout||'your last workout')} · ${escapeHtml(formatLogDate(suggestion.sourceDate))} · latest top set ${oldTarget}${suggestion.latest.rpe==null?' without RPE':` @ RPE ${suggestion.latest.rpe}`}</div>`;
       return `<${interactive?'button':'div'} class="suggestion-card ${suggestion.applied?'applied':''}" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name">${escapeHtml(ex?.name||'Exercise')}<span>${label}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div><div class="suggestion-reason">${escapeHtml(suggestion.reason)}</div>${basis}</${interactive?'button':'div'}>`;
     }
@@ -96,12 +106,12 @@
     function renderWorkoutProgression() {
       const draft=workoutState.draft, box=$('#workoutProgression'), context=$('#workoutContext');
       const program=workoutState.activeProgram && draft?.programId===workoutState.activeProgram.id?workoutState.activeProgram:null;
-      context.hidden=!program; context.textContent=program?`${program.name} · ${draft.name}`:'';
+      context.hidden=!program; context.textContent=program?`${program.name} · Week ${programWeek(program)} · ${draft.name}`:'';
       const suggestions=draft?.progressionSuggestions||[];
       if(!draft?.exercises?.length){box.hidden=true;return;}
       box.hidden=false;
       if(!suggestions.length){box.innerHTML=`<div class="progression-banner-head"><div><h3>No progression suggestions yet</h3><p>Suggestions only appear for exercises in this workout after you have real completed history. Sample workouts are never used.</p></div><span class="real-data-label">Real logs only</span></div>`;return;}
-      box.innerHTML=`<div class="progression-banner-head"><div><h3>Suggestions for this workout</h3><p>Only exercises below with real completed history appear. Tap a card to apply its target to every set.</p></div><span class="real-data-label">Real logs only</span></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
+      box.innerHTML=`<div class="progression-banner-head"><div><h3>${draft.autoAppliedProgression?'Progression targets applied':'Suggestions for this workout'}</h3><p>${draft.autoAppliedProgression?'Targets below were filled from your most recent real performance and this week’s rep range. Every field remains editable.':'Only exercises below with real completed history appear. Tap a card to apply its target to every set.'}</p></div><span class="real-data-label">Real logs only</span></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
       document.querySelectorAll('[data-real-suggestion]').forEach(button=>button.addEventListener('click',()=>applyProgressionSuggestion(draft,suggestions[Number(button.dataset.realSuggestion)])));
     }
 

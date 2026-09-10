@@ -1,6 +1,6 @@
 
     /** Holds in-memory UI and training state; persistence is intentionally outside this static preview. */
-    const state = { query:'', muscles:new Set(), equipment:'', selected:null, customExercises:[], activeView:'dashboard', dashboardPeriod:'week', statsPeriod:'week', selectedDashboardDate:null, calendarWeekOffset:0, samplePromptShown:false, scroll:{dashboard:0, library:0, workout:0, program:0, stats:0, detail:0} };
+    const state = { query:'', muscles:new Set(), equipment:'', selected:null, customExercises:[], activeView:'dashboard', workoutDetailReturn:'workout', dashboardPeriod:'week', statsPeriod:'week', selectedDashboardDate:null, calendarWeekOffset:0, samplePromptShown:false, scroll:{dashboard:0, library:0, workout:0, program:0, stats:0, detail:0} };
     const customDraft = { primary:new Set(), secondary:new Set(), equipment:'', force:'', mechanic:'', tracking:'reps' };
     const workoutState = {
       draft: null,
