@@ -61,6 +61,10 @@
     function openExercise(id, push = true, returnTo) {
       const ex = exercises.find(x => x.id === id);
       if (!ex) return;
+      // Drilling from one exercise detail into another (e.g. a similar exercise) must
+      // land at the top of the new page — restoring the old detail scroll would leave
+      // the user staring at the bottom, looking like the tap did nothing.
+      const fromDetail = state.activeView === 'detail';
       rememberScroll();
       state.selected = id;
       if (returnTo !== undefined) {
@@ -98,8 +102,8 @@
         $('#editCustomExercise').addEventListener('click', () => openCustomDialog(ex));
         $('#deleteCustomExercise').addEventListener('click', () => deleteCustomExercise(ex.id));
       }
-      $('#similarGrid').innerHTML = similarTo(ex).map(x => `<button class="similar" type="button" data-id="${escapeHtml(x.id)}"><strong>${escapeHtml(x.name)}</strong><span class="score">${escapeHtml(x.primary[0] || 'Unspecified muscle')} · ${escapeHtml(x.equipment || 'No equipment')}</span></button>`).join('');
-      document.querySelectorAll('.similar').forEach(btn => btn.addEventListener('click', () => openExercise(btn.dataset.id)));
+      $('#similarGrid').innerHTML = `<div class="action-list">${similarTo(ex).map(x => `<button class="action-row" type="button" data-id="${escapeHtml(x.id)}" aria-label="Open ${escapeHtml(x.name)}"><span><strong>${escapeHtml(x.name)}</strong><span>${escapeHtml(x.primary[0] || 'Unspecified muscle')} · ${escapeHtml(x.equipment || 'No equipment')}</span></span><span class="similar-chevron" aria-hidden="true">›</span></button>`).join('')}</div>`;
+      document.querySelectorAll('#similarGrid [data-id]').forEach(btn => btn.addEventListener('click', () => openExercise(btn.dataset.id)));
       state.activeView = 'detail';
       $('#dashboardView').classList.remove('active');
       $('#statsView').classList.remove('active');
@@ -108,6 +112,7 @@
       $('#programView').classList.remove('active');
       $('#detailView').classList.add('active');
       setActiveNav('library');
+      if (fromDetail) state.scroll['detail'] = 0;
       restoreScroll('detail');
       updateExerciseBackLabel();
       if (push) history.pushState({exercise:id}, '', `#${encodeURIComponent(id)}`);

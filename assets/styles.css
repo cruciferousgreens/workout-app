@@ -93,6 +93,9 @@
     button { color: inherit; }
     a { color: inherit; }
     .app { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom); }
+    /* Opaque backdrop behind the iOS status bar / Dynamic Island so scrolled content
+       slides underneath it instead of colliding with the clock. Zero-height elsewhere. */
+    .status-scrim { position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 40; pointer-events: none; }
     .shell { width: min(1120px, 100%); margin: 0 auto; padding: 28px 24px 112px; }
     .topline { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
     .top-actions { display: flex; align-items: center; gap: 12px; }
@@ -208,10 +211,8 @@
     .movement-card dd { margin: 0; text-align: right; text-transform: capitalize; font-weight: 700; }
     .instructions { padding-left: 20px; margin: 0; color: var(--ink); font-size: 13px; line-height: 1.55; }
     .instructions li + li { margin-top: 9px; }
-    .similar-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-    .similar { min-width: 0; padding: 14px; text-align: left; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; }
-    .similar:hover { border-color: var(--accent); }
-    .similar strong { display: block; margin-bottom: 8px; font-size: 13px; }
+    .similar-grid { display: block; }
+    .similar-chevron { color: var(--muted); font-size: 18px; line-height: 1; }
     .score { color: var(--muted); font-size: 11px; }
     .formula { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
     .workout-view, .program-view { display: none; }
@@ -373,7 +374,6 @@
       .stat { padding: 16px; }
       .detail-aside { grid-template-columns: 1fr; }
       .set-row { grid-template-columns: 36px repeat(3, 1fr); gap: 5px; padding: 0 8px; }
-      .similar-grid { grid-template-columns: 1fr; }
       .workout-meta { grid-template-columns: 1fr; }
       .workout-toolbar { align-items: flex-end; }
       .workout-exercise { padding: 15px 12px; }

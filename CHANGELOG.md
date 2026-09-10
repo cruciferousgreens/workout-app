@@ -2,6 +2,12 @@
 
 Newest first. Dates are release dates (America/New_York).
 
+## 2026-09-10 — Exercise detail fixes
+
+- **Similar exercises are compact tappable rows now.** The chunky cards are gone — similar exercises render as clean rows (name, primary muscle · equipment, chevron), consistent with the rest of the app.
+- **Tapping a similar exercise actually goes there.** Fixed a scroll bug where drilling from one exercise detail into another kept you pinned at the bottom of the page, making it look like the tap did nothing. The new exercise now opens at the top.
+- **No more content under the clock.** Added a backdrop behind the iOS status bar / Dynamic Island so scrolled content slides underneath it instead of colliding with the time.
+
 ## 2026-09-10 — Nav fixes follow-up
 
 - **Sample-derived PRs are labeled.** “Recent PRs” on the dashboard now shows a “Sample” tag on any record that came from sample data, so demo numbers never masquerade as your real PRs.
