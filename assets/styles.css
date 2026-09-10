@@ -180,6 +180,8 @@
     .log-set-number { width: 34px; min-height: 42px; padding: 0; display: grid; place-items: center; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 800; }
     .log-set-number:hover, .log-set-number:focus-visible { border-color: var(--line); background: var(--surface-2); color: var(--ink); outline: none; }
     .log-set-number.has-tags { border-color: #b9d6c5; background: var(--accent-soft); color: var(--accent); }
+    .weight-entry { min-width: 0; display: grid; gap: 3px; }
+    .weight-total-hint { justify-self: end; margin-right: 2px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .06em; line-height: 1; text-transform: uppercase; }
     .log-input { width: 100%; min-width: 0; height: 42px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; color: var(--ink); outline: none; font-variant-numeric: tabular-nums; }
     .log-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(21,106,70,.12); }
     .selected-set-tags { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 5px; min-height: 0; }
@@ -286,7 +288,7 @@
       .log-labels { display: none; }
       .log-set { grid-template-columns: 34px repeat(3, minmax(0, 1fr)) 42px; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); background: var(--surface); }
       .log-set-number { grid-row: 1; grid-column: 1; }
-      .log-set .weight-input { grid-row: 1; grid-column: 2; }
+      .log-set .weight-entry { grid-row: 1; grid-column: 2; }
       .log-set .reps-input { grid-row: 1; grid-column: 3; }
       .log-set .rpe-input { grid-row: 1; grid-column: 4; }
       .log-set .complete-set { grid-row: 1; grid-column: 5; }

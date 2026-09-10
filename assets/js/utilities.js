@@ -14,6 +14,8 @@
       if (!value) return '';
       return new Intl.DateTimeFormat('en-US', {month:'short', day:'numeric', year:'numeric'}).format(new Date(`${value}T12:00:00`));
     }
+    /** Logged weight is already the total external load, including for dumbbells. Never multiply by implement count. */
+    function setVolume(set) { return (Number(set.w) || 0) * (Number(set.r) || 0); }
     function escapeHtml(text) {
       const div = document.createElement('div'); div.textContent = text; return div.innerHTML;
     }

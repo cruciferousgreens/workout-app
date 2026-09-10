@@ -66,7 +66,7 @@
       const volumes={};
       workouts.forEach(workout=>workout.exercises.forEach(item=>{
         const ex=exercises.find(x=>x.id===item.exerciseId); if(!ex)return;
-        const volume=item.sets.reduce((total,set)=>total+((Number(set.w)||0)*(Number(set.r)||0)),0);
+        const volume=item.sets.reduce((total,set)=>total+setVolume(set),0);
         (ex.primary||[]).forEach(m=>volumes[m]=(volumes[m]||0)+volume);
         (ex.secondary||[]).forEach(m=>volumes[m]=(volumes[m]||0)+(volume*.45));
       }));
@@ -149,7 +149,7 @@
       const periodLabels={today:'Today',week:'This week',month:'This month',year:'This year',all:'All time'};
       $('#periodLabel').textContent=periodLabels[state.dashboardPeriod];
       $('#periodMenu').innerHTML=Object.entries(periodLabels).map(([key,label])=>`<button class="period-option" type="button" role="menuitemradio" aria-checked="${state.dashboardPeriod===key}" data-period="${key}">${label}</button>`).join('');
-      const periodWorkouts=workoutsForPeriod(state.dashboardPeriod), periodSets=periodWorkouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=periodSets.reduce((n,x)=>n+(Number(x.w)*Number(x.r)||0),0), sampleCount=periodWorkouts.filter(w=>w.sample).length;
+      const periodWorkouts=workoutsForPeriod(state.dashboardPeriod), periodSets=periodWorkouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=periodSets.reduce((n,set)=>n+setVolume(set),0), sampleCount=periodWorkouts.filter(w=>w.sample).length;
       $('#dashboardStats').innerHTML=`<div class="mini-stat"><strong>${periodWorkouts.length}</strong><span>workouts${sampleCount?` · ${sampleCount} sample`:''}</span></div><div class="mini-stat"><strong>${periodSets.length}</strong><span>sets</span></div><div class="mini-stat"><strong>${Math.round(volume).toLocaleString()}</strong><span>lb volume</span></div>`;
       const muscles=muscleCounts(periodWorkouts),volumes=muscleVolumes(periodWorkouts);$('#dashboardMuscles').innerHTML=Object.keys(muscles).length?Object.entries(muscles).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([m,n])=>`<span class="tag primary">${escapeHtml(m)} · ${n}</span>`).join(''):'<span class="section-note">No muscles logged in this period.</span>';
       $('#dashboardHeatmap').innerHTML=muscleHeatmapMarkup(volumes,true);hydrateBodyMaps();
@@ -164,14 +164,14 @@
       const labels={today:'Today',week:'Week',month:'Month',year:'Year',all:'All time'};
       $('#statsPeriodTabs').innerHTML=Object.entries(labels).map(([key,label])=>`<button class="period-tab" type="button" data-stats-period="${key}" aria-pressed="${state.statsPeriod===key}">${label}</button>`).join('');
       document.querySelectorAll('[data-stats-period]').forEach(button=>button.addEventListener('click',()=>{state.statsPeriod=button.dataset.statsPeriod;renderStats();}));
-      const workouts=workoutsForPeriod(state.statsPeriod), sets=workouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=sets.reduce((n,x)=>n+(Number(x.w)*Number(x.r)||0),0), sampleCount=workouts.filter(w=>w.sample).length;
+      const workouts=workoutsForPeriod(state.statsPeriod), sets=workouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=sets.reduce((n,set)=>n+setVolume(set),0), sampleCount=workouts.filter(w=>w.sample).length;
       $('#statsGrid').innerHTML=`<div class="stats-panel"><strong>${workouts.length}</strong><span>Completed workouts${sampleCount?` · ${sampleCount} sample`:''}</span></div><div class="stats-panel"><strong>${sets.length}</strong><span>Completed sets</span></div><div class="stats-panel"><strong>${Math.round(volume).toLocaleString()}</strong><span>Total lb volume</span></div>`;
       const muscles=muscleCounts(workouts), volumes=muscleVolumes(workouts);
       $('#muscleHeatmapNote').textContent=`${labels[state.statsPeriod]} · weighted volume by primary and secondary muscle`;
       $('#muscleHeatmap').innerHTML=muscleHeatmapMarkup(volumes,false);hydrateBodyMaps();
       $('#muscleStats').innerHTML=Object.keys(muscles).length?`<div class="tag-row">${Object.entries(muscles).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<span class="tag primary">${escapeHtml(m)} · ${n} sets</span>`).join('')}</div>`:'<p class="section-note">Complete a workout to start building muscle-level stats.</p>';
       renderMuscleAnalysis(workouts,state.statsPeriod);
-      const allWorkouts=workoutState.completed,monday=new Date();monday.setHours(12,0,0,0);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));const weeks=Array.from({length:10},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()-(7*(9-i)));const next=new Date(d);next.setDate(d.getDate()+7);const startIso=isoForDate(d),endIso=isoForDate(next);const value=allWorkouts.filter(w=>w.date>=startIso&&w.date<endIso).flatMap(w=>w.exercises.flatMap(e=>e.sets)).reduce((n,s)=>n+(Number(s.w)*Number(s.r)||0),0);return{label:new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric'}).format(d),shortLabel:new Intl.DateTimeFormat('en-US',{month:'numeric',day:'numeric'}).format(d),value};});
+      const allWorkouts=workoutState.completed,monday=new Date();monday.setHours(12,0,0,0);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));const weeks=Array.from({length:10},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()-(7*(9-i)));const next=new Date(d);next.setDate(d.getDate()+7);const startIso=isoForDate(d),endIso=isoForDate(next);const value=allWorkouts.filter(w=>w.date>=startIso&&w.date<endIso).flatMap(w=>w.exercises.flatMap(e=>e.sets)).reduce((n,set)=>n+setVolume(set),0);return{label:new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric'}).format(d),shortLabel:new Intl.DateTimeFormat('en-US',{month:'numeric',day:'numeric'}).format(d),value};});
       $('#volumeChart').innerHTML=allWorkouts.length?lineChart(weeks,value=>`${Math.round(value).toLocaleString()} lb`):'<div class="chart-empty">Complete a workout to start the weekly volume chart.</div>';
     }
     

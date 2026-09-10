@@ -89,6 +89,7 @@
       $('#workoutExercises').innerHTML = draft.exercises.length ? draft.exercises.map((item,itemIndex) => {
         const ex = exercises.find(x => x.id === item.exerciseId); if (!ex) return '';
         const isBodyweight = ex.equipment === 'body only';
+        const isDumbbell = ex.equipment === 'dumbbell';
         const tracking = exerciseTracking(item, ex);
         const lastWeight = lastUsedWeight(item.exerciseId);
         const grouped = item.supersetId && draft.exercises.filter(x => x.supersetId === item.supersetId).length > 1;
@@ -102,7 +103,7 @@
               <button class="swipe-delete-action delete-set" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-label="Delete set ${index + 1}">Delete</button>
               <div class="log-set swipe-content ${set.complete ? 'is-complete' : ''}" data-set-uid="${escapeHtml(set.uid)}">
                 <button class="log-set-number ${set.tags.length ? 'has-tags' : ''}" type="button" data-tag-exercise-uid="${escapeHtml(item.uid)}" data-tag-set-uid="${escapeHtml(set.uid)}" aria-label="Choose tags for set ${index + 1}" aria-haspopup="dialog">${index + 1}</button>
-                <input class="log-input weight-input" data-field="w" data-placeholder-weight="${escapeHtml(lastWeight)}" type="number" min="0" step="0.5" inputmode="decimal" value="${escapeHtml(set.w)}" placeholder="${isBodyweight ? (lastWeight ? `Last +${escapeHtml(lastWeight)}` : 'Optional') : (lastWeight ? `Last ${escapeHtml(lastWeight)}` : 'Weight')}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : 'weight'} in pounds${lastWeight ? `; last used ${escapeHtml(lastWeight)}` : ''}" />
+                <label class="weight-entry"><input class="log-input weight-input" data-field="w" data-placeholder-weight="${escapeHtml(lastWeight)}" type="number" min="0" step="0.5" inputmode="decimal" value="${escapeHtml(set.w)}" placeholder="${isBodyweight ? (lastWeight ? `Last +${escapeHtml(lastWeight)}` : 'Optional') : (lastWeight ? `Last ${escapeHtml(lastWeight)}` : 'Weight')}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : isDumbbell ? 'total dumbbell weight' : 'weight'} in pounds${lastWeight ? `; last used ${escapeHtml(lastWeight)}` : ''}" />${isDumbbell ? '<small class="weight-total-hint">Total</small>' : ''}</label>
                 <input class="log-input reps-input" data-field="${tracking === 'time' ? 'seconds' : 'r'}" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(tracking === 'time' ? (set.seconds ?? '') : (set.r ?? ''))}" placeholder="${tracking === 'time' ? 'Seconds' : 'Reps'}" aria-label="Set ${index + 1} ${tracking === 'time' ? 'seconds' : 'reps'}" />
                 <input class="log-input rpe-input" data-field="rpe" type="number" min="1" max="10" step="0.5" inputmode="decimal" value="${escapeHtml(set.rpe)}" placeholder="RPE optional" aria-label="Set ${index + 1} optional RPE" />
                 <div class="set-actions">

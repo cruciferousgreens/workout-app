@@ -1,6 +1,7 @@
 
     /** Calculates exercise PRs, history, similarity, and detail-view presentation. */
     function estimate1RM(set) {
+      // Use the logged load as-is; dumbbell entries are the combined total, not a per-hand value.
       const weight = Number(set.w);
       if (!Number.isFinite(weight) || weight <= 0) return 0;
       const rir = set.rpe == null || set.rpe === '' ? 0 : Math.max(0, 10 - Number(set.rpe));

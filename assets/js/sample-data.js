@@ -11,13 +11,13 @@
       const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
       const plans = [
         {day:0,name:'Upper A',moves:[
-          ['Barbell_Bench_Press_-_Medium_Grip',145,5,3],['Bent_Over_Barbell_Row',115,6,3],['Incline_Dumbbell_Press',45,8,3],['Triceps_Pushdown',50,10,3],['Plank',0,30,3,'time']
+          ['Barbell_Bench_Press_-_Medium_Grip',145,5,3],['Bent_Over_Barbell_Row',115,6,3],['Incline_Dumbbell_Press',90,8,3],['Triceps_Pushdown',50,10,3],['Plank',0,30,3,'time']
         ]},
         {day:1,name:'Lower A',moves:[
           ['Barbell_Deadlift',265,2,3],['Barbell_Squat',205,5,3],['Romanian_Deadlift',155,6,3],['Leg_Extensions',80,10,3],['Standing_Calf_Raises',90,10,3]
         ]},
         {day:3,name:'Upper B',moves:[
-          ['Standing_Military_Press',75,6,3],['Wide-Grip_Lat_Pulldown',110,8,3],['Seated_Cable_Rows',105,8,3],['Dumbbell_Bicep_Curl',25,10,3]
+          ['Standing_Military_Press',75,6,3],['Wide-Grip_Lat_Pulldown',110,8,3],['Seated_Cable_Rows',105,8,3],['Dumbbell_Bicep_Curl',50,10,3]
         ]},
         {day:5,name:'Lower B',moves:[
           ['Leg_Press',250,8,3],['Lying_Leg_Curls',70,10,3],['Barbell_Squat',185,8,3],['Standing_Calf_Raises',95,12,3]

@@ -22,7 +22,7 @@
     }
     function workoutSummary(workout) {
       const sets=workout.exercises.flatMap(item=>item.sets);
-      const volume=sets.reduce((total,set)=>total+((Number(set.w)||0)*(Number(set.r)||0)),0);
+      const volume=sets.reduce((total,set)=>total+setVolume(set),0);
       const muscles=[...new Set(workout.exercises.flatMap(item=>{const ex=exercises.find(row=>row.id===item.exerciseId);return [...(ex?.primary||[]),...(ex?.secondary||[])];}))];
       return {sets:sets.length,volume,muscles};
     }
@@ -43,7 +43,7 @@
     }
     function completedExerciseMarkup(item) {
       const ex=exercises.find(row=>row.id===item.exerciseId),isBodyweight=ex?.equipment==='body only',tracking=item.tracking||'reps';
-      const volume=item.sets.reduce((total,set)=>total+((Number(set.w)||0)*(Number(set.r)||0)),0);
+      const volume=item.sets.reduce((total,set)=>total+setVolume(set),0);
       return `<section class="completed-exercise-detail"><div class="completed-exercise-detail-head"><button class="completed-exercise-link" type="button" data-id="${escapeHtml(item.exerciseId)}">${escapeHtml(ex?.name||'Exercise')}</button><span>${tracking==='time'?`${item.sets.reduce((n,set)=>n+(Number(set.seconds)||0),0)} sec total`:`${formatVolume(volume)}${isBodyweight&&!volume?' · bodyweight':''}`}</span></div>${item.exerciseTags?.length?`<div class="exercise-tag-row">${item.exerciseTags.map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}</div>`:''}<div class="completed-set-head"><span>SET</span><span>LOAD</span><span>${tracking==='time'?'TIME':'REPS'}</span><span>RPE</span><span>${tracking==='time'?'TYPE':'EST. 1RM'}</span></div>${item.sets.map((set,index)=>{const estimate=tracking==='reps'&&Number(set.w)>0?Math.round(estimate1RM(set)):null;const load=isBodyweight?(Number(set.w)>0?`+${set.w} lb`:'Bodyweight'):`${set.w??'—'} lb`;return `<div class="completed-set-row"><span class="set-num">${index+1}</span><span><strong>${escapeHtml(load)}</strong></span><span><strong>${tracking==='time'?set.seconds:set.r}</strong> ${tracking==='time'?'sec':'reps'}</span><span class="completed-rpe">${set.rpe==null?'RPE —':`RPE <strong>${set.rpe}</strong>`}</span><span class="completed-est">${tracking==='time'?'Timed':estimate?`${estimate} lb`:'—'}</span>${set.tags?.length?`<div class="completed-set-tags">${set.tags.map(tag=>`<span class="set-tag-chip">${escapeHtml(tag)}</span>`).join('')}</div>`:''}</div>`}).join('')}${item.note?`<p class="completed-note"><strong>Notes:</strong> ${escapeHtml(item.note)}</p>`:''}</section>`;
     }
     function renderCompletedWorkout(workout) {
