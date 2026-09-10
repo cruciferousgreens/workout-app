@@ -43,7 +43,7 @@
     function rememberScroll() { state.scroll[state.activeView] = window.scrollY; }
     function restoreScroll(view) { requestAnimationFrame(() => window.scrollTo({top:state.scroll[view] || 0, behavior:'auto'})); }
     function setActiveNav(view) {
-      [['dashboard',$('#dashboardNav')],['library',$('#libraryNav')],['workout',$('#workoutsNav')],['program',$('#programNav')],['stats',$('#statsNav')]].forEach(([key,button]) => {
+      [['dashboard',$('#dashboardNav')],['library',$('#libraryNav')],['workout',$('#workoutsNav')],['program',$('#programNav')],['stats',$('#statsNav')],['settings',$('#settingsNav')]].forEach(([key,button]) => {
         const active = key === view;
         button.classList.toggle('active', active);
         if (active) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');

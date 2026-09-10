@@ -19,11 +19,9 @@
 </head>
 <body>
   <div class="app">
-    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch to dark theme" aria-pressed="false"><svg class="theme-icon theme-icon-light" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="theme-icon theme-icon-dark" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.4A8 8 0 0 1 8.6 4 8 8 0 1 0 20 15.4Z"></path></svg><span id="themeToggleLabel">Dark</span></button>
     <main class="shell">
       <section id="dashboardView" class="dashboard-view active" aria-labelledby="dashboardTitle">
         <div class="topline"><div><h1 id="dashboardTitle">Today</h1><p class="lede" id="dashboardDate"></p></div></div>
-        <div class="sample-banner dashboard-sample" id="dashboardSampleBanner"><span class="sample-banner-copy"><span class="sample-dot" aria-hidden="true"></span><span><strong>Sample training history</strong> · 10 weeks of example workouts</span></span><button class="clear-sample-data" type="button">Clear sample data</button></div>
         <div class="calendar-toolbar">
           <button class="calendar-page" id="previousWeek" type="button" aria-label="Previous week">‹</button>
           <div><strong id="calendarWeekLabel"></strong><span>Swipe or use arrows to browse</span></div>
@@ -52,8 +50,6 @@
             <button class="add-exercise" id="addExerciseButton" type="button">+ Custom exercise</button>
           </div>
         </div>
-
-        <div class="sample-banner" id="librarySampleBanner"><span class="sample-banner-copy"><span class="sample-dot" aria-hidden="true"></span><span>Example history and notes are marked <strong>Sample</strong>. Sample-derived PRs appear only until you log real sets.</span></span><button class="clear-sample-data" type="button">Clear sample data</button></div>
 
         <div class="controls">
           <div class="search-wrap">
@@ -95,7 +91,10 @@
             <p>Build from scratch, use a template, or pick up your last session.</p>
             <div class="workout-start-options">
               <button class="start-option primary" id="startBlankWorkout" type="button"><strong>Blank workout</strong><span>Add exercises and targets as you go.</span></button>
-              <button class="start-option" id="startSavedWorkout" type="button"><strong>From template</strong><span>Use a saved or built-in workout.</span></button>
+              <details class="template-disclosure" id="templateDisclosure">
+                <summary class="start-option"><strong>From template</strong><span>Use a saved or built-in workout.</span></summary>
+                <div id="workoutTemplateList" class="template-disclosure-list"></div>
+              </details>
               <button class="start-option" id="repeatLastWorkout" type="button"><strong>Repeat last</strong><span id="repeatLastWorkoutMeta">Copy your latest completed workout.</span></button>
             </div>
           </section>
@@ -113,7 +112,7 @@
             <h2>Exercises</h2>
             <div class="workout-toolbar-actions"><button class="secondary-button" id="openPlateCalculator" type="button">Plate calculator</button><button class="secondary-button" id="addWorkoutExercise" type="button">+ Add exercises</button></div>
           </div>
-          <div class="draft-status" id="draftStatus" role="status">Changes are kept automatically in this session</div>
+          <div class="draft-status" id="draftStatus" role="status">Changes are saved on this device</div>
           <div class="workout-exercises" id="workoutExercises"></div>
           <div class="workout-secondary-actions">
             <button class="small-button" id="saveWorkoutTemplate" type="button">Save as template</button>
@@ -138,10 +137,6 @@
             <p class="lede">Keep an ordered training block ready to run.</p>
           </div>
         </div>
-        <section class="dashboard-card built-in-programs" aria-labelledby="builtInProgramsTitle">
-          <div class="section-head"><h2 id="builtInProgramsTitle">Workout templates</h2><p class="section-note">Start these without creating a program</p></div>
-          <div id="builtInProgramList"></div>
-        </section>
         <div id="programSetup" class="program-setup">
           <h2>Create your active program.</h2>
           <p>Give the block a name, length, and a short focus. You can add its workouts in order next.</p>
@@ -174,7 +169,7 @@
           </details>
           <p class="form-error" id="programError" role="alert"></p>
           <button class="primary-button" id="createProgram" type="button">Create active program</button>
-          <p class="session-note">Program edits are kept while this preview remains open.</p>
+          <p class="session-note">Program edits are saved automatically on this device.</p>
         </div>
         <div id="programCover" class="program-cover" hidden></div>
         <section class="dashboard-card archived-programs" id="archivedPrograms" aria-labelledby="archivedProgramsTitle" hidden><h2 id="archivedProgramsTitle">Archived programs</h2><div id="archivedProgramList"></div></section>
@@ -183,9 +178,8 @@
       <section id="statsView" class="stats-view" aria-labelledby="statsTitle">
         <div class="topline"><div><h1 id="statsTitle">Stats</h1><p class="lede">Training volume and consistency from completed workouts.</p></div></div>
         <div class="period-tabs" id="statsPeriodTabs" aria-label="Stats period"></div>
-        <div class="stats-sample-note" id="statsSampleNote"><span><strong>Sample</strong> workouts power the demo views and labeled sample-derived PRs. They never affect real progression.</span><button class="clear-sample-data" type="button">Clear sample data</button></div>
         <div class="stats-grid" id="statsGrid"></div>
-        <section class="dashboard-card minimal-map"><div class="section-head"><h2>Muscle map</h2><p class="section-note" id="muscleHeatmapNote">Training volume by primary muscle</p></div><div id="muscleHeatmap"></div><div id="muscleStats"></div></section>
+        <section class="dashboard-card"><div class="section-head"><h2>Muscle map</h2><p class="section-note" id="muscleHeatmapNote">Training volume by primary muscle</p></div><div id="muscleHeatmap"></div><div id="muscleStats"></div></section>
         <div class="muscle-analysis-grid">
           <section class="analysis-panel"><h2>Volume by muscle</h2><p>Weighted volume. Secondary muscles receive 45% of the set’s volume.</p><div class="muscle-volume-list" id="muscleVolumeBreakdown"></div></section>
           <section class="analysis-panel"><h2>Training focus</h2><p>Share of completed rep-based sets: strength ≤5, hypertrophy 6–12, endurance 13+. Timed sets are excluded.</p><div class="balance-list" id="trainingFocus"></div></section>
@@ -196,6 +190,45 @@
         </div>
         <section class="analysis-panel chart-card"><div class="section-head"><div><h2>Muscle trends</h2><p class="section-note" id="muscleTrendNote">Compared with the previous period</p></div></div><div class="muscle-trend-list" id="muscleTrends"></div></section>
         <section class="dashboard-card chart-card"><div class="section-head"><h2>Weekly volume</h2><p class="section-note">Last 10 weeks · lb × reps</p></div><div class="chart-wrap" id="volumeChart"></div></section>
+      </section>
+
+      <section id="settingsView" class="stats-view" aria-labelledby="settingsTitle">
+        <div class="topline"><div><h1 id="settingsTitle">Settings</h1><p class="lede">Defaults and data for this device.</p></div></div>
+        <section class="dashboard-card">
+          <div class="section-head"><h2>Appearance</h2></div>
+          <div class="switch-row wide"><span class="switch-copy"><strong>Dark mode</strong><span>Easier on the eyes for evening sessions.</span></span><button class="switch" id="darkModeToggle" type="button" role="switch" aria-pressed="false" aria-label="Dark mode off"></button></div>
+        </section>
+        <section class="dashboard-card">
+          <div class="section-head"><h2>Progression defaults</h2><p class="section-note">Used for new exercises and programs.</p></div>
+          <div class="settings-grid">
+            <label class="rule-field"><span>RPE trigger threshold</span><input id="settingsRpeThreshold" type="number" min="1" max="10" step="1" value="8"></label>
+            <label class="rule-field"><span>Increment type</span><select id="settingsIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
+            <label class="rule-field"><span>Increment value</span><input id="settingsIncrementValue" type="number" min="0" step="0.5" value="5"></label>
+            <label class="rule-field"><span>Default rep range min</span><input id="settingsRepMin" type="number" min="1" step="1" value="6"></label>
+            <label class="rule-field"><span>Default rep range max</span><input id="settingsRepMax" type="number" min="1" step="1" value="12"></label>
+            <label class="rule-field"><span>Time step (timed exercises)</span><input id="settingsTimeStep" type="number" min="1" step="1" value="5"></label>
+          </div>
+          <div class="switch-row wide"><span class="switch-copy"><strong>Stall detection</strong><span>Suggest a separate deload week after repeated flat sessions with rising RPE. Never changes the program automatically.</span></span><button class="switch" id="settingsStallToggle" type="button" role="switch" aria-pressed="true" aria-label="Stall detector on"></button></div>
+        </section>
+        <section class="dashboard-card">
+          <div class="section-head"><h2>Data</h2><p class="section-note">Backups and storage on this device.</p></div>
+          <div class="settings-actions">
+            <button class="small-button" id="exportDataButton" type="button">Export data (JSON)</button>
+            <button class="small-button danger" id="deleteAllDataButton" type="button">Delete all data</button>
+          </div>
+        </section>
+        <section class="dashboard-card">
+          <div class="section-head"><h2>Attributions</h2></div>
+          <ul class="attribution-list">
+            <li>Muscle heat map uses an anatomical front/back body SVG in the style of Sasha-s-Body-Map, with named muscle regions.</li>
+            <li>Exercise library: free-exercise-db — 876 exercises, public domain (Unlicense).</li>
+            <li>Built-in program template: StrongLifts 5×5 (stronglifts.com).</li>
+          </ul>
+        </section>
+        <section class="dashboard-card">
+          <div class="section-head"><h2>About</h2></div>
+          <p class="section-note">Workout Tracker — an offline-first, free workout logging app. Your data stays on this device.</p>
+        </section>
       </section>
 
       <article id="detailView" class="detail" aria-live="polite">
@@ -229,7 +262,7 @@
           </div>
           <aside class="detail-aside">
             <section class="section" aria-labelledby="notesHeading">
-              <div class="section-head"><h2 id="notesHeading">Notes</h2><p class="section-note">Sample</p></div>
+              <div class="section-head"><h2 id="notesHeading">Notes</h2></div>
               <div class="note-card" id="noteCard"></div>
             </section>
             <section class="section" aria-labelledby="movementHeading">
@@ -330,17 +363,6 @@
       </div>
     </dialog>
 
-    <dialog class="custom-dialog" id="savedWorkoutDialog" aria-labelledby="savedWorkoutTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="savedWorkoutTitle">Saved workouts</h2><p>Start from a workout you’ve built before.</p></div>
-          <button class="dialog-close" id="closeSavedWorkout" type="button" aria-label="Close">×</button>
-        </div>
-        <div id="savedWorkoutList"></div>
-        <div class="form-actions"><button class="form-action secondary" id="savedStartBlank" type="button">Start blank instead</button></div>
-      </div>
-    </dialog>
-
     <dialog class="custom-dialog tag-dialog" id="setTagsDialog" aria-labelledby="setTagsTitle">
       <div class="custom-form">
         <div class="custom-form-head">
@@ -382,15 +404,6 @@
       </div>
     </dialog>
 
-    <dialog class="custom-dialog tag-dialog" id="samplePromptDialog" aria-labelledby="samplePromptTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="samplePromptTitle">Keep the sample workouts?</h2><p class="sample-prompt-copy">Your first real workout is logged. Sample sessions stay clearly labeled and separate from your real PRs and progression—but you can remove them now for a clean history.</p></div>
-        </div>
-        <div class="form-actions"><button class="form-action secondary" id="keepSampleData" type="button">Keep samples</button><button class="form-action primary" id="clearSampleFromPrompt" type="button">Clear sample data</button></div>
-      </div>
-    </dialog>
-
     <nav class="bottom-nav" aria-label="Primary navigation">
       <button class="nav-item active" id="dashboardNav" type="button" aria-current="page">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12 12 4l9 8"></path><path d="M5 10v10h14V10"></path></svg>Home
@@ -407,15 +420,18 @@
       <button class="nav-item" id="statsNav" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"></path></svg>Stats
       </button>
+      <button class="nav-item" id="settingsNav" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Settings
+      </button>
     </nav>
   </div>
 
   <script src="data/exercises-db.js"></script>
   <script src="assets/js/catalog.js"></script>
 <script src="assets/js/utilities.js"></script>
-<script src="assets/js/sample-data.js"></script>
 <script src="assets/js/program-templates.js"></script>
 <script src="assets/js/state.js"></script>
+<script src="assets/js/persistence.js"></script>
 <script src="assets/js/exercise-library.js"></script>
 <script src="assets/js/exercise-detail.js"></script>
 <script src="assets/js/navigation.js"></script>

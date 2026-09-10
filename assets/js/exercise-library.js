@@ -29,17 +29,16 @@
 
     function exerciseCard(x) {
       const muscles = x.primary.length ? x.primary.map(muscle => `<span class="tag primary">${escapeHtml(muscle)}</span>`).join('') : '<span class="tag primary">Unspecified muscle</span>';
-      const hasSampleHistory=getExerciseLogs(x.id).some(log=>log.sample);
       return `<button class="exercise-card" type="button" data-id="${escapeHtml(x.id)}">
-        <h2>${escapeHtml(x.name)} ${hasSampleHistory?'<span class="sample-label">Sample history</span>':''}</h2>
+        <h2>${escapeHtml(x.name)}</h2>
         <div class="tag-row">${muscles}<span class="tag">${escapeHtml(x.equipment || 'none')}</span>${x.custom ? '<span class="tag custom">Custom</span>' : ''}</div>
       </button>`;
     }
 
-    function getExerciseLogs(id, includeSamples = true) {
-      return workoutState.completed.filter(workout => includeSamples || !workout.sample).flatMap(workout => workout.exercises
+    function getExerciseLogs(id) {
+      return workoutState.completed.flatMap(workout => workout.exercises
         .filter(item => item.exerciseId === id)
-        .map(item => ({workoutId:workout.id,date: formatLogDate(workout.date), isoDate:workout.date, tracking:item.tracking || (item.sets.some(set => set.seconds != null) ? 'time' : 'reps'), progression:item.progression?{...item.progression}:null, exerciseTags:[...(item.exerciseTags||[])], sets:item.sets.map(set => ({w:set.w,r:set.r,seconds:set.seconds,rpe:set.rpe,tags:[...(set.tags || [])]})), name:workout.name, sample:!!workout.sample})));
+        .map(item => ({workoutId:workout.id,date: formatLogDate(workout.date), isoDate:workout.date, tracking:item.tracking || (item.sets.some(set => set.seconds != null) ? 'time' : 'reps'), progression:item.progression?{...item.progression}:null, exerciseTags:[...(item.exerciseTags||[])], sets:item.sets.map(set => ({w:set.w,r:set.r,seconds:set.seconds,rpe:set.rpe,tags:[...(set.tags || [])]})), name:workout.name})));
     }
 
     function recentExerciseIds() {

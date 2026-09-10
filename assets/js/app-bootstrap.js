@@ -1,5 +1,22 @@
 
     /** Connects static controls to feature modules and performs initial rendering. */
+    let deleteArmed=false;
+    function renderSettings(){
+      const dark=document.documentElement.dataset.theme==='dark';
+      const darkToggle=$('#darkModeToggle');
+      if(darkToggle){darkToggle.setAttribute('aria-pressed',String(dark));darkToggle.setAttribute('aria-label',`Dark mode ${dark?'on':'off'}`);}
+      $('#settingsRpeThreshold').value=progressionSetup.threshold;
+      $('#settingsIncrementType').value=progressionSetup.incrementType;
+      $('#settingsIncrementValue').value=progressionSetup.incrementValue;
+      $('#settingsRepMin').value=progressionSetup.defaultRange.min;
+      $('#settingsRepMax').value=progressionSetup.defaultRange.max;
+      $('#settingsTimeStep').value=progressionSetup.timeStep;
+      const stall=$('#settingsStallToggle');
+      stall.setAttribute('aria-pressed',String(!!progressionSetup.stallDetection));
+      stall.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);
+      const del=$('#deleteAllDataButton');
+      del.classList.remove('armed');del.textContent='Delete all data';deleteArmed=false;
+    }
     window.addEventListener('load', () => {
       if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
         navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -8,7 +25,8 @@
 
     function applyTheme(theme) {
       const dark=theme==='dark';document.documentElement.dataset.theme=dark?'dark':'light';
-      $('#themeToggle').setAttribute('aria-pressed',String(dark));$('#themeToggle').setAttribute('aria-label',`Switch to ${dark?'light':'dark'} theme`);$('#themeToggleLabel').textContent=dark?'Light':'Dark';
+      const toggle=$('#darkModeToggle');
+      if(toggle){toggle.setAttribute('aria-pressed',String(dark));toggle.setAttribute('aria-label',`Dark mode ${dark?'on':'off'}`);}
       const color=getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();document.querySelector('meta[name="theme-color"]').setAttribute('content',color);document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').setAttribute('content',dark?'black-translucent':'default');
       try{localStorage.setItem('workout-theme',dark?'dark':'light');}catch(_){}
     }
@@ -53,6 +71,7 @@
       closeCustomDialog();
       refreshFilters();
       renderLibrary();
+      schedulePersist();
       openExercise(id);
     });
 
@@ -60,7 +79,23 @@
     $('#closeCustomDialog').addEventListener('click', closeCustomDialog);
     $('#cancelCustomExercise').addEventListener('click', closeCustomDialog);
 
-    $('#themeToggle').addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
+    $('#darkModeToggle').addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
+    $('#settingsRpeThreshold').addEventListener('input',e=>{progressionSetup.threshold=Math.min(10,Math.max(1,Number(e.target.value)||8));schedulePersist();});
+    $('#settingsIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;schedulePersist();});
+    $('#settingsIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Math.max(0,Number(e.target.value)||0);schedulePersist();});
+    $('#settingsRepMin').addEventListener('input',e=>{progressionSetup.defaultRange.min=Math.max(1,Number(e.target.value)||1);progressionSetup.defaultRange.preset='custom';schedulePersist();});
+    $('#settingsRepMax').addEventListener('input',e=>{progressionSetup.defaultRange.max=Math.max(progressionSetup.defaultRange.min,Number(e.target.value)||progressionSetup.defaultRange.min);progressionSetup.defaultRange.preset='custom';schedulePersist();});
+    $('#settingsTimeStep').addEventListener('input',e=>{progressionSetup.timeStep=Math.max(1,Number(e.target.value)||5);schedulePersist();});
+    $('#settingsStallToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;const toggle=$('#settingsStallToggle');toggle.setAttribute('aria-pressed',String(progressionSetup.stallDetection));toggle.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);schedulePersist();});
+    $('#exportDataButton').addEventListener('click',()=>{downloadWorkoutBackup();showToast('Backup downloaded.');});
+    $('#deleteAllDataButton').addEventListener('click',()=>{
+      const button=$('#deleteAllDataButton');
+      if(!deleteArmed){deleteArmed=true;button.classList.add('armed');button.textContent='Tap again to confirm — erases everything';return;}
+      try{localStorage.removeItem(PERSIST_KEY);}catch(_){}
+      workoutState.completed=[];workoutState.templates=[];workoutState.tags=[];workoutState.exerciseTagPresets=[];workoutState.draft=null;workoutState.activeProgram=null;workoutState.archivedPrograms=[];
+      state.customExercises=[];exercises=exercises.filter(ex=>!ex.custom);
+      location.reload();
+    });
     applyTheme(document.documentElement.dataset.theme==='dark'?'dark':'light');
     $('#openPlateCalculator').addEventListener('click',()=>{renderPlateCalculator();$('#plateCalculatorDialog').showModal();});
     $('#closePlateCalculator').addEventListener('click',()=>$('#plateCalculatorDialog').close());
@@ -73,24 +108,22 @@
     $('#workoutsNav').addEventListener('click', () => showWorkouts());
     $('#programNav').addEventListener('click', () => showProgram());
     $('#statsNav').addEventListener('click', () => showStats());
-    $('#progressionThreshold').addEventListener('input',e=>progressionSetup.threshold=Number(e.target.value)||8);
-    $('#progressionIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;});
-    $('#progressionIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Number(e.target.value)||5;});
-    $('#programTimeStep').addEventListener('input',e=>{progressionSetup.timeStep=Math.max(1,Number(e.target.value)||5);});
-    $('#programRepMin').addEventListener('input',e=>{progressionSetup.defaultRange.min=Math.max(1,Number(e.target.value)||1);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));});
-    $('#programRepMax').addEventListener('input',e=>{progressionSetup.defaultRange.max=Math.max(progressionSetup.defaultRange.min,Number(e.target.value)||progressionSetup.defaultRange.min);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));});
-    document.querySelectorAll('[data-rep-preset]').forEach(button=>button.addEventListener('click',()=>applyRepPreset(button.dataset.repPreset)));
-    $('#undulatingToggle').addEventListener('click',()=>{progressionSetup.undulating=!progressionSetup.undulating;$('#undulatingToggle').setAttribute('aria-pressed',String(progressionSetup.undulating));$('#undulatingToggle').setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);renderWeekRanges();});
+    $('#settingsNav').addEventListener('click', () => showSettings());
+    $('#progressionThreshold').addEventListener('input',e=>{progressionSetup.threshold=Number(e.target.value)||8;schedulePersist();});
+    $('#progressionIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;schedulePersist();});
+    $('#progressionIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Number(e.target.value)||5;schedulePersist();});
+    $('#programTimeStep').addEventListener('input',e=>{progressionSetup.timeStep=Math.max(1,Number(e.target.value)||5);schedulePersist();});
+    $('#programRepMin').addEventListener('input',e=>{progressionSetup.defaultRange.min=Math.max(1,Number(e.target.value)||1);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
+    $('#programRepMax').addEventListener('input',e=>{progressionSetup.defaultRange.max=Math.max(progressionSetup.defaultRange.min,Number(e.target.value)||progressionSetup.defaultRange.min);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
+    document.querySelectorAll('[data-rep-preset]').forEach(button=>button.addEventListener('click',()=>{applyRepPreset(button.dataset.repPreset);schedulePersist();}));
+    $('#undulatingToggle').addEventListener('click',()=>{progressionSetup.undulating=!progressionSetup.undulating;$('#undulatingToggle').setAttribute('aria-pressed',String(progressionSetup.undulating));$('#undulatingToggle').setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);renderWeekRanges();schedulePersist();});
     $('#programLength').addEventListener('input',renderWeekRanges);
     $('#manageProgramOverrides').addEventListener('click',()=>{if(workoutState.activeProgram){$('#programSetup').hidden=true;document.querySelector('#programWorkouts')?.scrollIntoView({behavior:'smooth'});}else{$('#programError').textContent='Create the program first, then edit overrides inside each workout.';}});
-    document.querySelectorAll('[data-treatment]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.treatment=button.dataset.treatment;document.querySelectorAll('[data-treatment]').forEach(row=>row.setAttribute('aria-pressed',String(row===button)));}));
-    $('#stallDetectorToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;$('#stallDetectorToggle').setAttribute('aria-pressed',String(progressionSetup.stallDetection));$('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);});
+    document.querySelectorAll('[data-treatment]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.treatment=button.dataset.treatment;document.querySelectorAll('[data-treatment]').forEach(row=>row.setAttribute('aria-pressed',String(row===button)));schedulePersist();}));
+    $('#stallDetectorToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;$('#stallDetectorToggle').setAttribute('aria-pressed',String(progressionSetup.stallDetection));$('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);schedulePersist();});
     $('#createProgram').addEventListener('click', createProgram);
     $('#startBlankWorkout').addEventListener('click', () => startBlankWorkout());
-    $('#startSavedWorkout').addEventListener('click', () => { renderSavedWorkouts(); $('#savedWorkoutDialog').showModal(); });
-    $('#repeatLastWorkout').addEventListener('click',()=>repeatWorkout(workoutState.completed.find(workout=>!workout.sample)));
-    $('#closeSavedWorkout').addEventListener('click', () => $('#savedWorkoutDialog').close());
-    $('#savedStartBlank').addEventListener('click', () => { $('#savedWorkoutDialog').close(); startBlankWorkout(); });
+    $('#repeatLastWorkout').addEventListener('click',()=>repeatWorkout(workoutState.completed.slice().sort((a,b)=>b.date.localeCompare(a.date))[0]));
     $('#addWorkoutExercise').addEventListener('click', () => {
       workoutState.pickerMode='draft';workoutState.programWorkoutTarget=null;
       $('#exercisePickerTitle').textContent='Add exercise';
@@ -121,12 +154,10 @@
       workoutState.draft = null;
       $('#workoutComplete').hidden = true;
       $('#workoutError').textContent = '';
+      persistNow();
       renderWorkoutScreen();
     });
     $('#finishWorkout').addEventListener('click', finishWorkout);
-    document.querySelectorAll('.clear-sample-data').forEach(button=>button.addEventListener('click',clearSampleData));
-    $('#clearSampleFromPrompt').addEventListener('click',clearSampleData);
-    $('#keepSampleData').addEventListener('click',()=>$('#samplePromptDialog').close());
 
     $('#searchInput').addEventListener('input', e => {
       state.query = e.target.value;
@@ -152,10 +183,12 @@
       else if (hash === 'workout' || e.state?.view === 'workout') showWorkouts(false);
       else if (hash === 'program' || e.state?.view === 'program') showProgram(false);
       else if (hash === 'stats' || e.state?.view === 'stats') showStats(false);
+      else if (hash === 'settings' || e.state?.view === 'settings') showSettings(false);
       else if (id && exercises.some(x => x.id === id)) openExercise(id, false); else showDashboard(false);
     });
 
+    restorePersisted();
     populateFilters(); renderLibrary(); renderDashboard(); renderStats();
     const initialId = decodeURIComponent(location.hash.slice(1));
-    if (initialId === 'library') showLibrary(false); else if (initialId === 'workout') showWorkouts(false); else if (initialId === 'program') showProgram(false); else if (initialId === 'stats') showStats(false); else if (initialId && exercises.some(x => x.id === initialId)) openExercise(initialId, false); else showDashboard(false);
+    if (initialId === 'library') showLibrary(false); else if (initialId === 'workout') showWorkouts(false); else if (initialId === 'program') showProgram(false); else if (initialId === 'stats') showStats(false); else if (initialId === 'settings') showSettings(false); else if (initialId && exercises.some(x => x.id === initialId)) openExercise(initialId, false); else showDashboard(false);
   

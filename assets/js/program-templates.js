@@ -28,32 +28,4 @@
     /* StrongLifts remains available only as reusable Workout A/B templates. */
     const builtInPrograms = [];
 
-    const initialSampleWorkouts = generateSampleWorkouts();
-    const historicalProgramWorkoutIds = { 'Upper A':'sample-upper-a', 'Lower A':'sample-lower-a', 'Upper B':'sample-upper-b', 'Lower B':'sample-lower-b' };
-    const historicalProgramLogs = initialSampleWorkouts.slice(-16);
-    historicalProgramLogs.forEach(workout => {
-      workout.programId = 'sample-spring-strength';
-      workout.programWorkoutUid = historicalProgramWorkoutIds[workout.name] || null;
-    });
-    const sampleHistoricalProgram = {
-      id:'sample-spring-strength',
-      sample:true,
-      name:'Sample · Spring Strength Block',
-      length:4,
-      focus:'A completed four-week example program for testing program history and audit views.',
-      startedAt:historicalProgramLogs.at(-1)?.date || localIsoDate(),
-      archivedAt:historicalProgramLogs[0]?.date || localIsoDate(),
-      progression:{threshold:8,incrementType:'lb',incrementValue:5,timeStep:5,treatment:'suggestions',stallDetection:true,defaultRange:{preset:'hypertrophy',min:6,max:12,openTop:false,amrap:false},undulating:false,weeklyRanges:[]},
-      workouts:[
-        {uid:'sample-upper-a',name:'Upper A'}, {uid:'sample-lower-a',name:'Lower A'},
-        {uid:'sample-upper-b',name:'Upper B'}, {uid:'sample-lower-b',name:'Lower B'}
-      ]
-    };
-
-    const sampleNotes = {
-      'Wide-Grip_Lat_Pulldown':'Shoulder-width-plus grip felt strongest. Keep the chest high and think “elbows into back pockets.” The last rep gets loose when the torso leans too far back.',
-      'Barbell_Bench_Press_-_Medium_Grip':'Pause the first rep of each set. Right wrist stacks better when the grip is one finger narrower.',
-      'Barbell_Squat':'Use the second rack height. Brace before unracking and keep the walkout to two steps.'
-    };
-
     

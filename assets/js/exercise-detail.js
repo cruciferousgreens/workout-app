@@ -22,13 +22,13 @@
       return logs.flatMap(session => session.sets.map(set => ({...set, date:session.date})));
     }
 
-    function statsFor(id, source = 'real') {
-      const logs = getExerciseLogs(id, source === 'sample').filter(log => source === 'sample' ? log.sample : !log.sample);
+    function statsFor(id) {
+      const logs = getExerciseLogs(id);
       const sets = allSets(logs).filter(set => Number(set.w) > 0 && Number(set.r) > 0);
       if (!sets.length) return null;
       const bestEst = sets.reduce((a,b) => estimate1RM(a) > estimate1RM(b) ? a : b);
       const heaviest = sets.reduce((a,b) => Number(a.w) > Number(b.w) ? a : b);
-      return {sessions:logs.length, sets:sets.length, bestEst, projected:Math.round(estimate1RM(bestEst)), heaviest, source};
+      return {sessions:logs.length, sets:sets.length, bestEst, projected:Math.round(estimate1RM(bestEst)), heaviest};
     }
 
     function similarity(a, b) {
@@ -43,18 +43,17 @@
 
     function renderHistory(id) {
       const logs = getExerciseLogs(id);
-      const sampleCount = logs.filter(log => log.sample).length;
-      $('#historyCount').textContent = logs.length ? `${logs.length} completed workouts${sampleCount ? ` · ${sampleCount} sample` : ''}` : 'No completed workouts';
+      $('#historyCount').textContent = logs.length ? `${logs.length} completed workout${logs.length===1?'':'s'}` : 'No completed workouts';
       $('#historyList').innerHTML = logs.length ? logs.map(session => {
         const top = Math.round(Math.max(...session.sets.map(estimate1RM)));
         return `<div class="history-session">
-          <div class="session-head"><span class="session-date">${escapeHtml(session.date)} ${session.sample ? '<span class="sample-label">Sample</span>' : ''}</span><span class="session-est">${session.sample ? 'Illustrative estimate' : `Best estimate ${top} lb`} · <button class="filter-clear" type="button" data-history-workout="${escapeHtml(session.workoutId)}">View workout</button></span></div>
+          <div class="session-head"><span class="session-date">${escapeHtml(session.date)}</span><span class="session-est">Best estimate ${top} lb · <button class="filter-clear" type="button" data-history-workout="${escapeHtml(session.workoutId)}">View workout</button></span></div>
           ${session.exerciseTags?.length?`<div class="exercise-tag-row">${session.exerciseTags.map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}</div>`:''}
           <div class="sets">${session.sets.map((s,i) => `<div class="set-row"><span class="set-num">SET ${i+1}</span><span class="set-cell"><strong>${s.w ?? '—'}</strong>${s.w == null ? '' : ' lb'}</span><span class="set-cell"><strong>${session.tracking === 'time' ? (s.seconds ?? '—') : s.r}</strong> ${session.tracking === 'time' ? 'sec' : 'reps'}</span><span class="set-cell">${s.rpe == null ? '—' : `RPE <strong>${s.rpe}</strong>`}${s.tags?.length ? `<br><small>${s.tags.map(escapeHtml).join(' · ')}</small>` : ''}</span></div>`).join('')}</div>
         </div>`;
       }).join('') : `<div class="history-empty">No history for this movement yet.</div>`;
       document.querySelectorAll('[data-history-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=workoutState.completed.find(row=>row.id===button.dataset.historyWorkout);if(workout){state.workoutDetailReturn='library';showWorkouts();renderCompletedWorkout(workout);}}));
-      $('#formulaNote').textContent = logs.length ? 'Real workouts replace sample-derived PRs automatically. Sample values stay separate, remain labeled, and disappear when sample data is cleared.' : '';
+      $('#formulaNote').textContent = '';
     }
 
     function openExercise(id, push = true) {
@@ -65,30 +64,27 @@
       $('#detailTitle').textContent = ex.name;
       $('#detailTags').innerHTML = [...ex.primary.map(x => `<span class="tag primary">${escapeHtml(x)}</span>`), ...ex.secondary.map(x => `<span class="tag">${escapeHtml(x)}</span>`), `<span class="tag">${escapeHtml(ex.equipment || 'no equipment')}</span>`, ...(ex.custom ? ['<span class="tag custom">Custom</span>'] : [])].join('');
       $('#sourceId').innerHTML = ex.custom ? 'Created in this session' : `Source record <strong>${escapeHtml(ex.id)}</strong><br><a href="${SOURCE_URL}" target="_blank" rel="noreferrer">View dataset ↗</a>`;
-      const realStats = statsFor(id, 'real');
-      const sampleStats = statsFor(id, 'sample');
-      const st = realStats || sampleStats;
-      const sampleDerived = !realStats && !!sampleStats;
+      const realStats = statsFor(id);
+      const st = realStats;
       const isBodyweight = ex.equipment === 'body only';
-      const sourceNote = sampleDerived ? '<span class="sample-pr-note"><span class="sample-label">Sample-derived</span> Clears with sample data</span>' : '';
       $('#stats').innerHTML = st && !isBodyweight ? `
-        <div class="stat"><span class="stat-label">PROJECTED 1RM</span><span class="stat-value">${st.projected} lb</span><span class="stat-sub">RPE-adjusted · ${st.bestEst.w} × ${st.bestEst.r} @ ${st.bestEst.rpe ?? '—'}</span>${sourceNote}</div>
-        <div class="stat"><span class="stat-label">HEAVIEST SET PR</span><span class="stat-value">${st.heaviest.w} lb</span><span class="stat-sub">${st.heaviest.r} reps · ${st.heaviest.date}</span>${sourceNote}</div>
-        <div class="stat"><span class="stat-label">VOLUME LOGGED</span><span class="stat-value">${st.sets} sets</span><span class="stat-sub">Across ${st.sessions} ${sampleDerived ? 'sample' : 'real'} workouts</span>${sourceNote}</div>` : st ? `
-        <div class="stat"><span class="stat-label">BODYWEIGHT MOVEMENT</span><span class="stat-value">${st.sets} sets</span><span class="stat-sub">Added weight is optional</span>${sourceNote}</div>
-        <div class="stat"><span class="stat-label">BEST REP SET</span><span class="stat-value">${Math.max(...allSets(getExerciseLogs(id, true).filter(log => sampleDerived ? log.sample : !log.sample)).map(s=>Number(s.r)||0))} reps</span><span class="stat-sub">Across ${st.sessions} ${sampleDerived ? 'sample' : 'real'} workouts</span>${sourceNote}</div>
-        <div class="stat"><span class="stat-label">SESSIONS</span><span class="stat-value">${st.sessions}</span><span class="stat-sub">Completed workouts</span>${sourceNote}</div>` : `
+        <div class="stat"><span class="stat-label">PROJECTED 1RM</span><span class="stat-value">${st.projected} lb</span><span class="stat-sub">RPE-adjusted · ${st.bestEst.w} × ${st.bestEst.r} @ ${st.bestEst.rpe ?? '—'}</span></div>
+        <div class="stat"><span class="stat-label">HEAVIEST SET PR</span><span class="stat-value">${st.heaviest.w} lb</span><span class="stat-sub">${st.heaviest.r} reps · ${st.heaviest.date}</span></div>
+        <div class="stat"><span class="stat-label">VOLUME LOGGED</span><span class="stat-value">${st.sets} sets</span><span class="stat-sub">Across ${st.sessions} workout${st.sessions===1?'':'s'}</span></div>` : st ? `
+        <div class="stat"><span class="stat-label">BODYWEIGHT MOVEMENT</span><span class="stat-value">${st.sets} sets</span><span class="stat-sub">Added weight is optional</span></div>
+        <div class="stat"><span class="stat-label">BEST REP SET</span><span class="stat-value">${Math.max(...allSets(getExerciseLogs(id)).map(s=>Number(s.r)||0))} reps</span><span class="stat-sub">Across ${st.sessions} workout${st.sessions===1?'':'s'}</span></div>
+        <div class="stat"><span class="stat-label">SESSIONS</span><span class="stat-value">${st.sessions}</span><span class="stat-sub">Completed workouts</span></div>` : `
         <div class="stat"><span class="stat-label">PROJECTED 1RM</span><span class="stat-value">—</span><span class="stat-sub">Complete a weighted set to calculate it</span></div>
         <div class="stat"><span class="stat-label">HEAVIEST SET PR</span><span class="stat-value">—</span><span class="stat-sub">No completed sets yet</span></div>
         <div class="stat"><span class="stat-label">VOLUME LOGGED</span><span class="stat-value">0 sets</span><span class="stat-sub">No completed sets yet</span></div>`;
       const visual=exerciseImageMap[id];
       $('#exerciseVisual').classList.toggle('visible', !!visual);
       $('#exerciseVisual').innerHTML=visual?`<img src="${visual.src}" alt="${escapeHtml(visual.alt)}"><div class="exercise-visual-copy"><strong>Movement reference</strong><p>Use the instructions below for setup and execution. <a href="${visual.source}" target="_blank" rel="noreferrer">Image source ↗</a></p></div>`:'';
-      const trendLogs = realStats ? getExerciseLogs(id, false) : getExerciseLogs(id, true).filter(log => log.sample);
+      const trendLogs = getExerciseLogs(id);
       const trend=trendLogs.slice().reverse().map(session=>({label:session.date,shortLabel:session.date.replace(/, \d{4}/,''),value:Math.round(Math.max(...session.sets.map(estimate1RM)))})).filter(p=>p.value>0);
-      $('#exerciseProgressChart').innerHTML=isBodyweight?'<div class="chart-empty">Bodyweight progress will use reps and added load from real workouts.</div>':lineChart(trend,value=>`${Math.round(value)} lb`);
+      $('#exerciseProgressChart').innerHTML=isBodyweight?'<div class="chart-empty">Bodyweight progress will use reps and added load from your workouts.</div>':lineChart(trend,value=>`${Math.round(value)} lb`);
       renderHistory(id);
-      $('#noteCard').innerHTML = `${sampleNotes[id] || 'No sample note for this movement.'}<span class="note-meta">Exercise-specific note</span>`;
+      $('#noteCard').innerHTML = `No notes for this movement yet.<span class="note-meta">Exercise-specific note</span>`;
       $('#movementCard').innerHTML = `<dl><dt>Force</dt><dd>${escapeHtml(ex.force || '—')}</dd><dt>Mechanic</dt><dd>${escapeHtml(ex.mechanic || '—')}</dd><dt>Primary</dt><dd>${escapeHtml(ex.primary.join(', ') || '—')}</dd><dt>Secondary</dt><dd>${escapeHtml(ex.secondary.join(', ') || '—')}</dd></dl>${ex.custom ? `<div class="custom-tools"><button class="custom-tool" id="editCustomExercise" type="button">Edit</button><button class="custom-tool danger" id="deleteCustomExercise" type="button">Delete</button></div>` : ''}`;
       $('#instructions').innerHTML = ex.instructions.length ? ex.instructions.map(x => `<li>${escapeHtml(x)}</li>`).join('') : '<li>No instructions added.</li>';
       if (ex.custom) {

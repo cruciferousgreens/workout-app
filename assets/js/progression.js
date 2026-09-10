@@ -18,9 +18,9 @@
       return Math.round((weight+Number(value))*2)/2;
     }
 
-    function progressionForExercise(exerciseId, profile, includeSamples=false, config=null) {
+    function progressionForExercise(exerciseId, profile, config=null) {
       const programConfig=config || workoutState.activeProgram?.progression || progressionSetup;
-      const logs=getExerciseLogs(exerciseId,includeSamples).filter(log=>includeSamples?log.sample:!log.sample).sort((a,b)=>b.isoDate.localeCompare(a.isoDate));
+      const logs=getExerciseLogs(exerciseId).sort((a,b)=>b.isoDate.localeCompare(a.isoDate));
       if(!logs.length)return null;
       const latestLog=logs[0],latest=topSetForSession(latestLog); if(!latest)return null;
       const mode=profile?.mode || latest.mode || 'reps';
@@ -37,7 +37,7 @@
       if(repRangeChanged&&latest.weight>0){
         estimated1RM=estimate1RM({w:latest.weight,r:latest.reps,rpe:latest.rpe});
         const targetReps=profile?.openTop?min:Math.max(min,max),rawTarget=estimated1RM/(1+targetReps/30);
-        nextWeight=Math.max(0,Math.round(rawTarget/2.5)*2.5);nextReps=min;kind='range';
+        nextWeight=Math.max(0,Math.round(rawTarget*10)/10);nextReps=min;kind='range';
         const week=Number(programConfig.currentWeek)||null,weekPrefix=week?`Week ${week} is `:'This block is ';
         reason=`${weekPrefix}${programRangeLabel(profile)}; suggesting ${nextWeight} lb from your estimated 1RM of ${Math.round(estimated1RM)} lb so the new rep target starts at a sensible load.`;
       } else if(latest.rpe!=null && latest.rpe<=threshold){
@@ -55,11 +55,7 @@
       const flat=recent.length>=3 && recent.every((row,i)=>i===0 || (row.weight<=recent[i-1].weight && row.performance<=recent[i-1].performance));
       const rising=recent.length>=3 && recent.every((row,i)=>i===0 || row.rpe==null || recent[i-1].rpe==null || row.rpe>=recent[i-1].rpe);
       const stall=!!programConfig.stallDetection && flat && rising;
-      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog.isoDate,sourceWorkout:latestLog.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall,sampleDerived:includeSamples};
-    }
-
-    function sampleSuggestions() {
-      return Object.entries(sampleProgressionProfiles).map(([id,profile])=>progressionForExercise(id,profile,true,{...progressionSetup})).filter(Boolean).slice(0,4);
+      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog.isoDate,sourceWorkout:latestLog.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall};
     }
 
     function suggestionCardMarkup(suggestion,index,interactive=true) {
@@ -68,20 +64,16 @@
       const oldTarget=formatTarget(suggestion.latest.weight,suggestion.mode==='time'?suggestion.latest.seconds:suggestion.latest.reps);
       const nextTarget=formatTarget(suggestion.nextWeight,suggestion.mode==='time'?suggestion.nextSeconds:suggestion.nextReps);
       const label=suggestion.applied?'Applied ✓':suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='range'?'Week range':suggestion.kind==='time'?'Time +':'Rep +';
-      const basis=suggestion.sampleDerived?'':`<div class="suggestion-basis">Based on ${escapeHtml(suggestion.sourceWorkout||'your last workout')} · ${escapeHtml(formatLogDate(suggestion.sourceDate))} · latest top set ${oldTarget}${suggestion.latest.rpe==null?' without RPE':` @ RPE ${suggestion.latest.rpe}`}</div>`;
+      const basis=`<div class="suggestion-basis">Based on ${escapeHtml(suggestion.sourceWorkout||'your last workout')} · ${escapeHtml(formatLogDate(suggestion.sourceDate))} · latest top set ${oldTarget}${suggestion.latest.rpe==null?' without RPE':` @ RPE ${suggestion.latest.rpe}`}</div>`;
       return `<${interactive?'button':'div'} class="suggestion-card ${suggestion.applied?'applied':''}" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name">${escapeHtml(ex?.name||'Exercise')}<span>${label}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div><div class="suggestion-reason">${escapeHtml(suggestion.reason)}</div>${basis}</${interactive?'button':'div'}>`;
     }
 
     function renderProgressionPreview() {
-      const suggestions=sampleSuggestions();
-      const fallback='<div class="chart-empty">Sample history is cleared. Complete workouts to generate progression targets.</div>';
-      const ruleMarkup=suggestions.map(item=>{
-        const ex=exercises.find(x=>x.id===item.exerciseId),profile=sampleProgressionProfiles[item.exerciseId],time=profile.mode==='time';
-        return `<div class="exercise-rule-row" data-rule-id="${escapeHtml(item.exerciseId)}"><strong title="${escapeHtml(ex?.name||'Exercise')}">${escapeHtml(ex?.name||'Exercise')}</strong><label class="rule-field"><span>Track</span><select data-rule-field="mode"><option value="reps" ${time?'':'selected'}>Reps</option><option value="time" ${time?'selected':''}>Seconds</option></select></label><label class="rule-field"><span>${time?'Min sec':'Min reps'}</span><input type="number" min="1" max="600" value="${time?profile.timeMin:profile.min}" data-rule-field="${time?'timeMin':'min'}"></label><label class="rule-field"><span>${time?'Max sec':'Max reps'}</span><input type="number" min="1" max="600" value="${time?profile.timeMax:profile.max}" data-rule-field="${time?'timeMax':'max'}"></label><label class="rule-field"><span>${time?'Sec step':'Load step'}</span><input type="number" min="0.5" step="0.5" value="${time?profile.timeStep:profile.incrementValue}" data-rule-field="${time?'timeStep':'incrementValue'}"></label><label class="reps-only-label"><input type="checkbox" data-rule-field="repsOnly" ${profile.repsOnly?'checked':''}> Increase reps only</label></div>`;
-      }).join('');
-      $('#progressionPreview').innerHTML=`<div class="progression-preview-head"><div><h2 id="progressionPreviewTitle">Next-session suggestions</h2><p>Tap a card to apply its target. Rep- and time-range progression use the same RPE 8 trigger.</p></div><span class="sample-derived">Sample-derived preview</span></div>${suggestions.length?`<details class="exercise-rules"><summary>Adjust sample exercise rules</summary>${ruleMarkup}</details><div class="suggestion-list">${suggestions.map((item,i)=>suggestionCardMarkup(item,i,true)).join('')}</div>`:fallback}<p class="progression-footnote">These preview values come only from labeled sample history. In an actual program, cards use real completed workouts. The engine never schedules a deload automatically.</p>`;
-      document.querySelectorAll('[data-demo-suggestion]').forEach(button=>button.addEventListener('click',()=>{const suggestion=suggestions[Number(button.dataset.demoSuggestion)];if(!suggestion)return;suggestion.applied=!suggestion.applied;button.classList.toggle('applied',suggestion.applied);button.querySelector('.suggestion-name span').textContent=suggestion.applied?'Applied ✓':(suggestion.kind==='load'?'Load +':suggestion.kind==='time'?'Time +':suggestion.kind==='hold'?'Hold':'Rep +');}));
-      document.querySelectorAll('[data-rule-id]').forEach(row=>row.querySelectorAll('[data-rule-field]').forEach(control=>control.addEventListener('change',()=>{const profile=sampleProgressionProfiles[row.dataset.ruleId],field=control.dataset.ruleField;if(!profile)return;if(field==='repsOnly')profile[field]=control.checked;else if(field==='mode')profile[field]=control.value;else profile[field]=Number(control.value);if((profile.min||0)>(profile.max||Infinity))profile.max=profile.min;if((profile.timeMin||0)>(profile.timeMax||Infinity))profile.timeMax=profile.timeMin;renderProgressionPreview();})));
+      const host=$('#progressionPreview'); if(!host)return;
+      const ids=[...new Set(workoutState.completed.flatMap(workout=>workout.exercises.map(item=>item.exerciseId)))];
+      const suggestions=ids.map(id=>progressionForExercise(id,progressionProfileForDraftItem({exerciseId:id}),{...progressionSetup})).filter(Boolean).slice(0,4);
+      const fallback='<div class="chart-empty">Complete workouts to generate progression targets.</div>';
+      host.innerHTML=`<div class="progression-preview-head"><div><h2 id="progressionPreviewTitle">Next-session suggestions</h2><p>Based on your completed history. Rep- and time-range progression use the same RPE trigger.</p></div></div>${suggestions.length?`<div class="suggestion-list">${suggestions.map((item,i)=>suggestionCardMarkup(item,i,false)).join('')}</div>`:fallback}<p class="progression-footnote">The engine never schedules a deload automatically.</p>`;
     }
 
     function progressionProfileForDraftItem(item) {
@@ -92,7 +84,7 @@
 
     function prepareDraftProgression(draft,programConfig) {
       if(!draft)return;
-      draft.progressionSuggestions=draft.exercises.map(item=>progressionForExercise(item.exerciseId,progressionProfileForDraftItem(item),false,programConfig)).filter(Boolean);
+      draft.progressionSuggestions=draft.exercises.map(item=>progressionForExercise(item.exerciseId,progressionProfileForDraftItem(item),programConfig)).filter(Boolean);
     }
 
     function applyProgressionSuggestion(draft,suggestion,rerender=true) {
@@ -110,8 +102,8 @@
       const suggestions=draft?.progressionSuggestions||[];
       if(!draft?.exercises?.length){box.hidden=true;return;}
       box.hidden=false;
-      if(!suggestions.length){box.innerHTML=`<div class="progression-banner-head"><div><h3>No progression suggestions yet</h3><p>Suggestions only appear for exercises in this workout after you have real completed history. Sample workouts are never used.</p></div><span class="real-data-label">Real logs only</span></div>`;return;}
-      box.innerHTML=`<div class="progression-banner-head"><div><h3>${draft.autoAppliedProgression?'Progression targets applied':'Suggestions for this workout'}</h3><p>${draft.autoAppliedProgression?'Targets below were filled from your most recent real performance and this week’s rep range. Every field remains editable.':'Only exercises below with real completed history appear. Tap a card to apply its target to every set.'}</p></div><span class="real-data-label">Real logs only</span></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
+      if(!suggestions.length){box.innerHTML=`<div class="progression-banner-head"><div><h3>No progression suggestions yet</h3><p>Suggestions appear for exercises in this workout once you have completed history.</p></div></div>`;return;}
+      box.innerHTML=`<div class="progression-banner-head"><div><h3>${draft.autoAppliedProgression?'Progression targets applied':'Suggestions for this workout'}</h3><p>${draft.autoAppliedProgression?'Targets below were filled from your most recent performance and this week’s rep range. Every field remains editable.':'Only exercises below with completed history appear. Tap a card to apply its target to every set.'}</p></div></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
       document.querySelectorAll('[data-real-suggestion]').forEach(button=>button.addEventListener('click',()=>applyProgressionSuggestion(draft,suggestions[Number(button.dataset.realSuggestion)])));
     }
 

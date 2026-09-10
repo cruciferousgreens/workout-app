@@ -77,6 +77,7 @@
     function deleteCustomExercise(id) {
       exercises = exercises.filter(ex => ex.id !== id);
       state.customExercises = state.customExercises.filter(ex => ex.id !== id);
+      schedulePersist();
       refreshFilters();
       renderLibrary();
       showLibrary(false);

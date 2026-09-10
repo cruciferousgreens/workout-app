@@ -52,7 +52,7 @@
       const rows=[];
       workouts.slice().sort((a,b)=>b.date.localeCompare(a.date)).forEach(workout=>workout.exercises.forEach(item=>{
         const current=item.sets.filter(set=>Number(set.w)>0&&Number(set.r)>0); if(!current.length)return;
-        const prior=workoutState.completed.filter(row=>row.id!==workout.id&&row.date<workout.date&&!!row.sample===!!workout.sample).flatMap(row=>row.exercises.filter(entry=>entry.exerciseId===item.exerciseId).flatMap(entry=>entry.sets)).filter(set=>Number(set.w)>0&&Number(set.r)>0);
+        const prior=workoutState.completed.filter(row=>row.id!==workout.id&&row.date<workout.date).flatMap(row=>row.exercises.filter(entry=>entry.exerciseId===item.exerciseId).flatMap(entry=>entry.sets)).filter(set=>Number(set.w)>0&&Number(set.r)>0);
         if(!prior.length)return;
         const best=Math.max(...current.map(estimate1RM)),priorBest=Math.max(...prior.map(estimate1RM)),weight=Math.max(...current.map(set=>Number(set.w))),priorWeight=Math.max(...prior.map(set=>Number(set.w)));
         const kind=best>priorBest+.5?'Estimated 1RM PR':weight>priorWeight?'Heaviest set PR':'';
@@ -106,30 +106,18 @@
         ${front?`<ellipse class="body-region" data-muscle="shoulders" cx="37" cy="57" rx="11" ry="9"></ellipse><ellipse class="body-region" data-muscle="shoulders" cx="83" cy="57" rx="11" ry="9"></ellipse><path class="body-region" data-muscle="chest" d="M45 54 Q60 47 59 75 Q46 77 42 66Z"></path><path class="body-region" data-muscle="chest" d="M75 54 Q60 47 61 75 Q74 77 78 66Z"></path><rect class="body-region" data-muscle="biceps" x="29" y="70" width="9" height="30" rx="4"></rect><rect class="body-region" data-muscle="biceps" x="82" y="70" width="9" height="30" rx="4"></rect><rect class="body-region" data-muscle="forearms" x="25" y="101" width="8" height="28" rx="4"></rect><rect class="body-region" data-muscle="forearms" x="87" y="101" width="8" height="28" rx="4"></rect><rect class="body-region" data-muscle="abdominals" x="49" y="78" width="22" height="49" rx="8"></rect><path class="body-region" data-muscle="quadriceps" d="M44 139 Q57 135 57 170 L53 204 39 202Z"></path><path class="body-region" data-muscle="quadriceps" d="M76 139 Q63 135 63 170 L67 204 81 202Z"></path><path class="body-region" data-muscle="calves" d="M39 205 53 207 50 239 38 239Z"></path><path class="body-region" data-muscle="calves" d="M81 205 67 207 70 239 82 239Z"></path>`:`<path class="body-region" data-muscle="traps" d="M46 43 60 38 74 43 68 61 52 61Z"></path><path class="body-region" data-muscle="lats" d="M42 61 Q51 57 58 67 L54 108 40 116 35 78Z"></path><path class="body-region" data-muscle="lats" d="M78 61 Q69 57 62 67 L66 108 80 116 85 78Z"></path><rect class="body-region" data-muscle="triceps" x="29" y="69" width="9" height="31" rx="4"></rect><rect class="body-region" data-muscle="triceps" x="82" y="69" width="9" height="31" rx="4"></rect><rect class="body-region" data-muscle="lower back" x="47" y="99" width="26" height="30" rx="8"></rect><ellipse class="body-region" data-muscle="glutes" cx="49" cy="143" rx="12" ry="13"></ellipse><ellipse class="body-region" data-muscle="glutes" cx="71" cy="143" rx="12" ry="13"></ellipse><path class="body-region" data-muscle="hamstrings" d="M41 157 Q53 153 57 163 L53 203 39 201Z"></path><path class="body-region" data-muscle="hamstrings" d="M79 157 Q67 153 63 163 L67 203 81 201Z"></path><path class="body-region" data-muscle="calves" d="M39 205 53 207 50 239 38 239Z"></path><path class="body-region" data-muscle="calves" d="M81 205 67 207 70 239 82 239Z"></path>`}
       </svg><figcaption>${front?'Front':'Back'}</figcaption></figure>`;
     }
-    function abstractBodyMapSvg() {
-      return `<figure class="abstract-body-figure"><svg viewBox="0 0 150 250" role="img" aria-label="Abstract body showing training volume by broad muscle group">
-        <circle class="body-silhouette" cx="75" cy="24" r="15"></circle>
-        <path class="body-region" data-muscle-group="shoulders|chest|triceps" data-group-label="Upper push" d="M49 48 Q75 36 101 48 L112 76 97 94 91 75 88 100 62 100 59 75 53 94 38 76Z"></path>
-        <path class="body-region" data-muscle-group="lats|middle back|traps|biceps|forearms" data-group-label="Upper pull" d="M42 79 55 66 62 102 54 134 38 126 30 93Z M108 79 95 66 88 102 96 134 112 126 120 93Z"></path>
-        <path class="body-region" data-muscle-group="abdominals|lower back" data-group-label="Core" d="M62 102 Q75 108 88 102 L91 139 Q75 151 59 139Z"></path>
-        <path class="body-region" data-muscle-group="glutes|adductors|abductors" data-group-label="Hips" d="M58 141 Q75 148 92 141 L94 166 75 176 56 166Z"></path>
-        <path class="body-region" data-muscle-group="quadriceps|hamstrings" data-group-label="Thighs" d="M57 166 73 176 68 216 48 215Z M93 166 77 176 82 216 102 215Z"></path>
-        <path class="body-region" data-muscle-group="calves" data-group-label="Calves" d="M48 217 68 218 65 244 50 244Z M102 217 82 218 85 244 100 244Z"></path>
-      </svg><figcaption>Broad training regions</figcaption></figure>`;
-    }
     function hydrateBodyMaps(){
       document.querySelectorAll('.anatomy-map[data-volumes]').forEach(host=>{
         if(host.dataset.hydrated)return;
         const volumes=JSON.parse(decodeURIComponent(host.dataset.volumes));
-        const regions=[...host.querySelectorAll('[data-muscle], [data-muscle-group]')];
-        const regionValue=region=>(region.dataset.muscleGroup||region.dataset.muscle||'').split('|').filter(Boolean).reduce((sum,muscle)=>sum+Number(volumes[muscle]||0),0);
+        const regions=[...host.querySelectorAll('[data-muscle]')];
+        const regionValue=region=>Number(volumes[region.dataset.muscle]||0);
         const max=Math.max(1,...regions.map(regionValue));
         regions.forEach(region=>{
-          const muscles=(region.dataset.muscleGroup||region.dataset.muscle||'').split('|').filter(Boolean);
+          const muscle=region.dataset.muscle;
           const value=regionValue(region);
-          const label=region.dataset.groupLabel||titleCase(muscles[0]);
           region.classList.add(`heat-${heatLevel(value,max)}`);
-          const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=`${label} · ${formatVolume(value)}`;region.prepend(title);
+          const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=`${titleCase(muscle)} · ${formatVolume(value)}`;region.prepend(title);
         });
         host.dataset.hydrated='true';
       });
@@ -139,30 +127,17 @@
       if(!rows.length)return '<div class="chart-empty">No weighted training volume in this period.</div>';
       const max=Math.max(...rows.map(([,v])=>v)),shown=compact?rows.slice(0,4):rows;
       const encoded=encodeURIComponent(JSON.stringify(volumes));
-      const body=compact?`<div class="abstract-body-map">${abstractBodyMapSvg()}</div>`:`<div class="body-map-grid">${bodyMapSvg('front')}${bodyMapSvg('back')}</div>`;
+      const body=`<div class="body-map-grid">${bodyMapSvg('front')}${bodyMapSvg('back')}</div>`;
       return `<div class="heatmap-shell"><div class="anatomy-map" data-volumes="${encoded}">${body}</div><div><div class="heatmap-list">${shown.map(([muscle,value])=>`<div class="heatmap-row"><i class="heatmap-swatch heat-${heatLevel(value,max)}"></i><span>${escapeHtml(titleCase(muscle))}</span><strong>${formatVolume(value)}</strong></div>`).join('')}</div>${compact?'':`<div class="heatmap-legend"><span>Less</span><i class="heatmap-gradient"></i><span>More volume</span></div>`}</div></div>`;
     }
-    function sampleWorkoutsPresent() { return workoutState.completed.some(workout=>workout.sample); }
-    function clearSampleData() {
-      workoutState.completed=workoutState.completed.filter(workout=>!workout.sample);
-      workoutState.archivedPrograms=workoutState.archivedPrograms.filter(program=>!program.sample);
-      if($('#samplePromptDialog').open)$('#samplePromptDialog').close();
-      renderDashboard(); renderStats(); renderLibrary(); renderProgram();
-      if(state.selected)openExercise(state.selected,false);
-    }
-    function updateSampleVisibility() {
-      const present=sampleWorkoutsPresent();
-      $('#dashboardSampleBanner').hidden=!present; $('#librarySampleBanner').hidden=!present; $('#statsSampleNote').hidden=!present;
-    }
     function renderDashboard() {
-      updateSampleVisibility();
       const now=new Date(); $('#dashboardDate').textContent=new Intl.DateTimeFormat('en-US',{weekday:'long',month:'long',day:'numeric'}).format(now);
       const strip=$('#weekStrip'),start=new Date(now);start.setHours(12,0,0,0);start.setDate(now.getDate()-((now.getDay()+6)%7)+(state.calendarWeekOffset*7));
       const end=new Date(start);end.setDate(start.getDate()+6);
       const sameMonth=start.getMonth()===end.getMonth();
       $('#calendarWeekLabel').textContent=sameMonth?`${new Intl.DateTimeFormat('en-US',{month:'short'}).format(start)} ${start.getDate()}–${end.getDate()}, ${end.getFullYear()}`:`${new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric'}).format(start)} – ${new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric'}).format(end)}`;
       $('#nextWeek').disabled=state.calendarWeekOffset>=0;
-      strip.innerHTML=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);const iso=isoForDate(d);const dayWorkouts=workoutState.completed.filter(w=>w.date===iso);const hasReal=dayWorkouts.some(w=>!w.sample),hasSample=dayWorkouts.some(w=>w.sample);const selected=state.selectedDashboardDate===iso;return `<button type="button" class="day-chip ${d.toDateString()===now.toDateString()?'today':''} ${dayWorkouts.length?'has-workout':''} ${hasReal?'has-real-workout':''} ${selected?'selected':''}" data-calendar-date="${iso}" aria-pressed="${selected}" aria-label="${new Intl.DateTimeFormat('en-US',{weekday:'long',month:'long',day:'numeric'}).format(d)}${hasSample?' · Sample workout':''}${hasReal?' · Real workout':''}"><span>${new Intl.DateTimeFormat('en-US',{weekday:'short'}).format(d)}</span><strong>${d.getDate()}</strong><em>${dayWorkouts.length?`<i aria-hidden="true"></i>${hasSample?'Sample':'Logged'}`:'&nbsp;'}</em></button>`}).join('');
+      strip.innerHTML=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);const iso=isoForDate(d);const dayWorkouts=workoutState.completed.filter(w=>w.date===iso);const selected=state.selectedDashboardDate===iso;return `<button type="button" class="day-chip ${d.toDateString()===now.toDateString()?'today':''} ${dayWorkouts.length?'has-workout':''} ${dayWorkouts.length?'has-real-workout':''} ${selected?'selected':''}" data-calendar-date="${iso}" aria-pressed="${selected}" aria-label="${new Intl.DateTimeFormat('en-US',{weekday:'long',month:'long',day:'numeric'}).format(d)}${dayWorkouts.length?' · Workout logged':''}"><span>${new Intl.DateTimeFormat('en-US',{weekday:'short'}).format(d)}</span><strong>${d.getDate()}</strong><em>${dayWorkouts.length?`<i aria-hidden="true"></i>Logged`:'&nbsp;'}</em></button>`}).join('');
       document.querySelectorAll('[data-calendar-date]').forEach(button=>button.addEventListener('click',()=>{state.selectedDashboardDate=state.selectedDashboardDate===button.dataset.calendarDate?null:button.dataset.calendarDate;renderDashboard();}));
       $('#previousWeek').onclick=()=>{state.calendarWeekOffset-=1;state.selectedDashboardDate=null;renderDashboard();};
       $('#nextWeek').onclick=()=>{if(state.calendarWeekOffset<0){state.calendarWeekOffset+=1;state.selectedDashboardDate=null;renderDashboard();}};
@@ -170,29 +145,28 @@
       strip.onpointerdown=event=>{weekSwipeStart={x:event.clientX,y:event.clientY,id:event.pointerId};strip.setPointerCapture?.(event.pointerId);};
       strip.onpointerup=event=>{if(!weekSwipeStart||event.pointerId!==weekSwipeStart.id)return;const dx=event.clientX-weekSwipeStart.x,dy=event.clientY-weekSwipeStart.y;weekSwipeStart=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)){if(dx>0)$('#previousWeek').click();else $('#nextWeek').click();}};
       const selectedWorkouts=state.selectedDashboardDate?workoutState.completed.filter(w=>w.date===state.selectedDashboardDate):workoutState.completed.slice(0,4);
-      if(state.selectedDashboardDate){const label=formatLogDate(state.selectedDashboardDate),samples=selectedWorkouts.filter(w=>w.sample).length;$('#calendarSummary').textContent=`${label} · ${selectedWorkouts.length?`${selectedWorkouts.length} workout${selectedWorkouts.length===1?'':'s'}${samples?` · ${samples} sample`:''}`:'No workouts'}`;$('#dashRecentTitle').textContent=label;}else{$('#calendarSummary').textContent=state.calendarWeekOffset===0?'This week. Tap a day to see its workouts.':'Earlier week. Tap a day to see its workouts.';$('#dashRecentTitle').textContent='Recent workouts';}
+      if(state.selectedDashboardDate){const label=formatLogDate(state.selectedDashboardDate);$('#calendarSummary').textContent=`${label} · ${selectedWorkouts.length?`${selectedWorkouts.length} workout${selectedWorkouts.length===1?'':'s'}`:'No workouts'}`;$('#dashRecentTitle').textContent=label;}else{$('#calendarSummary').textContent=state.calendarWeekOffset===0?'This week. Tap a day to see its workouts.':'Earlier week. Tap a day to see its workouts.';$('#dashRecentTitle').textContent='Recent workouts';}
       const p=workoutState.activeProgram; $('#dashboardProgram').innerHTML=p?`<p><strong>${escapeHtml(p.name)}</strong><br>Week ${programWeek(p)} of ${p.length} · ${p.workouts.length} workouts in rotation</p><button class="secondary-button" id="openDashboardProgram" type="button">Open program</button>`:'<p>No active program yet. Build a training block when you’re ready.</p><button class="secondary-button" id="openDashboardProgram" type="button">Create program</button>';
       $('#openDashboardProgram').addEventListener('click',()=>showProgram());
       const periodLabels={today:'Today',week:'This week',month:'This month',year:'This year',all:'All time'};
       $('#periodLabel').textContent=periodLabels[state.dashboardPeriod];
       $('#periodMenu').innerHTML=Object.entries(periodLabels).map(([key,label])=>`<button class="period-option" type="button" role="menuitemradio" aria-checked="${state.dashboardPeriod===key}" data-period="${key}">${label}</button>`).join('');
-      const periodWorkouts=workoutsForPeriod(state.dashboardPeriod), periodSets=periodWorkouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=periodSets.reduce((n,set)=>n+setVolume(set),0), sampleCount=periodWorkouts.filter(w=>w.sample).length;
-      $('#dashboardStats').innerHTML=`<div class="mini-stat"><strong>${periodWorkouts.length}</strong><span>workouts${sampleCount?` · ${sampleCount} sample`:''}</span></div><div class="mini-stat"><strong>${periodSets.length}</strong><span>sets</span></div><div class="mini-stat"><strong>${Math.round(volume).toLocaleString()}</strong><span>lb volume</span></div>`;
+      const periodWorkouts=workoutsForPeriod(state.dashboardPeriod), periodSets=periodWorkouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=periodSets.reduce((n,set)=>n+setVolume(set),0);
+      $('#dashboardStats').innerHTML=`<div class="mini-stat"><strong>${periodWorkouts.length}</strong><span>workouts</span></div><div class="mini-stat"><strong>${periodSets.length}</strong><span>sets</span></div><div class="mini-stat"><strong>${Math.round(volume).toLocaleString()}</strong><span>lb volume</span></div>`;
       const muscles=muscleCounts(periodWorkouts),volumes=muscleVolumes(periodWorkouts);$('#dashboardMuscles').innerHTML=Object.keys(muscles).length?Object.entries(muscles).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([m,n])=>`<span class="tag primary">${escapeHtml(m)} · ${n}</span>`).join(''):'<span class="section-note">No muscles logged in this period.</span>';
       $('#dashboardHeatmap').innerHTML=muscleHeatmapMarkup(volumes,true);hydrateBodyMaps();
-      $('#dashboardRecent').innerHTML=selectedWorkouts.length?selectedWorkouts.map(w=>`<button class="recent-workout" type="button" data-workout-id="${escapeHtml(w.id)}"><strong>${escapeHtml(w.name)} ${w.sample?'<span class="sample-label">Sample</span>':''}</strong><span>${escapeHtml(formatLogDate(w.date))}</span></button>`).join(''):state.selectedDashboardDate?`<p>No workout logged. <button class="filter-clear" id="startSelectedDateWorkout" type="button">Start one for this date</button></p>`:'<p>No completed workouts yet. Your first session will appear here.</p>';
+      $('#dashboardRecent').innerHTML=selectedWorkouts.length?selectedWorkouts.map(w=>`<button class="recent-workout" type="button" data-workout-id="${escapeHtml(w.id)}"><strong>${escapeHtml(w.name)}</strong><span>${escapeHtml(formatLogDate(w.date))}</span></button>`).join(''):state.selectedDashboardDate?`<p>No workout logged. <button class="filter-clear" id="startSelectedDateWorkout" type="button">Start one for this date</button></p>`:'<p>No completed workouts yet. Your first session will appear here.</p>';
       $('#periodTrigger').onclick=()=>{const menu=$('#periodMenu');menu.hidden=!menu.hidden;$('#periodTrigger').setAttribute('aria-expanded',String(!menu.hidden));};
-      document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',()=>{state.dashboardPeriod=button.dataset.period;$('#periodMenu').hidden=true;renderDashboard();}));
+      document.querySelectorAll('[data-period]').forEach(button=>button.addEventListener('click',()=>{state.dashboardPeriod=button.dataset.period;$('#periodMenu').hidden=true;schedulePersist();renderDashboard();}));
       document.querySelectorAll('[data-workout-id]').forEach(b=>b.addEventListener('click',()=>{state.workoutDetailReturn='dashboard';showWorkouts();renderCompletedWorkout(workoutState.completed.find(w=>w.id===b.dataset.workoutId));}));
       $('#startSelectedDateWorkout')?.addEventListener('click',()=>{const date=state.selectedDashboardDate;showWorkouts();startBlankWorkout();workoutState.draft.date=date;renderWorkoutScreen();});
     }
     function renderStats() {
-      updateSampleVisibility();
       const labels={today:'Today',week:'Week',month:'Month',year:'Year',all:'All time'};
       $('#statsPeriodTabs').innerHTML=Object.entries(labels).map(([key,label])=>`<button class="period-tab" type="button" data-stats-period="${key}" aria-pressed="${state.statsPeriod===key}">${label}</button>`).join('');
-      document.querySelectorAll('[data-stats-period]').forEach(button=>button.addEventListener('click',()=>{state.statsPeriod=button.dataset.statsPeriod;renderStats();}));
-      const workouts=workoutsForPeriod(state.statsPeriod), sets=workouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=sets.reduce((n,set)=>n+setVolume(set),0), sampleCount=workouts.filter(w=>w.sample).length;
-      $('#statsGrid').innerHTML=`<div class="stats-panel"><strong>${workouts.length}</strong><span>Completed workouts${sampleCount?` · ${sampleCount} sample`:''}</span></div><div class="stats-panel"><strong>${sets.length}</strong><span>Completed sets</span></div><div class="stats-panel"><strong>${Math.round(volume).toLocaleString()}</strong><span>Total lb volume</span></div>`;
+      document.querySelectorAll('[data-stats-period]').forEach(button=>button.addEventListener('click',()=>{state.statsPeriod=button.dataset.statsPeriod;schedulePersist();renderStats();}));
+      const workouts=workoutsForPeriod(state.statsPeriod), sets=workouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=sets.reduce((n,set)=>n+setVolume(set),0);
+      $('#statsGrid').innerHTML=`<div class="stats-panel"><strong>${workouts.length}</strong><span>Completed workouts</span></div><div class="stats-panel"><strong>${sets.length}</strong><span>Completed sets</span></div><div class="stats-panel"><strong>${Math.round(volume).toLocaleString()}</strong><span>Total lb volume</span></div>`;
       const muscles=muscleCounts(workouts), volumes=muscleVolumes(workouts);
       $('#muscleHeatmapNote').textContent=`${labels[state.statsPeriod]} · weighted volume by primary and secondary muscle`;
       $('#muscleHeatmap').innerHTML=muscleHeatmapMarkup(volumes,false);hydrateBodyMaps();

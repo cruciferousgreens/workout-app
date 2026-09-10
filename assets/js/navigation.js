@@ -7,6 +7,7 @@
       $('#workoutView').classList.remove('active');
       $('#programView').classList.remove('active');
       $('#statsView').classList.remove('active');
+      $('#settingsView').classList.remove('active');
     }
     function showDashboard(push = true) {
       rememberScroll(); state.activeView = 'dashboard'; hideAllViews();
@@ -32,6 +33,11 @@
       rememberScroll(); state.selected = null; state.activeView = 'stats'; hideAllViews();
       $('#statsView').classList.add('active'); setActiveNav('stats'); renderStats(); restoreScroll('stats');
       if (push) history.pushState({view:'stats'}, '', '#stats');
+    }
+    function showSettings(push = true) {
+      rememberScroll(); state.selected = null; state.activeView = 'settings'; hideAllViews();
+      $('#settingsView').classList.add('active'); setActiveNav('settings'); renderSettings(); restoreScroll('settings');
+      if (push) history.pushState({view:'settings'}, '', '#settings');
     }
 
     
