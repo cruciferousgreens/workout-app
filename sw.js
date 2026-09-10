@@ -1,7 +1,7 @@
 /* sw.js — service worker: cache the app shell + exercise DB for offline use.
  * Bump CACHE_NAME whenever the shell changes to force clients to update.
  */
-var CACHE_NAME = 'workout-app-v1';
+var CACHE_NAME = 'workout-app-v2';
 
 var APP_SHELL = [
   './',
@@ -13,7 +13,7 @@ var APP_SHELL = [
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  '../data/exercises.json'
+  './data/exercises.json'
 ];
 
 self.addEventListener('install', function (event) {

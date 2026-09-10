@@ -14,7 +14,7 @@
 /* Config                                                              */
 /* ------------------------------------------------------------------ */
 
-var EXERCISE_DB_URL = '../data/exercises.json';
+var EXERCISE_DB_URL = 'data/exercises.json';
 
 /* Pinned commit of yuhonas/free-exercise-db — image URLs are hotlinked
  * against this exact revision so they never drift. */

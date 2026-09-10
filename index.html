@@ -1,13 +1,41 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=./app/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Workout App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Workout Tracker</title>
+  <meta name="description" content="Log workouts, track RPE and progression.">
+
+  <!-- PWA / iOS home-screen support -->
+  <meta name="theme-color" content="#f7f7f8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Workout">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <p><a href="./app/">Open the workout app</a></p>
-  <script>location.replace('./app/');</script>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <a class="app-title" href="#/library">Workout</a>
+      <nav class="app-nav">
+        <a href="#/library">Library</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="view" class="view" aria-live="polite"></main>
+
+  <footer id="app-footer" class="app-footer"></footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <noscript><p class="noscript">This app needs JavaScript to run.</p></noscript>
+
+  <script src="strength.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
