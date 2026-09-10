@@ -16,7 +16,6 @@
       --accent: #2e7d32;
       --accent-hover: #256429;
       --accent-soft: #ddefdc;
-      --accent-ink: #1f5c25;
       --pine: #2e7d32;
       --pine-soft: #ddefdc;
       --rose: #d7827e;
@@ -64,7 +63,6 @@
       --accent: #2e7d32;
       --accent-hover: #35923c;
       --accent-soft: #1d3323;
-      --accent-ink: #a9dcab;
       --pine: #2e7d32;
       --pine-soft: #1d3323;
       --rose: #f0a3b8;
@@ -107,7 +105,6 @@
       --accent: #b4637a;
       --accent-hover: #a2546a;
       --accent-soft: rgba(180,99,122,.12);
-      --accent-ink: #96485e;
       --pine: #286983;
       --pine-soft: rgba(40,105,131,.12);
       --rose: #d7827e;
@@ -149,7 +146,6 @@
       --accent: #f5a97f;
       --accent-hover: #f8bd99;
       --accent-soft: rgba(245,169,127,.14);
-      --accent-ink: #f5a97f;
       --pine: #8bd5ca;
       --pine-soft: rgba(139,213,202,.14);
       --rose: #f5bde6;
@@ -191,7 +187,6 @@
       --accent: #a6e3a1;
       --accent-hover: #b9ecb4;
       --accent-soft: rgba(166,227,161,.14);
-      --accent-ink: #a6e3a1;
       --pine: #94e2d5;
       --pine-soft: rgba(148,226,213,.14);
       --rose: #f5c2e7;
@@ -225,7 +220,11 @@
     button { color: inherit; }
     a { color: inherit; }
     /* ===== 3. App shell, status scrim & page container ===== */
-    .app { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom); }
+    /* .app is a size container: on desktop the column is 393px, so all
+       width breakpoints below key off the column (container queries), not the
+       viewport — the desktop app behaves exactly like the iPhone viewport
+       (Justin 2026-09-10: desktop is just the phone, centered, for testing). */
+    .app { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom); container-type: inline-size; }
     /* Opaque backdrop behind the iOS status bar / Dynamic Island so scrolled content
        slides underneath it instead of colliding with the clock. Zero-height elsewhere. */
     .status-scrim { position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 40; pointer-events: none; }
@@ -261,7 +260,7 @@
     .filter-clear[hidden] { display: none; }
     .muscle-options { display: flex; flex-wrap: wrap; gap: 7px; }
     .muscle-option { min-height: 34px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; text-transform: capitalize; }
-    .muscle-option[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+    .muscle-option[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     select { width: 100%; min-height: 42px; margin-top: 8px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
     .summary-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 18px 2px 12px; }
     .library-foot { margin: 20px 0 8px; }
@@ -272,13 +271,22 @@
     .active-query { font-weight: 700; color: var(--ink); }
     /* ===== 6. Exercise library cards & tags ===== */
     .exercise-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-    .exercise-card { min-width: 0; min-height: 164px; padding: 18px; text-align: left; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); cursor: pointer; transition: transform .14s, box-shadow .14s, border-color .14s; }
-    .exercise-card:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow); }
-    .exercise-card:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+    .exercise-card { position: relative; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); transition: transform .14s, box-shadow .14s, border-color .14s; }
+    .exercise-card-main { display: block; width: 100%; min-height: 164px; padding: 18px; padding-right: 54px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .exercise-card:has(.exercise-card-main:hover) { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow); }
+    .exercise-card:has(.exercise-card-main:focus-visible) { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+    .exercise-card-main:focus-visible { outline: none; }
     .exercise-card h2 { margin: 0 0 20px; font-size: 18px; line-height: 1.18; letter-spacing: -.02em; }
+    /* Favorite star: hollow muted by default, filled accent when favorited. */
+    .fav-toggle { display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+    .fav-toggle svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+    .fav-toggle:hover { background: var(--surface-2); }
+    .fav-toggle[aria-pressed="true"] { color: var(--accent); }
+    .fav-toggle[aria-pressed="true"] svg { fill: currentColor; }
+    .exercise-card .fav-toggle { position: absolute; top: 8px; right: 8px; }
     .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
     .tag { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink); font-size: 11px; text-transform: capitalize; }
-    .tag.primary { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+    .tag.primary { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
     .tag.custom { background: var(--gold-soft); color: var(--warning); font-weight: 700; }
     .empty { padding: 60px 20px; text-align: center; color: var(--muted); grid-column: 1 / -1; }
 
@@ -303,7 +311,7 @@
     fieldset.field legend { padding: 0; color: var(--muted); font-size: 12px; font-weight: 700; }
     .form-pill-options { display: flex; flex-wrap: wrap; gap: 7px; }
     .form-pill { min-height: 36px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; text-transform: capitalize; }
-    .form-pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+    .form-pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .form-pill:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
     .form-error { min-height: 18px; margin: 12px 0 0; color: var(--danger); font-size: 12px; }
     .form-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 5px; }
@@ -313,6 +321,9 @@
     .custom-tools { display: flex; gap: 8px; margin-top: 18px; }
     .custom-tool { min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 700; }
     .custom-tool.danger { color: var(--danger); border-color: var(--rose); }
+    .custom-delete-row { margin-top: 26px; }
+    .custom-delete-row:empty { display: none; }
+    .custom-delete-btn { width: 100%; min-height: 46px; font-size: 14px; }
     .empty strong { display: block; color: var(--ink); font: 700 22px/1.25 var(--font-sans); margin-bottom: 8px; }
 
     /* ===== 8. Exercise detail ===== */
@@ -322,9 +333,11 @@
     .back { margin: 0 0 26px; padding: 9px 14px 9px 10px; border: 0; border-radius: 999px; background: var(--surface-2); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-size: 14px; font-weight: 700; }
     .back:hover { background: var(--surface-2); color: var(--ink); }
     /* Top-bar back pill: same affordance as the in-content back pill (Justin 2026-09-10). */
-    #topBarBack.back-pill { grid-column: 1; display: inline-flex; align-items: center; gap: 1px; width: auto; height: auto; padding: 8px 13px 8px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink); font-size: 14px; font-weight: 700; white-space: nowrap; }
+    #topBarBack.back-pill { grid-column: 1; display: inline-flex; align-items: center; justify-content: center; gap: 1px; width: 84px; height: auto; padding: 8px 0; border-radius: 999px; background: var(--surface-2); color: var(--ink); font-size: 14px; font-weight: 700; white-space: nowrap; }
     #topBarBack.back-pill svg { width: 16px; height: 16px; }
-    #topBarBack.back-pill[hidden] { display: inline-flex; visibility: hidden; }
+    /* No reserved slot: the title is centered on the bar itself, so it never
+       moves whether the pill is shown or hidden (Justin 2026-09-10). */
+    #topBarBack.back-pill[hidden] { display: none; }
     .detail-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: start; margin-bottom: 26px; }
     .detail-title { font: 800 clamp(30px, 6vw, 44px)/1.02 var(--font-sans); letter-spacing: -.03em; margin-bottom: 16px; }
     .detail-tags { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -340,6 +353,8 @@
     .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
     .section h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
     .section-note { margin: 0; color: var(--muted); font-size: 12px; }
+    button.section-note.mode-toggle { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); font-weight: 700; cursor: pointer; }
+    button.section-note.mode-toggle:active { opacity: .6; }
     /* Exercise detail: stack section heads so notes never crowd the title on narrow screens. */
     .detail .section-head { flex-direction: column; align-items: flex-start; gap: 3px; }
     .detail .chart-empty { min-height: 0; padding: 30px 18px; }
@@ -385,7 +400,7 @@
     .secondary-button.danger-button { border-color: var(--rose); color: var(--rose); }
     .secondary-button { border: 1px solid var(--line); background: var(--surface); }
     .primary-button:hover { background: var(--accent-hover); }
-    .workout-meta { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .35fr); gap: 12px; margin-bottom: 22px; }
+    .workout-meta { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 22px; }
     .workout-meta .field input { background: var(--surface); }
     .workout-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
     .workout-toolbar h2 { margin: 0; font-size: 18px; }
@@ -424,33 +439,43 @@
        showPicker on a 1px hidden input). */
     .date-input-overlay { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
     .swipe-hint { color: var(--muted); font-size: 11px; white-space: nowrap; }
-    .log-labels, .log-set { display: grid; grid-template-columns: 42px minmax(82px, .75fr) minmax(74px, .65fr) minmax(74px, .65fr) 42px; gap: 8px; align-items: start; }
+    .log-labels, .log-set { display: grid; grid-template-columns: 44px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 93px; gap: 6px; align-items: start; }
     .log-labels { margin-bottom: 6px; color: var(--muted); font-size: 10px; font-weight: 750; }
-    .set-swipe + .set-swipe { margin-top: 12px; }
-    .log-set { padding: 7px 0; }
-    .log-set-number { width: 34px; min-height: 42px; padding: 0; display: grid; place-items: center; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 800; }
+    .log-set { padding: 12px 0; border: 0; background: transparent; }
+    .log-set + .log-set { border-top: 1px solid var(--line); }
+    .log-set-number { width: 44px; min-height: 44px; padding: 0; display: grid; place-items: center; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
     .log-set-number:hover, .log-set-number:focus-visible { border-color: var(--line); background: var(--surface-2); color: var(--ink); outline: none; }
-    .log-set-number.has-tags { border-color: var(--foam); background: var(--accent-soft); color: var(--accent); }
+    .log-set-number.has-tags { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .weight-entry { min-width: 0; display: grid; gap: 3px; }
     .weight-total-hint { justify-self: end; margin-right: 2px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .06em; line-height: 1; text-transform: uppercase; }
-    .log-input { width: 100%; min-width: 0; height: 42px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); outline: none; font-variant-numeric: tabular-nums; }
+    .log-input { width: 100%; min-width: 0; height: 44px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); outline: none; font-size: 16px; font-variant-numeric: tabular-nums; }
     .log-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
     .selected-set-tags { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 5px; min-height: 0; }
     .selected-set-tags:empty { display: none; }
-    .set-tag-chip { display: inline-flex; align-items: center; min-height: 23px; padding: 3px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: 10px; font-weight: 700; }
-    .complete-set { width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 50%; background: var(--surface-raised); color: var(--muted); cursor: pointer; display: grid; place-items: center; font-size: 18px; font-weight: 900; }
-    .complete-set[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--surface-raised); }
-    .log-set.is-complete .log-input { background: var(--pine-soft); border-color: var(--foam); }
-    .set-swipe { border-radius: var(--radius-sm); }
-    .set-swipe .swipe-delete-action { width: 76px; }
-    .set-swipe.is-open .swipe-content { transform: translateX(-76px); }
-    .add-set { margin: 12px 0 0 42px; padding: 7px 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 13px; font-weight: 750; }
+    .set-tag-chip { display: inline-flex; align-items: center; min-height: 23px; padding: 3px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700; }
+    .set-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+    .complete-set { width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface-raised); cursor: pointer; display: grid; place-items: center; }
+    .complete-set svg { width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .complete-set[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); }
+    .complete-set[aria-pressed="true"] svg { stroke: var(--on-accent); }
+    .log-set.is-complete .log-set-number { color: var(--accent); }
+    .delete-set-inline { width: 44px; height: 44px; padding: 0; border: 1px solid transparent; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+    .delete-set-inline svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+    .delete-set-inline:hover, .delete-set-inline:focus-visible { border-color: var(--rose); background: var(--rose-soft); color: var(--danger); outline: none; }
+    .add-set { margin: 12px 0 0 50px; padding: 7px 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 13px; font-weight: 750; }
     .workout-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
     .workout-error { margin: 0; color: var(--danger); font-size: 12px; }
     .picker-search { width: 100%; height: 44px; margin-bottom: 12px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none; }
+    /* Picker gets the library's search + filter interface (Justin 2026-09-10):
+       circular icon-only filter button like the Exercises tab. */
+    .picker-controls { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; margin-bottom: 12px; align-items: center; }
+    .picker-controls .picker-search { margin-bottom: 0; padding-left: 38px; }
+    .picker-filter-button { min-width: 0; width: 44px; height: 44px; padding: 0; border-radius: 50%; }
+    .picker-filter-button span { display: none; }
+    .picker-filter-panel { margin-bottom: 12px; }
     .picker-list { display: grid; gap: 7px; max-height: 48vh; overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
     #exercisePickerList { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
-    .picker-section-label { margin: 8px 2px 2px; color: var(--muted); font-size: 11px; font-weight: 800; }
+    .picker-section-label { margin: 8px 2px 2px; color: var(--muted); font-size: 11px; font-weight: 800; display: flex; align-items: center; gap: 5px; letter-spacing: .08em; }
     .picker-item { min-height: 58px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; text-align: left; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center; }
     .picker-item strong { display: block; margin-bottom: 4px; color: var(--ink); font-size: 14px; }
     .picker-item > span:first-child > span { color: var(--muted); font-size: 11px; text-transform: capitalize; }
@@ -469,7 +494,6 @@
     .tag-list-item { display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px 4px 9px; border-radius: 999px; background: var(--surface-2); font-size: 11px; }
     .tag-list-item button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--line); color: var(--muted); cursor: pointer; }
     .completed-card { max-width: 760px; padding: clamp(22px, 5vw, 38px); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); scroll-margin-bottom: var(--bottom-nav-clearance); }
-    .completed-mark { width: 44px; height: 44px; margin-bottom: 18px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); font-size: 22px; }
     .completed-set-cell .perf-sub { display: block; color: var(--muted); font-size: 11px; font-weight: 600; margin-top: 1px; }
     .completed-card h2 { margin-bottom: 6px; font: 800 clamp(26px, 5vw, 34px)/1.08 var(--font-sans); letter-spacing: -.025em; }
     .completed-meta { color: var(--muted); font-size: 13px; }
@@ -498,29 +522,35 @@
     .program-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
     .session-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; }
     /* ===== 11. Bottom nav & top bar ===== */
-    .bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; width: 100%; margin: 0; display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); border: 0; border-top: 1px solid var(--line); border-radius: 0; background: var(--nav-bg); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6); }
+    .bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; width: 100%; margin: 0; display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); border: 0; border-top: 1px solid var(--line); border-radius: 0; /* iOS 26 Safari ignores theme-color and samples fixed bars: keep an opaque background-color (Justin 2026-09-10) */ background-color: var(--bg); background-image: linear-gradient(var(--nav-bg), var(--nav-bg)); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6); }
     /* Slim persistent top bar: back chevron (non-root screens only), page title, settings gear. */
-    .top-bar { position: fixed; top: env(safe-area-inset-top); left: 0; right: 0; z-index: 30; display: grid; grid-template-columns: auto minmax(0, 1fr) 44px; align-items: center; height: 54px; padding: 0 4px; border-bottom: 1px solid var(--line); background: var(--nav-bg); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6); }
-    #topBarBack { grid-column: 1; }
-    /* Reserve the back-pill slot even when hidden so the title never jumps. */
-    #topBarBack[hidden] { display: grid; visibility: hidden; }
-    .top-bar-title { grid-column: 2; margin: 0; font-size: 17px; font-weight: 750; text-align: left; padding-left: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #topBarSettings { grid-column: 3; }
-    /* Breadcrumb title on sub-pages ("Exercises / Air Bike"): parent is tappable. */
-    .top-bar-title:has(.crumb-parent) { display: flex; align-items: baseline; }
-    .crumb-parent { flex: none; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
+    .top-bar { position: fixed; top: env(safe-area-inset-top); left: 0; right: 0; z-index: 30; display: grid; grid-template-columns: auto minmax(0, 1fr) 44px; align-items: center; height: 54px; padding: 0 4px; border-bottom: 1px solid var(--line); /* iOS 26 Safari ignores theme-color and samples fixed bars: keep an opaque background-color (Justin 2026-09-10) */ background-color: var(--bg); background-image: linear-gradient(var(--nav-bg), var(--nav-bg)); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6); }
+    #topBarBack { grid-column: 1; z-index: 1; }
+    /* No reserved slot: the title is absolutely centered on the bar, so it stays
+       pixel-static whether or not the back pill is shown (Justin 2026-09-10). */
+    #topBarBack[hidden] { display: none; }
+    /* Bar-centered title: centered on the bar itself (not the leftover grid space),
+       so back-pill visibility can never shift it. Symmetric padding keeps long
+       titles clear of the back pill and gear while preserving the true center. */
+    .top-bar-title { position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; margin: 0; padding: 0 100px; font-size: 17px; font-weight: 750; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+    #topBarSettings { grid-column: 3; z-index: 1; }
+    /* Active state when the Settings page is open: same treatment as an active tab. */
+    #topBarSettings.active { background: var(--accent-soft); color: var(--accent); }
+    /* Breadcrumb title on sub-pages ("Exercises / Air Bike"): the parent is static
+       context text; the top-bar back chevron is the only back control. */
+    .top-bar-title:has(.crumb-parent) { align-items: baseline; }
+    .crumb-parent { flex: none; font: inherit; color: var(--muted); white-space: nowrap; }
     .crumb-sep { flex: none; margin: 0 7px; color: var(--muted); opacity: .55; }
     .crumb-here { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .top-bar-btn { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; color: var(--ink); cursor: pointer; }
-    .top-bar-btn svg { width: 22px; height: 22px; }
+    .top-bar-btn svg { width: 22px; height: 22px; stroke-width: 2.5; /* match tab icon weight (Justin 2026-09-10) */ }
     .top-bar-btn[hidden] { display: none; }
-    /* The top bar owns back/title on the exercise detail; hide the in-screen duplicates. */
-    .has-top-bar #backButton { display: none; }
+    /* The top bar owns back/title on the exercise detail; hide the in-screen duplicate. */
     .has-top-bar .detail .detail-title { display: none; }
     .nav-item { min-height: 50px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer; font-size: 10px; font-weight: 700; line-height: 1.25; }
-    .nav-item.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+    .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
     .nav-item.has-live-draft { position: relative; }
-    .nav-item.has-live-draft:not(.active) { color: var(--accent-ink); }
+    .nav-item.has-live-draft:not(.active) { color: var(--accent); }
     .nav-item.has-live-draft::after { content: ''; position: absolute; top: 6px; left: 50%; margin-left: 12px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--surface-raised); pointer-events: none; }
     .nav-item[disabled] { opacity: .42; cursor: default; }
     .small-button[disabled] { opacity: .45; cursor: default; }
@@ -534,13 +564,13 @@
     }
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
-    @media (max-width: 820px) {
+    @container (max-width: 820px) {
       .exercise-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .detail-layout { grid-template-columns: 1fr; }
       .detail-aside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
       .detail-aside .section { margin-bottom: 0; }
     }
-    @media (max-width: 580px) {
+    @container (max-width: 580px) {
       .shell { padding: 20px 16px 112px; }
       .topline { align-items: start; }
       .top-actions { flex-direction: column-reverse; align-items: flex-end; gap: 8px; }
@@ -556,9 +586,9 @@
       .muscle-options { gap: 6px; }
       .muscle-option { min-height: 36px; }
       .exercise-grid { grid-template-columns: 1fr; gap: 8px; }
-      .exercise-card { min-height: 128px; padding: 16px; }
+      .exercise-card-main { min-height: 128px; padding: 16px; padding-right: 50px; }
       .exercise-card h2 { margin-bottom: 15px; }
-      .detail-header { grid-template-columns: 1fr; gap: 12px; }
+      .detail-header { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
       .source-id { text-align: left; max-width: none; }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .stat:first-child { grid-column: 1 / -1; }
@@ -566,10 +596,11 @@
       .detail-aside { grid-template-columns: 1fr; }
       .set-row { grid-template-columns: 36px repeat(3, 1fr); gap: 5px; padding: 0 8px; }
       .workout-meta { grid-template-columns: 1fr; }
+      .workout-meta .date-field { grid-column: auto; grid-row: auto; }
       .workout-toolbar { align-items: flex-end; }
       .workout-exercise { padding: 15px 12px; }
       .log-labels { display: none; }
-      .log-set { grid-template-columns: 34px repeat(3, minmax(0, 1fr)) 42px; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); background: var(--surface); }
+      .log-set { grid-template-columns: 44px repeat(3, minmax(0, 1fr)) 93px; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
       .log-set-number { grid-row: 1; grid-column: 1; }
       .log-set .weight-entry { grid-row: 1; grid-column: 2; }
       .log-set .reps-input { grid-row: 1; grid-column: 3; }
@@ -578,7 +609,7 @@
       .selected-set-tags { grid-row: 2; grid-column: 2 / 6; }
       .log-input { padding: 0 6px; text-align: center; }
       .log-input::placeholder { font-size: 10px; }
-      .add-set { margin-left: 34px; }
+      .add-set { margin-left: 50px; }
       .workout-footer { align-items: flex-start; flex-direction: column; }
       .workout-footer .workout-actions { width: 100%; }
       .workout-footer .workout-actions button { flex: 1; }
@@ -632,19 +663,6 @@
     .swipe-delete-action { width: 72px; background: var(--danger); font-size: 11px; letter-spacing: .01em; }
     .swipe-item.is-open .swipe-content { transform: translateX(-72px); }
     .exercise-swipe { border-radius: var(--radius-md); }
-    .set-swipe { background: transparent; }
-    .set-swipe.is-open { background: var(--danger); }
-    .set-swipe .swipe-delete-action { width: 64px; }
-    .set-swipe.is-open .swipe-content { transform: translateX(-64px); }
-    .set-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
-    .complete-set, .delete-set-inline { width: 34px; height: 34px; padding: 0; align-self: center; border-radius: 8px; cursor: pointer; display: grid; place-items: center; }
-    .complete-set svg, .delete-set-inline svg { width: 17px; height: 17px; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-    .complete-set svg { stroke: var(--subtle); }
-    .complete-set[aria-pressed="true"] svg { stroke: var(--surface-raised); }
-    .delete-set-inline { border: 1px solid var(--rose); background: var(--surface-raised); color: var(--danger); }
-    .delete-set-inline svg { stroke: currentColor; }
-    .delete-set-inline:hover, .delete-set-inline:focus-visible { border-color: var(--danger); background: var(--rose-soft); outline: none; }
-    .log-labels, .log-set { grid-template-columns: 34px minmax(0,.85fr) minmax(0,.7fr) minmax(0,.7fr) 73px; }
     .exercise-tools { display: flex; align-items: center; gap: 6px; }
     .drag-handle, .superset-button { min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); cursor: grab; font-size: 11px; font-weight: 750; touch-action: none; }
     .drag-handle { font-size: 18px; letter-spacing: -3px; }
@@ -658,19 +676,18 @@
     .small-button { min-height: 38px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 750; }
     .status-note { min-height: 18px; margin: 8px 0 0; color: var(--accent); font-size: 12px; }
     .bottom-nav { grid-template-columns: repeat(5, 1fr); }
-    @media (max-width: 700px) {
+    @container (max-width: 700px) {
       .dashboard-grid { grid-template-columns: 1fr; }
       .dashboard-card.wide { grid-column: auto; }
       .stats-grid { grid-template-columns: 1fr; }
     }
-    @media (max-width: 580px) {
+    @container (max-width: 580px) {
       .shell { padding-left: 12px; padding-right: 12px; }
       .week-strip { gap: 4px; }
       .day-chip { border-radius: 16px; }
       .dashboard-card { padding: 16px; }
-      .log-set { grid-template-columns: 28px repeat(3,minmax(0,1fr)) 73px; }
       .log-set .set-actions { grid-column: 5; }
-      .exercise-tools { flex-wrap: wrap; justify-content: flex-end; }
+      .exercise-tools { flex-wrap: wrap; justify-content: flex-start; }
       .bottom-nav { padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); }
       .nav-item { min-height: 48px; font-size: 10px; }
       .nav-item svg { width: 22px; height: 22px; }
@@ -696,7 +713,6 @@
       mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6m4-6v6'/%3E%3C/svg%3E") center/contain no-repeat;
     }
     .swipe-item.is-open .swipe-content { transform: translateX(-72px); }
-    .set-swipe.is-open .swipe-content { transform: translateX(-72px); }
     .swipe-content { will-change: transform; touch-action: pan-y; }
     .day-chip { width: 100%; color: inherit; cursor: pointer; appearance: none; }
     .day-chip.selected { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
@@ -714,7 +730,8 @@
     #dashboardStats .stats-panel strong { font-size: 24px; }
     #dashboardStats .stats-panel span { font-size: 11px; }
     .muscle-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-    .calendar-summary { min-height: 19px; margin: -12px 2px 18px; color: var(--muted); font-size: 12px; }
+    .calendar-summary { min-height: 19px; margin: 0 2px 10px; color: var(--muted); font-size: 12px; text-align: center; }
+    .link-button { padding: 0; border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
     /* ===== 13. Charts ===== */
     .chart-card { margin-top: 12px; }
     .chart-wrap { width: 100%; min-height: 180px; overflow: hidden; }
@@ -739,13 +756,12 @@
     .archived-programs { margin-top: 18px; }
     .archive-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 0; border-top: 1px solid var(--line); }
     .archive-row span { color: var(--muted); font-size: 11px; }
-    @media (max-width: 580px) {
+    @container (max-width: 580px) {
       .exercise-visual.visible { grid-template-columns: 1fr; }
       .exercise-visual img { height: 190px; }
       .exercise-visual-copy { padding: 14px 16px; }
       .program-workout { grid-template-columns: 30px minmax(0,1fr) auto; padding: 10px; }
       .start-program-row { padding: 0 8px; }
-      .calendar-summary { margin-top: -14px; }
     }
 
     /* Extended calendar and muscle-volume maps */
@@ -758,12 +774,20 @@
     .period-tab { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 750; }
     .period-tab[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .heatmap-shell { display: grid; grid-template-columns: minmax(180px,.78fr) minmax(220px,1.22fr); gap: 20px; align-items: center; margin-top: 14px; }
-    .heatmap-figure { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; min-width: 0; }
-    .heatmap-body { min-width: 0; text-align: center; }
-    .heatmap-body svg { display: block; width: 100%; height: 300px; }
-    .heatmap-body span { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; font-weight: 750; text-transform: uppercase; }
-    .heatmap-region { stroke: var(--shadow-color); stroke-width: 1.2; transition: fill .16s ease; }
-    .heatmap-outline { fill: var(--line); stroke: var(--line-strong); stroke-width: 1.3; }
+    /* Sasha anatomical body map (restored 2026-09-10). The SVG holds front+back
+       side by side in one 760x614 viewBox; heat-N classes paint the regions. */
+    .anatomy-map svg { display: block; width: 100%; height: auto; }
+    .anatomy-map [data-muscle] { stroke: var(--surface); stroke-width: 1; transition: fill .16s ease; }
+    /* (body-map-credit retired 2026-09-10: attribution lives in Settings) */
+    /* Per-exercise map on the exercise detail page (Justin 2026-09-10). */
+    .exercise-musclemap { margin-top: 18px; }
+    .exercise-map-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .blindspot-toggle { display: inline-block; margin-top: 10px; background: none; border: 0; padding: 2px 0; color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; }
+    .dash-blindspots:empty { display: none; }
+    .blindspot-toggle:active { opacity: .6; }
+    .blindspot-list { margin-top: 8px; }
+    .tag.blindspot-tag { background: transparent; border: 1px dashed var(--line); color: var(--muted); font-weight: 600; }
+    .exercise-map-legend span { display: inline-flex; align-items: center; gap: 6px; }
     .heatmap-list { display: grid; gap: 7px; }
     .heatmap-row { display: grid; grid-template-columns: 10px minmax(0,1fr) auto; gap: 8px; align-items: center; font-size: 12px; }
     .heatmap-swatch { width: 10px; height: 10px; border-radius: 3px; }
@@ -773,20 +797,14 @@
     .heatmap-gradient { width: 110px; height: 7px; border-radius: 999px; background: linear-gradient(90deg,var(--pine-soft),var(--foam),var(--accent)); }
     .compact-heatmap { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
     .compact-heatmap .heatmap-shell { grid-template-columns: 150px minmax(0,1fr); gap: 14px; margin-top: 0; }
-    .compact-heatmap .heatmap-body svg { height: 150px; }
     .compact-heatmap .heatmap-list { gap: 5px; }
     .compact-heatmap .heatmap-row { font-size: 10px; }
-    @media (max-width: 700px) {
+    @container (max-width: 700px) {
       .week-strip { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; }
       .heatmap-shell { grid-template-columns: 1fr; }
-      .heatmap-figure { max-width: 340px; margin: 0 auto; }
-      .heatmap-body svg { height: 250px; }
       .compact-heatmap .heatmap-shell { grid-template-columns: 140px minmax(0,1fr); }
-      .compact-heatmap .heatmap-figure { max-width: none; }
-      .compact-heatmap .heatmap-body:nth-child(2) { display: none; }
-      .compact-heatmap .heatmap-figure { grid-template-columns: 1fr; }
     }
-    @media (max-width: 420px) {
+    @container (max-width: 420px) {
       .compact-heatmap .heatmap-shell { grid-template-columns: 120px minmax(0,1fr); gap: 10px; }
       .compact-heatmap .heatmap-row { grid-template-columns: 8px minmax(0,1fr); }
       .compact-heatmap .heatmap-row strong { display: none; }
@@ -839,7 +857,9 @@
     .step-pills { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 2px 2px; }
     .step-pills [data-step] { min-height: 36px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
     .step-pills [data-step][aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-    .step-pills .step-custom { width: 88px; flex: 0 0 auto; height: 36px; }
+    /* Custom time-step edits inline in its own pill (Justin 2026-09-10). 16px font
+       stops iOS Safari auto-zoom on focus. */
+    .step-pills .step-custom { width: 88px; flex: 0 0 auto; height: 36px; border: 1px solid var(--accent); border-radius: 999px; background: var(--accent-soft); color: var(--accent); text-align: center; font-size: 16px; font-weight: 700; outline: none; }
     /* Weight-unit pills share the step-pill look, including the selected state. */
     .step-pills [data-units] { min-height: 36px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
     .step-pills [data-units][aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
@@ -849,6 +869,13 @@
     .theme-pills [data-theme-name] { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 6px 14px 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
     .theme-pills [data-theme-name] i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); }
     .theme-pills [data-theme-name][aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    /* Theme families (Justin 2026-09-10): two columns — Cruciferous/Asterid and
+       Rosé/Matcha — with a subtle hairline separator between the families. */
+    .theme-pills.theme-families { display: flex; align-items: stretch; }
+    .theme-family { flex: 1 1 0; display: flex; flex-direction: column; gap: 8px; }
+    .theme-family:first-child { padding-right: 12px; }
+    .theme-family:last-child { border-left: 1px solid var(--line); padding-left: 12px; }
+    .theme-family [data-theme-name] { width: 100%; justify-content: flex-start; }
     .filter-group { position: relative; margin-top: 0; }
     .filter-group > label { position: absolute; top: -7px; left: 10px; z-index: 1; padding: 0 6px; background: var(--notch-bg, var(--bg)); }
     .filter-group > label + select { margin-top: 0; }
@@ -860,11 +887,11 @@
     /* Surfaces the notched fields sit on: match the cutout behind each label. */
     .program-setup, .dashboard-card, .custom-dialog { --notch-bg: var(--surface); }
     .progression-setup { --notch-bg: var(--surface-raised); }
-    @media (max-width: 700px) {
+    @container (max-width: 700px) {
       .exercise-rule-controls { grid-template-columns: 1fr 1fr 1fr; }
       .load-progression { grid-column: 1 / -1; }
     }
-    @media (max-width: 430px) {
+    @container (max-width: 430px) {
       .exercise-rule-controls { grid-template-columns: 1fr 1fr; }
       .exercise-rule-controls .rule-field:first-child { grid-column: 1 / -1; }
       .load-progression { grid-column: 1 / -1; }
@@ -907,7 +934,7 @@
     button.suggestion-card:hover { border-color: var(--accent); box-shadow: 0 3px 10px rgba(0,0,0,.06); }
     button.suggestion-card.applied { border-color: var(--accent); background: var(--accent-soft); }
     .suggestion-name { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
-    .suggestion-name span { flex: none; padding: 4px 11px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: none; white-space: nowrap; }
+    .suggestion-name span { flex: none; padding: 4px 11px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: none; white-space: nowrap; }
     .suggestion-change { display: flex; align-items: baseline; gap: 10px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
     .suggestion-change strong { color: var(--ink); font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
     .suggestion-reason { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.45; }
@@ -926,12 +953,12 @@
     .program-progression-summary { margin: 18px 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
     .program-progression-summary h3 { margin: 0 0 8px; font-size: 14px; }
     .program-progression-meta { display: flex; flex-wrap: wrap; gap: 6px; }
-    @media (max-width: 700px) {
+    @container (max-width: 700px) {
       .comparison-grid { grid-template-columns: 1fr; }
       .progression-fields { grid-template-columns: 1fr 1fr; }
       .progression-choice, .switch-row { grid-column: 1 / -1; }
     }
-    @media (max-width: 420px) {
+    @container (max-width: 420px) {
       .progression-fields { grid-template-columns: 1fr; }
       .progression-choice, .switch-row { grid-column: auto; }
       .choice-pills { grid-template-columns: 1fr; }
@@ -945,7 +972,11 @@
     .calendar-toolbar strong, .calendar-toolbar span { display: block; }
     .calendar-toolbar strong { font-size: 13px; }
     .calendar-toolbar span { margin-top: 2px; color: var(--muted); font-size: 10px; }
-    .calendar-page { width: 40px; height: 40px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 25px; line-height: 1; }
+    .calendar-page { width: 40px; height: 40px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 25px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+    /* Optical centering (Justin 2026-09-10): ‹ › glyphs carry uneven side
+       bearings, so the visible chevron sits off-center without a nudge. */
+    #previousWeek { transform: translateX(-2px); }
+    #nextWeek { transform: translateX(2px); }
     .calendar-page:hover, .calendar-page:focus-visible { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); outline: none; }
     /* Disabled week-pager (Justin 2026-09-10): grey out the forward control at today. */
     .calendar-page[disabled] { opacity: .35; cursor: default; }
@@ -982,23 +1013,20 @@
     .anatomy-map svg { display: block; width: 100%; height: auto; max-height: 360px; }
     .anatomy-map [data-muscle] { stroke: var(--shadow-color); stroke-width: .55; transition: fill .16s ease; }
     .anatomy-labels { display: grid; grid-template-columns: 1fr 1fr; margin-top: 2px; color: var(--muted); font-size: 10px; font-weight: 750; text-align: center; text-transform: uppercase; }
-    .body-map-credit { margin: 8px 0 0; color: var(--muted); font-size: 9px; text-align: center; }
-    .body-map-credit a { text-underline-offset: 2px; }
     .compact-heatmap .anatomy-map { min-height: 120px; }
     .compact-heatmap .anatomy-map svg { max-height: 160px; }
-    @media (max-width: 700px) {
+    @container (max-width: 700px) {
       .week-strip { grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; }
       .day-chip { min-height: 68px; padding: 8px 2px; border-radius: 13px; }
       .day-chip span { font-size: 9px; }
       .day-chip strong { font-size: 16px; }
       .heatmap-shell, .compact-heatmap .heatmap-shell { grid-template-columns: 1fr; }
-      .heatmap-figure, .compact-heatmap .heatmap-figure { max-width: none; grid-template-columns: 1fr; }
       .workout-detail-metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
       .program-workout { grid-template-columns: 30px minmax(0,1fr); }
       .program-row-actions { grid-column: 2; justify-content: flex-start; }
     }
     .add-set { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; margin: 12px 0 0 42px; padding: 0 13px; border: 1px solid var(--foam); border-radius: var(--radius-sm); background: var(--pine-soft); color: var(--accent); }
-    .set-count-badge { display: inline-flex; align-items: center; min-height: 22px; margin-top: 7px; padding: 2px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 10px; font-weight: 750; }
+    /* (set-count-badge retired 2026-09-10: the accordion summary already carries the set count) */
     .suggestion-basis { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.5; }
     .muscle-analysis-grid { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(250px,.85fr); gap: 12px; margin-top: 12px; }
     .analysis-panel { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
@@ -1020,7 +1048,7 @@
     .trend-change { padding: 4px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 10px; font-weight: 800; }
     .trend-change.up { background: var(--accent-soft); color: var(--accent); }
     .trend-change.down { background: var(--rose-soft); color: var(--warning); }
-    @media (max-width: 700px) { .muscle-analysis-grid { grid-template-columns: 1fr; } }
+    @container (max-width: 700px) { .muscle-analysis-grid { grid-template-columns: 1fr; } }
     .tracking-segment { display: inline-flex; padding: 3px; gap: 3px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
     .tracking-segment button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 750; }
     .tracking-segment button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
@@ -1052,11 +1080,11 @@
     .archive-workout { width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; cursor: pointer; }
     .archive-workout strong { font-size: 12px; }
     .archive-workout span { color: var(--muted); font-size: 10px; }
-    @media (max-width: 580px) {
+    @container (max-width: 580px) {
       .program-template-card { grid-template-columns: 1fr; }
       .program-template-card .primary-button { width: 100%; }
     }
-    @media (max-width: 520px) {
+    @container (max-width: 520px) {
       .completed-set-head { display: none; }
       .completed-set-row { grid-template-columns: 34px repeat(2,minmax(0,1fr)); gap: 6px; }
       .completed-set-row .completed-rpe { grid-column: 2; }
@@ -1077,23 +1105,25 @@
     .template-disclosure > summary::-webkit-details-marker { display: none; }
     .template-disclosure[open] { grid-column: 1 / -1; }
     .template-disclosure-list { margin-top: 10px; }
-    .built-in-label { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
+    .built-in-label { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
     .sample-label { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--gold-soft); color: var(--gold); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
     .advanced-options summary::-webkit-details-marker { display: none; }
     .advanced-options summary::after { content: '+'; color: var(--accent); font-size: 18px; font-weight: 500; }
     .advanced-options[open] > summary::after, .program-rules[open] > summary::after { content: '−'; }
     .advanced-options { margin-top: 10px; border-top: 1px solid var(--line); }
     .advanced-options summary { display: flex; align-items: center; justify-content: space-between; min-height: 40px; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 800; }
-    .workout-focus { margin: 4px 0 0; }
-    .workout-focus > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 38px; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
-    .workout-focus > summary::-webkit-details-marker { display: none; }
-    .workout-focus > summary::after { content: '›'; color: var(--muted); font-size: 20px; font-weight: 500; line-height: 1; transition: transform .18s ease; }
-    .workout-focus[open] > summary::after { content: '›'; transform: rotate(90deg); }
-    .workout-focus .field-help { margin: 0 0 8px; }
+    .workout-focus-open .field-help { margin: 8px 0 0; }
+    .workout-focus-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
     .advanced-options-body { display: grid; gap: 10px; padding: 2px 0 8px; }
+    /* Similar exercises collapse on the exercise detail (Justin 2026-09-10). */
+    .similar-collapse summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; list-style: none; cursor: pointer; }
+    .similar-collapse summary::-webkit-details-marker { display: none; }
+    .similar-collapse summary::after { content: '+'; color: var(--accent); font-size: 18px; font-weight: 500; }
+    .similar-collapse[open] > summary::after { content: '−'; }
+    .similar-collapse .section-head { margin-bottom: 0; }
     .set-utility-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .copy-first-set { min-height: 30px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 700; }
-    .copy-first-set:disabled { opacity: .45; cursor: default; }
+    .copy-first-set { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 0 13px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; font-weight: 700; }
+    .copy-first-set:disabled { background: transparent; color: var(--muted); opacity: .55; cursor: default; }
     /* Accent circular add-exercises button on the workout page (Justin 2026-09-10). */
     #addWorkoutExercise { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .rep-preset-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 9px 0 12px; }
@@ -1116,8 +1146,10 @@
     .program-muscle-bar i { height: 6px; border-radius: 999px; background: var(--accent-soft); overflow: hidden; }
     .program-muscle-bar i::after { content:''; display:block; width:var(--fill); height:100%; background:var(--accent); border-radius:inherit; }
     .inline-feedback { color: var(--accent); font-size: 10px; font-weight: 750; }
+    .options-apply-row { display: flex; align-items: center; gap: 8px; }
+    .remove-exercise-bottom { width: 100%; margin-top: 16px; padding: 10px 2px; text-align: center; }
     .search-suggestion-note { padding: 8px 2px; color: var(--muted); font-size: 11px; }
-    @media (max-width: 640px) {
+    @container (max-width: 640px) {
       .workout-start-options, .program-muscle-bars { grid-template-columns: 1fr; }
       .week-range-list { grid-template-columns: 1fr; }
       .range-fields { grid-template-columns: 1fr 1fr; }
@@ -1148,7 +1180,7 @@
     }
     button, input, textarea, select { color: var(--ink); }
     button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible,
-    .exercise-card:focus-visible, .form-pill:focus-visible, .day-chip:focus-visible {
+    .form-pill:focus-visible, .day-chip:focus-visible {
       outline: 3px solid var(--focus-ring);
       outline-offset: 2px;
     }
@@ -1207,12 +1239,20 @@
       color: var(--muted);
     }
     .tag.primary, .exercise-tag-chip.preset, .set-tag-chip,
-    .choice-pill[aria-pressed="true"],
-    .period-tab[aria-pressed="true"], .real-data-label {
-      border-color: var(--pine);
-      background: var(--pine-soft);
-      color: var(--accent-ink);
+    .choice-pill[aria-pressed="true"], .real-data-label {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
     }
+    /* Design paradigm (Justin 2026-09-10, locked): emphasis treatments use ONE
+       theme accent — var(--accent) for text/border, var(--accent-soft) for the
+       fill. Never mix a second hue token (pine/rose) or a separate ink token
+       into the same element: pine border + mauve text read as broken. The old
+       --accent-ink token is retired. */
+    /* Note: .period-tab[aria-pressed="true"] is deliberately NOT in the list
+       above — its active state is the single-accent treatment at the
+       .period-tab rule, so the border and text never come from two different
+       tokens (Justin 2026-09-10: teal border + pink text looked broken). */
     /* Note: .switch is deliberately excluded here — its off-state track uses
        --switch-track (visible on light themes), set in the base .switch rule. */
     .form-pill, .muscle-option, .reps-only-toggle,
@@ -1226,7 +1266,7 @@
     .period-trigger[aria-expanded="true"] {
       border-color: var(--accent);
       background: var(--accent-soft);
-      color: var(--accent-ink);
+      color: var(--accent);
     }
     .switch[aria-pressed="true"] { background: var(--accent); }
     .switch::after { background: var(--surface-raised); box-shadow: 0 1px 4px var(--shadow-color); }
@@ -1236,16 +1276,15 @@
     .start-option:hover { border-color: var(--accent); }
     .swipe-item { border-radius: var(--radius-md); }
     .swipe-delete-action { background: var(--danger); color: var(--on-accent); }
-    .set-swipe { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); }
-    .log-set { padding: 8px; }
-    .log-set-number { border-radius: 999px; background: var(--surface-raised); color: var(--muted); }
-    .log-set-number.has-tags { border-color: var(--rose); background: var(--rose-soft); color: var(--danger); }
-    .log-set.is-complete { background: var(--pine-soft); }
-    .log-set.is-complete .log-input { border-color: var(--foam); background: var(--surface-raised); }
-    .complete-set { border-color: var(--line-strong); background: var(--surface-raised); }
-    .complete-set[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
-    .delete-set-inline { color: var(--danger); }
-    .selected-set-tags { padding-inline: 8px; }
+    /* Set rows: full-bleed inline ledger rows — no boxes, no side borders (Justin 2026-09-10, UX consult). */
+    .log-set { padding: 12px 0; border: 0; background: transparent; }
+    .log-set + .log-set { border-top: 1px solid var(--line); }
+    .log-set-number { border-radius: var(--radius-sm); background: transparent; }
+    .log-set-number.has-tags { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .log-set.is-complete { background: transparent; }
+    .log-set.is-complete .log-input { border-color: var(--line); background: var(--surface-raised); }
+    .complete-set { border-color: var(--line-strong); }
+    .selected-set-tags { padding-inline: 0; }
     .advanced-options { border-color: var(--line); border-radius: var(--radius-sm); background: var(--surface-2); }
     .advanced-options summary, .program-rules > summary { color: var(--ink-strong); }
     .suggestion-card, button.suggestion-card {
@@ -1284,7 +1323,7 @@
       background: var(--nav-bg);
     }
     .nav-item { border-radius: 18px; color: var(--muted); }
-    .nav-item.active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+    .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
     .day-chip { border-color: var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
     .day-chip.today { border-color: var(--accent); background: transparent; }
     .day-chip.selected { border-color: var(--accent); background: var(--accent); color: var(--on-accent); box-shadow: none; }
@@ -1294,11 +1333,9 @@
     .mini-stat, .workout-detail-metric { border-radius: var(--radius-md); background: var(--surface-2); }
     .period-menu { border-color: var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); box-shadow: var(--shadow); }
     .period-option:hover, .period-option[aria-checked="true"] { background: var(--rose-soft); color: var(--ink-strong); }
-    @media (max-width: 640px) {
+    @container (max-width: 640px) {
       .dashboard-card, .stats-panel, .workout-exercise, .completed-card,
       .program-template-card, .analysis-panel { padding: 16px; }
-      .set-swipe + .set-swipe { margin-top: 9px; }
-      .log-set { padding: 8px 6px; }
     }
 
     /* Training home, theme, accessible set detail, and lightweight tools */
@@ -1326,7 +1363,8 @@
     .last-session-line { margin: 10px 0 8px; padding: 9px 11px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--muted); font-size: 12px; }
     .last-session-line strong { color: var(--ink-strong); }
     /* ===== 14. Toasts ===== */
-    .app-toast { position: fixed; z-index: 80; left: 50%; bottom: calc(112px + env(safe-area-inset-bottom)); width: min(420px, calc(100% - 28px)); padding: 13px 16px; transform: translateX(-50%); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--ink-strong); color: var(--bg); box-shadow: var(--shadow); font-size: 13px; font-weight: 750; }
+    .app-toast { position: fixed; z-index: 80; left: 50%; bottom: calc(112px + env(safe-area-inset-bottom)); width: min(420px, calc(100% - 28px)); padding: 13px 16px; transform: translate(-50%, 10px); border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--ink-strong); color: var(--bg); box-shadow: var(--shadow); font-size: 13px; font-weight: 750; opacity: 0; transition: opacity .28s ease, transform .28s ease; pointer-events: none; }
+    .app-toast.show { transform: translate(-50%, 0); opacity: 1; }
     .app-toast.pr-toast { border-color: var(--gold); background: var(--gold-soft); color: var(--ink-strong); }
     .compact-dialog { width: min(460px, calc(100% - 28px)); }
     /* Stacked dialog actions (Justin 2026-09-10): three buttons don't fit
@@ -1339,14 +1377,8 @@
     .completed-set-cell { min-width: 0; }
     .completed-set-cell::before { content: attr(data-label); display: none; color: var(--muted); font-size: 9px; font-weight: 850; letter-spacing: .08em; }
     .completed-set-tags { grid-column: 2 / -1; }
-    /* ===== 15. Anatomical body heat map ===== */
-    .body-map-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
-    .body-figure { margin: 0; text-align: center; }
-    .body-figure svg { display: block; width: 100%; max-height: 330px; }
-    .body-figure figcaption { margin-top: 4px; color: var(--muted); font-size: 11px; font-weight: 800; }
-    .body-silhouette { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 2; }
-    .body-region { stroke: var(--surface); stroke-width: 1.4; transition: fill .16s; }
-    .heat-0 { fill: var(--heat-0); } .heat-1 { fill: var(--heat-1); } .heat-2 { fill: var(--heat-2); } .heat-3 { fill: var(--heat-3); } .heat-4 { fill: var(--heat-4); } .heat-5 { fill: var(--heat-5); }
+    /* ===== 15. Heat-level fills (shared by the Sasha body map regions and swatches) ===== */
+    .heat-0 { fill: var(--heat-0); background: var(--heat-0); } .heat-1 { fill: var(--heat-1); background: var(--heat-1); } .heat-2 { fill: var(--heat-2); background: var(--heat-2); } .heat-3 { fill: var(--heat-3); background: var(--heat-3); } .heat-4 { fill: var(--heat-4); background: var(--heat-4); } .heat-5 { fill: var(--heat-5); background: var(--heat-5); }
     .heatmap-gradient { background: linear-gradient(90deg,var(--heat-0),var(--heat-2),var(--heat-5)); }
     /* ===== 16. Settings ===== */
     .settings-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-bottom: 8px; }
@@ -1354,8 +1386,8 @@
     .small-button.danger { border-color: var(--rose); color: var(--rose); }
     .small-button.armed { border-color: var(--rose); background: var(--rose-soft); color: var(--ink-strong); }
     .attribution-list { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
-    .attribution-list a { color: var(--accent-ink); }
-    @media (max-width: 520px) { .settings-grid { grid-template-columns: 1fr; } }
+    .attribution-list a { color: var(--accent); }
+    @container (max-width: 520px) { .settings-grid { grid-template-columns: 1fr; } }
     /* Settings polish — airy stacked headers, generous rhythm */
     #settingsView .dashboard-card { margin-bottom: 18px; padding: 22px; }
     #settingsView .dashboard-card:last-of-type { margin-bottom: 8px; }
@@ -1401,7 +1433,7 @@
     .action-row { width: 100%; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center; min-height: 52px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); text-align: left; cursor: pointer; }
     .action-row span { color: var(--muted); font-size: 11px; }
     .action-row strong { display: block; }
-    .action-row-value { color: var(--accent-ink); font-size: 13px; font-weight: 850; }
+    .action-row-value { color: var(--accent); font-size: 13px; font-weight: 850; }
     .focus-key { display: grid; grid-template-columns: 90px minmax(0,1fr) 42px; align-items: center; gap: 9px; min-height: 38px; }
     .focus-key strong { font-size: 12px; }
     .focus-key .analysis-track { width: 100%; }
@@ -1432,10 +1464,15 @@
        "repeat this workout" reachable without the big button he removed. */
     .detail-repeat-button { border: 0; background: none; padding: 10px 4px; color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; }
     .detail-secondary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-    .completed-detail-back { margin-bottom: 12px; }
+    .completed-detail-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .completed-detail-back { margin-bottom: 0; }
+    /* "Start new workout" pill next to Back on the completed-workout screen
+       (Justin 2026-09-10): accent pill matching primary-button colors. */
+    .start-new-workout-pill { min-height: 40px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--accent); color: var(--surface-raised); font-size: 14px; font-weight: 750; cursor: pointer; }
+    .start-new-workout-pill:hover { background: var(--accent-hover); }
     .program-cover-head { position: relative; padding-right: 150px; }
     .program-cover-edit { position: absolute; right: 20px; top: 20px; min-height: 40px; padding: 0 14px; border: 1px solid var(--gold-soft); border-radius: 999px; background: var(--surface-raised); color: var(--ink-strong); cursor: pointer; font-weight: 800; }
-    @media (max-width: 520px) {
+    @container (max-width: 520px) {
       .shell { padding: var(--top-bar-clearance) 14px calc(205px + env(safe-area-inset-bottom)); }
       .workout-start-options { grid-template-columns: 1fr; }
       .workout-toolbar { align-items: flex-start; }
@@ -1466,10 +1503,10 @@
   
     /* ===== Desktop mode (laptop testing, Justin 2026-09-10) =====
        Purely additive: this block only applies at viewport widths >= 900px, so
-       the phone layout is untouched. Centers the app in a phone-width column and
-       constrains the fixed top bar / bottom nav to that column, making the full
-       app testable with a mouse on a laptop. */
+       the phone layout is untouched. Centers the app in a column exactly
+       393px wide — Justin's iPhone 14 Pro CSS resolution — so the desktop
+       render is pixel-identical to the phone, just centered in the browser. */
     @media (min-width: 900px) {
-      .app { width: 100%; max-width: 480px; margin: 0 auto; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
-      .top-bar, .bottom-nav { left: 50%; right: auto; width: min(480px, 100%); transform: translateX(-50%); }
+      .app { width: 100%; max-width: 393px; margin: 0 auto; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+      .top-bar, .bottom-nav { left: 50%; right: auto; width: min(393px, 100%); transform: translateX(-50%); }
     }

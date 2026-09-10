@@ -1,11 +1,39 @@
 
 /* ===== module: workout-history.js ===== */
     /** Finalizes editable workout records and renders detailed set-by-set history. */
-    function finishWorkout() {
+    /** Sets missing required values (reps/seconds, weight for weighted
+        exercises, or exercises with no sets at all). Powers the "Unfilled
+        sets" dialog (Justin 2026-09-10). */
+    function invalidSetsIn(draft){
+      const rows=[];
+      (draft?.exercises||[]).forEach(item=>{
+        const ex=exercises.find(row=>row.id===item.exerciseId);
+        const weightOptional=ex?.equipment==='body only', tracking=exerciseTracking(item,ex);
+        if(!item.sets.length){rows.push({item,set:null});return;}
+        item.sets.forEach(set=>{
+          const bad=(!weightOptional&&set.w==='')||(tracking==='time'?set.seconds:set.r)===''||Number(set.w||0)<0||Number(tracking==='time'?set.seconds:set.r)<1||(set.rpe!==''&&(Number(set.rpe)<1||Number(set.rpe)>10));
+          if(bad)rows.push({item,set});
+        });
+      });
+      return rows;
+    }
+    function isInvalidSet(item,set){
+      const ex=exercises.find(row=>row.id===item.exerciseId);
+      const weightOptional=ex?.equipment==='body only', tracking=exerciseTracking(item,ex);
+      return (!weightOptional&&set.w==='')||(tracking==='time'?set.seconds:set.r)===''||Number(set.w||0)<0||Number(tracking==='time'?set.seconds:set.r)<1||(set.rpe!==''&&(Number(set.rpe)<1||Number(set.rpe)>10));
+    }
+    function finishWorkout(skipInvalid=false) {
       const draft = workoutState.draft;
       if (!draft || !draft.exercises.length) { showToast('Add at least one exercise before finishing.'); return; }
-      const invalid = draft.exercises.some(item => { const ex=exercises.find(row=>row.id===item.exerciseId); const weightOptional=ex?.equipment==='body only',tracking=exerciseTracking(item,ex); return !item.sets.length || item.sets.some(set => ((!weightOptional && set.w === '') || (tracking==='time'?set.seconds:set.r) === '' || Number(set.w||0) < 0 || Number(tracking==='time'?set.seconds:set.r) < 1 || (set.rpe !== '' && (Number(set.rpe) < 1 || Number(set.rpe) > 10)))); });
-      if (invalid) { showToast('Finish blocked: complete reps or seconds for every set, plus weight for weighted exercises. RPE is optional.','',6500); return; }
+      if (!skipInvalid) {
+        const bad = invalidSetsIn(draft);
+        if (bad.length) {
+          $('#invalidSetsCopy').textContent=`${bad.length} set${bad.length===1?' is':'s are'} missing reps, seconds, or weight.`;
+          $('#invalidSetsDelete').textContent=`Delete ${bad.length===1?'the unfilled set':'unfilled sets'}`;
+          $('#invalidSetsDialog').showModal();
+          return;
+        }
+      }
       const unmarked=draft.exercises.flatMap(item=>item.sets.map((set,index)=>({set,index,item}))).filter(row=>!row.set.complete);
       if (unmarked.length) {
         $('#unfinishedSetsCopy').textContent=`${unmarked.length} set${unmarked.length===1?' isn’t':'s aren’t'} marked complete.`;
@@ -18,7 +46,7 @@
       if (draft.editingId) workoutState.completed = workoutState.completed.map(x => x.id === draft.editingId ? completed : x); else workoutState.completed.unshift(completed);
       const finishedProgram=workoutState.activeProgram&&completed.programId===workoutState.activeProgram.id?workoutState.activeProgram:null;
       workoutState.draft = null; state.workoutDetailReturn='workout'; persistNow(); renderCompletedWorkout(completed); renderProgram(); renderLibrary(); renderDashboard(); renderStats();
-      /* Land on the celebration header, instantly (no smooth scroll — Justin 2026-09-10). */
+      /* Land on the top of the completed workout, instantly (no smooth scroll — Justin 2026-09-10). */
       window.scrollTo({top:0, behavior:'auto'});
       if(finishedProgram){finishedProgram.notice=`${completed.name} logged.`;showProgram();}
     }
@@ -58,7 +86,7 @@
       if(!workout)return;
       const summary=workoutSummary(workout),prs=workoutPRs(workout);
       $('#workoutEditor').hidden = true; $('#workoutStart').hidden = true; $('#workoutComplete').hidden = false;
-      $('#workoutComplete').innerHTML = `<button class="back completed-detail-back" id="backFromWorkoutDetail" type="button" aria-label="Back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>Back</button><div class="completed-card"><div class="completed-mark" aria-hidden="true">🎉</div><h2>${escapeHtml(workout.name)}${isSampleWorkout(workout)?'<span class="sample-label">Sample</span>':''}</h2><p class="completed-meta">Completed ${escapeHtml(formatLogDate(workout.date))}</p><div class="workout-detail-metrics"><div class="workout-detail-metric"><strong>${workout.exercises.length}</strong><span>exercises</span></div><div class="workout-detail-metric"><strong>${summary.sets}</strong><span>completed sets</span></div><div class="workout-detail-metric"><strong>${formatVolume(summary.volume)}</strong><span>total volume</span></div></div><div class="section-head"><h3>Muscles worked</h3><p class="section-note">Primary and secondary</p></div><div class="workout-muscles">${summary.muscles.length?summary.muscles.map(muscle=>`<span class="tag primary">${escapeHtml(muscle)}</span>`).join(''):'<span class="section-note">No muscle data</span>'}</div>${prs.length?`<div class="section-head"><h3>PRs hit</h3></div><div class="workout-prs">${prs.map(pr=>`<span class="workout-pr">${escapeHtml(pr)}</span>`).join('')}</div>`:''}<div class="section-head"><h3>Set-by-set</h3><p class="section-note">Reps × weight @ RPE</p></div><div class="completed-exercise-details">${workout.exercises.map(item=>completedExerciseMarkup(item,workout.id)).join('')}</div><div class="detail-secondary-actions"><button class="edit-detail-action" id="editCompletedWorkout" type="button">Edit workout</button><button class="edit-detail-action" id="saveCompletedTemplate" type="button">Save as template</button><button class="edit-detail-action" id="addCompletedToProgram" type="button">Add to active program</button></div><div style="text-align:center"><button class="detail-repeat-button" id="repeatCompletedWorkout" type="button">Repeat this workout</button></div><p class="status-note" id="completedSaveStatus" role="status"></p></div>`;
+      $('#workoutComplete').innerHTML = `<div class="completed-detail-top"><button class="back completed-detail-back" id="backFromWorkoutDetail" type="button" aria-label="Back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>Back</button><button class="start-new-workout-pill" id="startNewWorkout" type="button">Start new workout</button></div><div class="completed-card"><h2>${escapeHtml(workout.name)}${isSampleWorkout(workout)?'<span class="sample-label">Sample</span>':''}</h2><p class="completed-meta">Completed ${escapeHtml(formatLogDate(workout.date))}</p><div class="workout-detail-metrics"><div class="workout-detail-metric"><strong>${workout.exercises.length}</strong><span>exercises</span></div><div class="workout-detail-metric"><strong>${summary.sets}</strong><span>completed sets</span></div><div class="workout-detail-metric"><strong>${formatVolume(summary.volume)}</strong><span>total volume</span></div></div><div class="section-head"><h3>Muscles worked</h3><p class="section-note">Primary and secondary</p></div><div class="workout-muscles">${summary.muscles.length?summary.muscles.map(muscle=>`<span class="tag primary">${escapeHtml(muscle)}</span>`).join(''):'<span class="section-note">No muscle data</span>'}</div>${prs.length?`<div class="section-head"><h3>PRs hit</h3></div><div class="workout-prs">${prs.map(pr=>`<span class="workout-pr">${escapeHtml(pr)}</span>`).join('')}</div>`:''}<div class="section-head"><h3>Set-by-set</h3><p class="section-note">Reps × weight @ RPE</p></div><div class="completed-exercise-details">${workout.exercises.map(item=>completedExerciseMarkup(item,workout.id)).join('')}</div><div class="detail-secondary-actions"><button class="edit-detail-action" id="editCompletedWorkout" type="button">Edit workout</button><button class="edit-detail-action" id="saveCompletedTemplate" type="button">Save as template</button><button class="edit-detail-action" id="addCompletedToProgram" type="button">Add to active program</button></div><div style="text-align:center"><button class="detail-repeat-button" id="repeatCompletedWorkout" type="button">Repeat this workout</button></div><p class="status-note" id="completedSaveStatus" role="status"></p></div>`;
       document.querySelectorAll('.completed-exercise-link').forEach(button => button.addEventListener('click', () => openExercise(button.dataset.id, true, button.dataset.returnWorkout ? {view:'completed-workout', workoutId:button.dataset.returnWorkout} : undefined)));
       $('#editCompletedWorkout').addEventListener('click',()=>editCompletedWorkout(workout.id));
       /* Quiet tertiary repeat (Justin 2026-09-10): the big green button is gone,
@@ -66,7 +94,10 @@
       $('#repeatCompletedWorkout').addEventListener('click',()=>repeatWorkout(workout));
       $('#saveCompletedTemplate').addEventListener('click',()=>saveCompletedAsTemplate(workout,$('#completedSaveStatus')));
       $('#addCompletedToProgram').addEventListener('click',()=>addCompletedWorkoutToProgram(workout,$('#completedSaveStatus')));
-      $('#backFromWorkoutDetail').addEventListener('click',()=>{const target=state.workoutDetailReturn||'workout';if(target==='dashboard')showDashboard();else if(target==='program')showProgram();else if(target==='library')showLibrary();else{$('#workoutComplete').hidden=true;renderWorkoutScreen();}});
+      $('#backFromWorkoutDetail').addEventListener('click',()=>{const target=state.workoutDetailReturn||'workout';if(target==='dashboard')showDashboard(false);else if(target==='program')showProgram(false);else if(target==='library')showLibrary(false);else if(target==='exercise-detail'&&state.workoutDetailExerciseId){openExercise(state.workoutDetailExerciseId,false,state.workoutDetailExerciseReturn||{view:'library'});}else{$('#workoutComplete').hidden=true;renderWorkoutScreen();}});
+      /* Start-new pill next to Back (Justin 2026-09-10): lands on the Workout
+         tab's start screen, exactly like tapping the Workout tab itself. */
+      $('#startNewWorkout').addEventListener('click',()=>{$('#workoutComplete').hidden=true;showWorkouts();window.scrollTo({top:0,behavior:'auto'});});
     }
 
     

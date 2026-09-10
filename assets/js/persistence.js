@@ -14,9 +14,12 @@ function collectPersistable(){
     archivedPrograms:workoutState.archivedPrograms,
     draft:workoutState.draft,
     customExercises:state.customExercises,
+    favorites:[...state.favorites],
     progressionSetup:progressionSetup,
     dashboardPeriod:state.dashboardPeriod,
-    statsPeriod:state.statsPeriod
+    statsPeriod:state.statsPeriod,
+    topExercisesMode:state.topExercisesMode,
+    showBlindspots:state.showBlindspots
   };
 }
 function persistNow(){
@@ -63,6 +66,7 @@ function restorePersisted(){
   if(Array.isArray(data.archivedPrograms))workoutState.archivedPrograms=data.archivedPrograms;
   if(data.draft&&typeof data.draft==='object'&&data.draft!==null)workoutState.draft=data.draft;
   if(Array.isArray(data.customExercises))state.customExercises=data.customExercises;
+  if(Array.isArray(data.favorites))state.favorites=new Set(data.favorites.filter(x=>typeof x==='string'));
   if(data.progressionSetup&&typeof data.progressionSetup==='object'){
     const incoming=data.progressionSetup;
     Object.assign(progressionSetup,incoming);
@@ -71,6 +75,8 @@ function restorePersisted(){
   }
   if(typeof data.dashboardPeriod==='string')state.dashboardPeriod=data.dashboardPeriod;
   if(typeof data.statsPeriod==='string')state.statsPeriod=data.statsPeriod;
+  if(data.topExercisesMode==='volume'||data.topExercisesMode==='sets')state.topExercisesMode=data.topExercisesMode;
+  if(typeof data.showBlindspots==='boolean')state.showBlindspots=data.showBlindspots;
   mergeCustomExercises();
 }
 function exportWorkoutData(){

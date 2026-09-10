@@ -52,11 +52,17 @@
       return '';
     }
 
-    let toastTimer;
+    let toastTimer, toastFadeTimer;
+    /* Toasts pop up and fade away (Justin 2026-09-10) — never a static banner. */
     function showToast(message,kind='',durationMs=3600) {
       const toast=$('#appToast'); if(!toast)return;
       toast.textContent=message; toast.className=`app-toast ${kind}`.trim(); toast.hidden=false;
-      clearTimeout(toastTimer); toastTimer=setTimeout(()=>{toast.hidden=true;},durationMs);
+      clearTimeout(toastTimer); clearTimeout(toastFadeTimer);
+      requestAnimationFrame(()=>requestAnimationFrame(()=>toast.classList.add('show')));
+      toastTimer=setTimeout(()=>{
+        toast.classList.remove('show');
+        toastFadeTimer=setTimeout(()=>{ if(!toast.classList.contains('show'))toast.hidden=true; },300);
+      },durationMs);
     }
 
     let saveStatusTimer;
@@ -188,18 +194,17 @@
         const grouped = item.supersetId && draft.exercises.filter(x => x.supersetId === item.supersetId).length > 1;
         const doneSets=item.sets.filter(set=>set.complete).length;
         const topWeight=Math.max(0,...item.sets.map(set=>Number(set.w)||0));
-        const cardSummary=`${item.sets.length} set${item.sets.length===1?'':'s'}${topWeight?` · ${displayWeight(topWeight)} ${weightUnit()}`:''}${doneSets?` · ${doneSets}/${item.sets.length} complete`:''}`;
+        const cardSummary=`${topWeight?`${displayWeight(topWeight)} ${weightUnit()}`:''}${doneSets?`${topWeight?' · ':''}${doneSets}/${item.sets.length} complete`:''}`;
         return `<div class="swipe-item exercise-swipe" data-exercise-wrapper="${escapeHtml(item.uid)}">
           <button class="swipe-delete-action remove-workout-exercise" type="button" data-uid="${escapeHtml(item.uid)}" aria-label="Remove ${escapeHtml(ex.name)}">Delete</button>
           <details class="exercise-accordion workout-exercise swipe-content" data-workout-exercise="${escapeHtml(item.uid)}" ${item.cardOpen===false?'':'open'}>
-            <summary class="exercise-accordion-head"><span class="exercise-accordion-title"><strong>${escapeHtml(ex.name)}</strong><small>${escapeHtml(cardSummary)}</small></span><span class="exercise-accordion-actions"><button class="exercise-info-button" type="button" data-exercise-info="${escapeHtml(item.exerciseId)}" aria-label="About ${escapeHtml(ex.name)}">i</button><span class="exercise-accordion-chevron" aria-hidden="true">›</span></span></summary>
+            <summary class="exercise-accordion-head"><span class="exercise-accordion-title"><strong>${escapeHtml(ex.name)}</strong>${cardSummary?`<small>${escapeHtml(cardSummary)}</small>`:''}</span><span class="exercise-accordion-actions"><button class="exercise-info-button" type="button" data-exercise-info="${escapeHtml(item.exerciseId)}" aria-label="About ${escapeHtml(ex.name)}">i</button><span class="exercise-accordion-chevron" aria-hidden="true">›</span></span></summary>
             <div class="exercise-accordion-body">
             ${grouped ? `<div class="superset-band">Superset ${draft.exercises.filter((row, index) => row.supersetId && draft.exercises.findIndex(first => first.supersetId === row.supersetId) === index).findIndex(row => row.supersetId === item.supersetId) + 1}</div>` : ''}
-            <div class="workout-exercise-head"><div class="exercise-title-copy"><p>${escapeHtml((ex.primary||[]).map(titleCase).join(', ') || 'Unspecified muscle')} · ${escapeHtml(titleCase(ex.equipment || 'No equipment'))}</p><div class="exercise-meta-row"><span class="set-count-badge">${item.sets.length} set${item.sets.length===1?'':'s'}</span></div></div><button class="drag-handle" type="button" data-drag-uid="${escapeHtml(item.uid)}" aria-label="Drag to reorder ${escapeHtml(ex.name)}">⋮⋮</button></div>
-            <details class="advanced-options" ${item.optionsOpen?'open':''}><summary>Exercise options</summary><div class="advanced-options-body"><div class="exercise-tools"><div class="tracking-segment" role="group" aria-label="Track reps or seconds"><button type="button" data-tracking-mode="reps" data-tracking-uid="${escapeHtml(item.uid)}" aria-pressed="${tracking==='time'?'false':'true'}">Reps</button><button type="button" data-tracking-mode="seconds" data-tracking-uid="${escapeHtml(item.uid)}" aria-pressed="${tracking==='time'?'true':'false'}">Seconds</button></div>${draft.exercises.length > 1 ? `<button class="superset-button ${grouped ? 'active' : ''}" type="button" data-superset-uid="${escapeHtml(item.uid)}">${grouped ? 'Edit superset' : 'Create superset'}</button>` : ''}</div><div class="exercise-tag-row">${(item.exerciseTags||[]).map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}<button class="exercise-tag-button" type="button" data-draft-exercise-tags="${escapeHtml(item.uid)}">${item.exerciseTags?.length?'Edit exercise tags':'+ Exercise tags'}</button></div><button class="remove-workout-exercise text-danger-button" type="button" data-uid="${escapeHtml(item.uid)}" aria-label="Remove ${escapeHtml(ex.name)} from this workout">Remove exercise</button></div></details>
-            ${lastSummary?`<p class="last-session-line"><strong>${escapeHtml(lastSummary)}</strong></p>`:'<p class="last-session-line">No history for this exercise yet.</p>'}
+            <details class="advanced-options" ${item.optionsOpen?'open':''}><summary>Exercise options</summary><div class="advanced-options-body"><div class="exercise-tools"><div class="tracking-segment" role="group" aria-label="Track reps or seconds"><button type="button" data-tracking-mode="reps" data-tracking-uid="${escapeHtml(item.uid)}" aria-pressed="${tracking==='time'?'false':'true'}">Reps</button><button type="button" data-tracking-mode="seconds" data-tracking-uid="${escapeHtml(item.uid)}" aria-pressed="${tracking==='time'?'true':'false'}">Seconds</button></div>${draft.exercises.length > 1 ? `<button class="superset-button ${grouped ? 'active' : ''}" type="button" data-superset-uid="${escapeHtml(item.uid)}">${grouped ? 'Edit superset' : 'Create superset'}</button>` : ''}</div><div class="exercise-tag-row">${(item.exerciseTags||[]).map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}<button class="exercise-tag-button" type="button" data-draft-exercise-tags="${escapeHtml(item.uid)}">${item.exerciseTags?.length?'Edit exercise tags':'+ Exercise tags'}</button></div><div class="options-apply-row"><button class="copy-first-set" type="button" data-copy-first-set="${escapeHtml(item.uid)}" ${item.sets.length<2?'disabled':''}>Apply set 1 to all</button><span class="inline-feedback" data-copy-feedback="${escapeHtml(item.uid)}" aria-live="polite"></span></div></div></details>
+            ${lastSummary?`<p class="last-session-line"><strong>${escapeHtml(lastSummary)}</strong></p>`:''}
             <div class="log-labels"><span>SET</span><span>${isBodyweight ? `ADDED ${weightUnit().toUpperCase()}` : `WEIGHT (${weightUnit().toUpperCase()})`}</span><span>${tracking === 'time' ? 'SECONDS' : 'REPS'}</span><span>RPE</span><span>ACTIONS</span></div>
-            <div>${item.sets.map((set,index) => `<div class="set-swipe" data-set-wrapper="${escapeHtml(set.uid)}">
+            <div class="log-sets">${item.sets.map((set,index) => `
               <div class="log-set ${set.complete ? 'is-complete' : ''}" data-set-uid="${escapeHtml(set.uid)}">
                 <button class="log-set-number ${set.tags.length ? 'has-tags' : ''}" type="button" data-tag-exercise-uid="${escapeHtml(item.uid)}" data-tag-set-uid="${escapeHtml(set.uid)}" aria-label="Choose tags for set ${index + 1}" aria-haspopup="dialog">${index + 1}</button>
                 <label class="weight-entry"><input class="log-input weight-input" data-field="w" data-placeholder-weight="${escapeHtml(weightHint)}" type="number" min="0" step="${isMetric()?'0.1':'0.5'}" inputmode="decimal" value="${escapeHtml(displayWeight(set.w))}" placeholder="${weightHint?escapeHtml(displayWeight(weightHint)):(isBodyweight?'Optional':'Weight')}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : isDumbbell ? 'total dumbbell weight' : 'weight'} in ${isMetric()?'kilograms':'pounds'}${weightHint ? (target.w ? `; suggested ${escapeHtml(displayWeight(weightHint))}` : `; last used ${escapeHtml(displayWeight(weightHint))}`) : ''}" />${isDumbbell ? '<small class="weight-total-hint">Total</small>' : ''}</label>
@@ -210,9 +215,10 @@
                   <button class="delete-set delete-set-inline" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-label="Delete set ${index + 1}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
                 </div>
                 <div class="selected-set-tags" aria-label="Selected tags">${set.tags.map(tag => `<span class="set-tag-chip">${escapeHtml(tag)}</span>`).join('')}</div>
-              </div></div>`).join('')}</div>
-            <div class="set-utility-row"><button class="add-set" type="button" data-uid="${escapeHtml(item.uid)}">+ Add set</button><button class="copy-first-set" type="button" data-copy-first-set="${escapeHtml(item.uid)}" ${item.sets.length<2?'disabled':''}>Apply set 1 to all</button><span class="inline-feedback" data-copy-feedback="${escapeHtml(item.uid)}" aria-live="polite"></span></div>
+              </div>`).join('')}</div>
+            <div class="set-utility-row"><button class="add-set" type="button" data-uid="${escapeHtml(item.uid)}">+ Add set</button></div>
             <div class="exercise-note">${item.noteOpen || item.note ? `<textarea id="note-${escapeHtml(item.uid)}" data-exercise-note="${escapeHtml(item.uid)}" aria-label="Exercise notes" placeholder="Cues, setup, pain, or anything to remember">${escapeHtml(item.note || '')}</textarea>` : `<button class="add-note-toggle" type="button" data-add-note="${escapeHtml(item.uid)}">+ Add notes</button>`}</div>
+            <button class="remove-workout-exercise text-danger-button remove-exercise-bottom" type="button" data-uid="${escapeHtml(item.uid)}" aria-label="Remove ${escapeHtml(ex.name)} from this workout">Remove exercise</button>
             </div>
           </details></div>`;
       }).join('') : '<div class="history-empty">No exercises yet. Add your first movement to begin logging.</div>';

@@ -69,9 +69,12 @@
       workouts.forEach(workout=>workout.exercises.forEach(item=>{if((item.tracking||'reps')==='time')return;item.sets.forEach(set=>{if((set.tags||[]).some(tag=>tag.toLowerCase()==='warmup'))return;const reps=Number(set.r);if(!reps)return;if(reps<=5)focus.Strength+=1;else if(reps<=12)focus.Hypertrophy+=1;else focus.Endurance+=1;});}));
       const focusTotal=Object.values(focus).reduce((sum,value)=>sum+value,0);
       $('#trainingFocus').innerHTML=focusTotal?Object.entries(focus).map(([name,value])=>{const share=Math.round(value/focusTotal*100);return `<div class="focus-key"><strong>${name}</strong><span class="analysis-track"><i class="analysis-fill" style="width:${share}%"></i></span><span class="analysis-value">${share}%</span></div>`;}).join(''):'<p class="section-note">Complete rep-based working sets to see your training focus.</p>';
-      const exerciseVolumes={};workouts.forEach(workout=>workout.exercises.forEach(item=>{exerciseVolumes[item.exerciseId]=(exerciseVolumes[item.exerciseId]||0)+item.sets.reduce((sum,set)=>sum+setVolume(set),0);}));
-      const top=Object.entries(exerciseVolumes).filter(([,value])=>value>0).sort((a,b)=>b[1]-a[1]).slice(0,6);
-      $('#topExercises').innerHTML=top.length?`<div class="action-list">${top.map(([id,value])=>`<button class="action-row" type="button" data-stat-exercise="${escapeHtml(id)}"><span><strong>${escapeHtml(exercises.find(ex=>ex.id===id)?.name||'Exercise')}</strong><span>Open history and trend</span></span><span class="action-row-value">${formatVolume(value)}</span></button>`).join('')}</div>`:'<p class="section-note">No weighted exercise volume in this period.</p>';
+      /* Top exercises: "By weighted volume" toggles to "By number of sets" (Justin 2026-09-10). */
+      const exerciseStats={};workouts.forEach(workout=>workout.exercises.forEach(item=>{const entry=exerciseStats[item.exerciseId]||(exerciseStats[item.exerciseId]={volume:0,sets:0});entry.volume+=item.sets.reduce((sum,set)=>sum+setVolume(set),0);entry.sets+=item.sets.length;}));
+      const bySets=state.topExercisesMode==='sets';
+      const top=Object.entries(exerciseStats).filter(([,entry])=>bySets?entry.sets>0:entry.volume>0).sort((a,b)=>bySets?b[1].sets-a[1].sets:b[1].volume-a[1].volume).slice(0,6);
+      const modeButton=$('#topExercisesMode');if(modeButton)modeButton.textContent=bySets?'By number of sets':'By weighted volume';
+      $('#topExercises').innerHTML=top.length?`<div class="action-list">${top.map(([id,entry])=>`<button class="action-row" type="button" data-stat-exercise="${escapeHtml(id)}"><span><strong>${escapeHtml(exercises.find(ex=>ex.id===id)?.name||'Exercise')}</strong><span>Open history and trend</span></span><span class="action-row-value">${bySets?`${entry.sets} set${entry.sets===1?'':'s'}`:formatVolume(entry.volume)}</span></button>`).join('')}</div>`:`<p class="section-note">${bySets?'No completed sets in this period yet.':'No weighted exercise volume in this period.'}</p>`;
       const prs=recentPRRows(workouts);
       $('#recentPRs').innerHTML=prs.length?`<div class="action-list">${prs.map(pr=>`<button class="action-row" type="button" data-stat-exercise="${escapeHtml(pr.exerciseId)}"><span><strong>${escapeHtml(exercises.find(ex=>ex.id===pr.exerciseId)?.name||'Exercise')}</strong><span>${escapeHtml(pr.kind)}${pr.sample?' <span class="sample-label">Sample</span>':''} · ${escapeHtml(formatLogDate(pr.date))}</span></span><span class="action-row-value">${escapeHtml(pr.value)}</span></button>`).join('')}</div>`:'<p class="section-note">No new PRs in this period yet. Keep logging completed sets—your next one will show here.</p>';
       document.querySelectorAll('[data-stat-exercise]').forEach(button=>button.addEventListener('click',()=>openExercise(button.dataset.statExercise)));
@@ -101,27 +104,57 @@
       if(!value||!max)return 0;
       return Math.max(1,Math.min(5,Math.ceil(Math.sqrt(value/max)*5)));
     }
-    function bodyMapSvg(view) {
-      const front=view==='front';
-      return `<figure class="body-figure"><svg viewBox="0 0 120 260" role="img" aria-label="${front?'Front':'Back'} muscle volume silhouette">
-        <circle class="body-silhouette" cx="60" cy="22" r="14"></circle><path class="body-silhouette" d="M43 40 Q60 34 77 40 L91 70 82 125 76 155 84 243 66 243 60 172 54 243 36 243 44 155 38 125 29 70Z"></path>
-        ${front?`<ellipse class="body-region" data-muscle="shoulders" cx="37" cy="57" rx="11" ry="9"></ellipse><ellipse class="body-region" data-muscle="shoulders" cx="83" cy="57" rx="11" ry="9"></ellipse><path class="body-region" data-muscle="chest" d="M45 54 Q60 47 59 75 Q46 77 42 66Z"></path><path class="body-region" data-muscle="chest" d="M75 54 Q60 47 61 75 Q74 77 78 66Z"></path><rect class="body-region" data-muscle="biceps" x="29" y="70" width="9" height="30" rx="4"></rect><rect class="body-region" data-muscle="biceps" x="82" y="70" width="9" height="30" rx="4"></rect><rect class="body-region" data-muscle="forearms" x="25" y="101" width="8" height="28" rx="4"></rect><rect class="body-region" data-muscle="forearms" x="87" y="101" width="8" height="28" rx="4"></rect><rect class="body-region" data-muscle="abdominals" x="49" y="78" width="22" height="49" rx="8"></rect><path class="body-region" data-muscle="quadriceps" d="M44 139 Q57 135 57 170 L53 204 39 202Z"></path><path class="body-region" data-muscle="quadriceps" d="M76 139 Q63 135 63 170 L67 204 81 202Z"></path><path class="body-region" data-muscle="calves" d="M39 205 53 207 50 239 38 239Z"></path><path class="body-region" data-muscle="calves" d="M81 205 67 207 70 239 82 239Z"></path>`:`<path class="body-region" data-muscle="traps" d="M46 43 60 38 74 43 68 61 52 61Z"></path><path class="body-region" data-muscle="lats" d="M42 61 Q51 57 58 67 L54 108 40 116 35 78Z"></path><path class="body-region" data-muscle="lats" d="M78 61 Q69 57 62 67 L66 108 80 116 85 78Z"></path><rect class="body-region" data-muscle="triceps" x="29" y="69" width="9" height="31" rx="4"></rect><rect class="body-region" data-muscle="triceps" x="82" y="69" width="9" height="31" rx="4"></rect><rect class="body-region" data-muscle="lower back" x="47" y="99" width="26" height="30" rx="8"></rect><ellipse class="body-region" data-muscle="glutes" cx="49" cy="143" rx="12" ry="13"></ellipse><ellipse class="body-region" data-muscle="glutes" cx="71" cy="143" rx="12" ry="13"></ellipse><path class="body-region" data-muscle="hamstrings" d="M41 157 Q53 153 57 163 L53 203 39 201Z"></path><path class="body-region" data-muscle="hamstrings" d="M79 157 Q67 153 63 163 L67 203 81 201Z"></path><path class="body-region" data-muscle="calves" d="M39 205 53 207 50 239 38 239Z"></path><path class="body-region" data-muscle="calves" d="M81 205 67 207 70 239 82 239Z"></path>`}
-      </svg><figcaption>${front?'Front':'Back'}</figcaption></figure>`;
+    /* Sasha anatomical body map (restored 2026-09-10 at Justin's request; the
+       style revisit is pinned in UX-BACKLOG.md). SVG regions carry data-muscle;
+       this maps them to the exercise library's muscle names. */
+    const bodyMapMuscleAliases={
+      'upper-chest':'chest','lower-chest':'chest','front-delts':'shoulders','rear-delts':'shoulders','side-delts':'shoulders',
+      'quads':'quadriceps','hamstrings':'hamstrings','glutes':'glutes','forearms':'forearms','abs':'abdominals',
+      'lats':'lats','lower-back':'lower back','traps':'traps','triceps':'triceps','biceps':'biceps','calves':'calves','obliques':'abdominals'
+    };
+    let bodyMapTemplatePromise;
+    function loadBodyMapTemplate(){
+      if(!bodyMapTemplatePromise)bodyMapTemplatePromise=fetch('data/sasha-male-body.svg').then(response=>{if(!response.ok)throw new Error('Body map unavailable');return response.text();}).catch(()=>null);
+      return bodyMapTemplatePromise;
+    }
+    function paintBodyRegion(region,level,label){
+      region.classList.add(`heat-${level}`);
+      const title=document.createElementNS('http://www.w3.org/2000/svg','title');
+      title.textContent=label;region.prepend(title);
     }
     function hydrateBodyMaps(){
-      document.querySelectorAll('.anatomy-map[data-volumes]').forEach(host=>{
-        if(host.dataset.hydrated)return;
-        const volumes=JSON.parse(decodeURIComponent(host.dataset.volumes));
-        const regions=[...host.querySelectorAll('[data-muscle]')];
-        const regionValue=region=>Number(volumes[region.dataset.muscle]||0);
-        const max=Math.max(1,...regions.map(regionValue));
-        regions.forEach(region=>{
-          const muscle=region.dataset.muscle;
-          const value=regionValue(region);
-          region.classList.add(`heat-${heatLevel(value,max)}`);
-          const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=`${titleCase(muscle)} · ${formatVolume(value)}`;region.prepend(title);
+      /* Volume heat maps (dashboard + stats): data-volumes holds {muscle: volume}. */
+      const volumeHosts=[...document.querySelectorAll('.anatomy-map[data-volumes]:not([data-hydrated])')];
+      /* Per-exercise maps (exercise detail): data-primary/data-secondary hold
+         comma-separated library muscle names; primary = full heat, secondary = soft. */
+      const exerciseHosts=[...document.querySelectorAll('.anatomy-map[data-primary]:not([data-hydrated])')];
+      const hosts=volumeHosts.concat(exerciseHosts);
+      if(!hosts.length)return;
+      loadBodyMapTemplate().then(template=>{
+        hosts.forEach(host=>{
+          if(!template){host.innerHTML='<div class="chart-empty">Body map unavailable.</div>';return;}
+          host.innerHTML=template;
+          const regions=[...host.querySelectorAll('[data-muscle]')];
+          if(host.dataset.primary!==undefined){
+            const primary=new Set(host.dataset.primary.split(',').filter(Boolean));
+            const secondary=new Set(host.dataset.secondary.split(',').filter(Boolean));
+            regions.forEach(region=>{
+              const muscle=bodyMapMuscleAliases[region.dataset.muscle];
+              const kind=muscle&&primary.has(muscle)?'primary':muscle&&secondary.has(muscle)?'secondary':null;
+              paintBodyRegion(region,kind==='primary'?5:kind==='secondary'?2:0,`${titleCase(muscle||region.dataset.muscle)}${kind?` · ${kind}`:' · not targeted'}`);
+            });
+          }else{
+            const volumes=JSON.parse(decodeURIComponent(host.dataset.volumes));
+            const regionValue=region=>Number(volumes[bodyMapMuscleAliases[region.dataset.muscle]]||0);
+            const max=Math.max(1,...regions.map(regionValue));
+            regions.forEach(region=>{
+              const muscle=bodyMapMuscleAliases[region.dataset.muscle];
+              const value=regionValue(region);
+              paintBodyRegion(region,heatLevel(value,max),`${titleCase(muscle||region.dataset.muscle)} · ${formatVolume(value)}`);
+            });
+          }
+          host.dataset.hydrated='true';
         });
-        host.dataset.hydrated='true';
       });
     }
     function muscleHeatmapMarkup(volumes,compact=false) {
@@ -129,9 +162,19 @@
       if(!rows.length)return '<div class="chart-empty">No weighted training volume in this period.</div>';
       const max=Math.max(...rows.map(([,v])=>v)),shown=compact?rows.slice(0,4):rows;
       const encoded=encodeURIComponent(JSON.stringify(volumes));
-      const body=`<div class="body-map-grid">${bodyMapSvg('front')}${bodyMapSvg('back')}</div>`;
-      return `<div class="heatmap-shell"><div class="anatomy-map" data-volumes="${encoded}">${body}</div><div><div class="heatmap-list">${shown.map(([muscle,value])=>`<div class="heatmap-row"><i class="heatmap-swatch heat-${heatLevel(value,max)}"></i><span>${escapeHtml(titleCase(muscle))}</span><strong>${formatVolume(value)}</strong></div>`).join('')}</div>${compact?'':`<div class="heatmap-legend"><span>Less</span><i class="heatmap-gradient"></i><span>More volume</span></div>`}</div></div>`;
+      const map=`<div class="anatomy-map" data-volumes="${encoded}"><div class="chart-empty">Loading anatomical map\u2026</div></div>`;
+      return `<div class="heatmap-shell">${map}<div><div class="heatmap-list">${shown.map(([muscle,value])=>`<div class="heatmap-row"><i class="heatmap-swatch heat-${heatLevel(value,max)}"></i><span>${escapeHtml(titleCase(muscle))}</span><strong>${formatVolume(value)}</strong></div>`).join('')}</div>${compact?'':`<div class="heatmap-legend"><span>Less</span><i class="heatmap-gradient"></i><span>More volume</span></div>`}</div></div>`;
     }
+    /* Per-exercise body map for the exercise detail page (Justin 2026-09-10).
+       The legend carries the actual muscle names with their colors, so the
+       "muscles worked" live with the map instead of the top of the page. */
+    function exerciseBodyMapMarkup(ex){
+      const primary=(ex.primary||[]).join(','),secondary=(ex.secondary||[]).join(',');
+      const pNames=(ex.primary||[]).map(titleCase).join(', '),sNames=(ex.secondary||[]).map(titleCase).join(', ');
+      const legend=[pNames?`<span><i class="heatmap-swatch heat-5"></i>Primary \u00b7 ${escapeHtml(pNames)}</span>`:'',sNames?`<span><i class="heatmap-swatch heat-2"></i>Secondary \u00b7 ${escapeHtml(sNames)}</span>`:''].join('');
+      return `<div class="anatomy-map exercise-map" data-primary="${escapeHtml(primary)}" data-secondary="${escapeHtml(secondary)}"><div class="chart-empty">Loading anatomical map\u2026</div></div><div class="exercise-map-legend">${legend}</div>`;
+    }
+
     function renderDashboard() {
       const now=new Date();
       const strip=$('#weekStrip'),start=new Date(now);start.setHours(12,0,0,0);start.setDate(now.getDate()-((now.getDay()+6)%7)+(state.calendarWeekOffset*7));
@@ -149,32 +192,54 @@
       strip.onpointercancel=()=>{weekSwipeStart=null;};
       strip.onpointerup=event=>{if(!weekSwipeStart||event.pointerId!==weekSwipeStart.id)return;const dx=event.clientX-weekSwipeStart.x,dy=event.clientY-weekSwipeStart.y;weekSwipeStart=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)){if(dx>0)$('#previousWeek').click();else $('#nextWeek').click();}};
       const selectedWorkouts=state.selectedDashboardDate?workoutState.completed.filter(w=>w.date===state.selectedDashboardDate):workoutState.completed.slice(0,4);
-      if(state.selectedDashboardDate){const label=formatLogDate(state.selectedDashboardDate);$('#calendarSummary').textContent=`${label} · ${selectedWorkouts.length?`${selectedWorkouts.length} workout${selectedWorkouts.length===1?'':'s'}`:'No workouts'}`;$('#dashRecentTitle').textContent=label;}else{$('#calendarSummary').textContent=state.calendarWeekOffset===0?'This week. Tap a day to see its workouts.':'Earlier week. Tap a day to see its workouts.';$('#dashRecentTitle').textContent='Recent workouts';}
+      if(state.selectedDashboardDate){const label=formatLogDate(state.selectedDashboardDate);$('#calendarSummary').textContent=`${label} · ${selectedWorkouts.length?`${selectedWorkouts.length} workout${selectedWorkouts.length===1?'':'s'}`:'No workouts'}`;$('#dashRecentTitle').textContent=label;}else{const summary=$('#calendarSummary');if(state.calendarWeekOffset===0){summary.textContent='This week.';}else{summary.innerHTML='<button type="button" class="link-button" id="gotoThisWeek">Go to this week.</button>';const go=$('#gotoThisWeek');if(go)go.addEventListener('click',()=>{state.calendarWeekOffset=0;state.selectedDashboardDate=null;renderDashboard();});}$('#dashRecentTitle').textContent='Recent workouts';}
       const p=workoutState.activeProgram; $('#dashboardProgram').innerHTML=p?`<p><strong>${escapeHtml(p.name)}</strong><br>Week ${programWeek(p)} of ${p.length} · ${p.workouts.length} workouts in rotation</p><button class="secondary-button" id="openDashboardProgram" type="button">Open program</button>`:'<p>No active program yet. Build a training block when you’re ready.</p><button class="secondary-button" id="openDashboardProgram" type="button">Create program</button>';
       $('#openDashboardProgram').addEventListener('click',()=>showProgram());
       const periodLabels={today:'Today',week:'Week',month:'Month',year:'Year',all:'All time'};
       $('#dashPeriodTabs').innerHTML=Object.entries(periodLabels).map(([key,label])=>`<button class="period-tab" type="button" data-dash-period="${key}" aria-pressed="${state.dashboardPeriod===key}">${label}</button>`).join('');
-      document.querySelectorAll('[data-dash-period]').forEach(button=>button.addEventListener('click',()=>{state.dashboardPeriod=button.dataset.dashPeriod;schedulePersist();renderDashboard();}));
+      document.querySelectorAll('[data-dash-period]').forEach(button=>button.addEventListener('click',()=>{
+        if(state.dashboardPeriod===button.dataset.dashPeriod)return;
+        state.dashboardPeriod=button.dataset.dashPeriod;schedulePersist();renderDashboard();
+        /* The re-render destroys the tapped button; refocus its replacement so iOS
+           Safari doesn't drop focus to <body> and scroll to the top (Justin 2026-09-10). */
+        document.querySelector('[data-dash-period="'+state.dashboardPeriod+'"]')?.focus({preventScroll:true});
+      }));
       const periodWorkouts=workoutsForPeriod(state.dashboardPeriod), periodSets=periodWorkouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=periodSets.reduce((n,set)=>n+setVolume(set),0);
       $('#dashboardStats').innerHTML=`<div class="stats-panel"><strong>${periodWorkouts.length}</strong><span>Completed workouts</span></div><div class="stats-panel"><strong>${periodSets.length}</strong><span>Completed sets</span></div><div class="stats-panel"><strong>${Math.round(displayVolume(volume)).toLocaleString()}</strong><span>Total ${weightUnit()} volume</span></div>`;
       const muscles=muscleCounts(periodWorkouts),volumes=muscleVolumes(periodWorkouts);$('#dashboardMuscles').innerHTML=Object.keys(muscles).length?Object.entries(muscles).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([m,n])=>`<span class="tag primary">${escapeHtml(m)} · ${n}</span>`).join(''):'<span class="section-note">No muscles logged in this period.</span>';
       $('#dashboardHeatmap').innerHTML=muscleHeatmapMarkup(volumes,true);hydrateBodyMaps();
+      renderBlindspots(volumes,'#dashBlindspots');
       const selDate=state.selectedDashboardDate, todayIso=localIsoDate();
       const emptyDateCopy=selDate>todayIso?'<p>Nothing logged for this date.</p>':selDate===todayIso?'<p>No workout logged yet today. <button class="filter-clear" id="startSelectedDateWorkout" type="button">Start workout</button></p>':'<p>No workout logged for this date. <button class="filter-clear" id="startSelectedDateWorkout" type="button">Log a workout</button></p>';
       $('#dashboardRecent').innerHTML=selectedWorkouts.length?selectedWorkouts.map(w=>{const setCount=w.exercises.flatMap(e=>e.sets).length;const detail=state.selectedDashboardDate?`${w.exercises.length} exercise${w.exercises.length===1?'':'s'} · ${setCount} set${setCount===1?'':'s'}`:formatLogDate(w.date);return `<button class="recent-workout" type="button" data-workout-id="${escapeHtml(w.id)}"><span><strong>${escapeHtml(w.name)}${isSampleWorkout(w)?'<span class="sample-label">Sample</span>':''}</strong><small>${escapeHtml(detail)}</small></span><span aria-hidden="true">›</span></button>`;}).join(''):state.selectedDashboardDate?emptyDateCopy:'<p>No completed workouts yet. Your first session will appear here.</p>';
       document.querySelectorAll('[data-workout-id]').forEach(b=>b.addEventListener('click',()=>{state.workoutDetailReturn='dashboard';showWorkouts();renderCompletedWorkout(workoutState.completed.find(w=>w.id===b.dataset.workoutId));}));
       $('#startSelectedDateWorkout')?.addEventListener('click',()=>{const date=state.selectedDashboardDate;showWorkouts();startBlankWorkout();workoutState.draft.date=date;renderWorkoutScreen();});
     }
+    /* Muscle blindspots: library muscles with zero weighted volume in the
+       period, always visible as dashed pills (Justin 2026-09-10 — no toggle).
+       Shared by the Stats muscle map and the Home At-a-glance card. */
+    function renderBlindspots(volumes,wrapSelector){
+      const wrap=$(wrapSelector||'#blindspotWrap');if(!wrap)return;
+      const allMuscles=[...new Set(exercises.flatMap(ex=>[...(ex.primary||[]),...(ex.secondary||[])].map(m=>String(m).toLowerCase())))].sort();
+      const missing=allMuscles.filter(m=>!volumes[m]);
+      if(!missing.length){wrap.innerHTML='';return;}
+      wrap.innerHTML=`<div class="tag-row blindspot-list">${missing.map(m=>`<span class="tag blindspot-tag">${escapeHtml(titleCase(m))}</span>`).join('')}</div>`;
+    }
     function renderStats() {
       const labels={today:'Today',week:'Week',month:'Month',year:'Year',all:'All time'};
       $('#statsPeriodTabs').innerHTML=Object.entries(labels).map(([key,label])=>`<button class="period-tab" type="button" data-stats-period="${key}" aria-pressed="${state.statsPeriod===key}">${label}</button>`).join('');
-      document.querySelectorAll('[data-stats-period]').forEach(button=>button.addEventListener('click',()=>{state.statsPeriod=button.dataset.statsPeriod;schedulePersist();renderStats();}));
+      document.querySelectorAll('[data-stats-period]').forEach(button=>button.addEventListener('click',()=>{
+        if(state.statsPeriod===button.dataset.statsPeriod)return;
+        state.statsPeriod=button.dataset.statsPeriod;schedulePersist();renderStats();
+        /* Same focus-drop scroll-to-top guard as the dashboard tabs (Justin 2026-09-10). */
+        document.querySelector('[data-stats-period="'+state.statsPeriod+'"]')?.focus({preventScroll:true});
+      }));
       const workouts=workoutsForPeriod(state.statsPeriod), sets=workouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=sets.reduce((n,set)=>n+setVolume(set),0);
       $('#statsGrid').innerHTML=`<div class="stats-panel"><strong>${workouts.length}</strong><span>Completed workouts</span></div><div class="stats-panel"><strong>${sets.length}</strong><span>Completed sets</span></div><div class="stats-panel"><strong>${Math.round(displayVolume(volume)).toLocaleString()}</strong><span>Total ${weightUnit()} volume</span></div>`;
       const muscles=muscleCounts(workouts), volumes=muscleVolumes(workouts);
-      $('#muscleHeatmapNote').textContent=`${labels[state.statsPeriod]} · weighted volume by primary and secondary muscle`;
       $('#muscleHeatmap').innerHTML=muscleHeatmapMarkup(volumes,false);hydrateBodyMaps();
       $('#muscleStats').innerHTML=Object.keys(muscles).length?`<div class="tag-row">${Object.entries(muscles).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<span class="tag primary">${escapeHtml(m)} · ${n} sets</span>`).join('')}</div>`:'<p class="section-note">Complete a workout to start building muscle-level stats.</p>';
+      renderBlindspots(volumes);
       renderMuscleAnalysis(workouts,state.statsPeriod);
       const allWorkouts=workoutState.completed,monday=new Date();monday.setHours(12,0,0,0);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));const weeks=Array.from({length:10},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()-(7*(9-i)));const next=new Date(d);next.setDate(d.getDate()+7);const startIso=isoForDate(d),endIso=isoForDate(next);const value=allWorkouts.filter(w=>w.date>=startIso&&w.date<endIso).flatMap(w=>w.exercises.flatMap(e=>e.sets)).reduce((n,set)=>n+setVolume(set),0);return{label:new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric'}).format(d),shortLabel:new Intl.DateTimeFormat('en-US',{month:'numeric',day:'numeric'}).format(d),value};});
       $('#volumeChart').innerHTML=allWorkouts.length?lineChart(weeks,value=>`${Math.round(displayVolume(value)).toLocaleString()} ${weightUnit()}`):'<div class="chart-empty">Complete a workout to start the weekly volume chart.</div>';

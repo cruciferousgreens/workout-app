@@ -2,15 +2,14 @@
 /* ===== module: app-bootstrap.js ===== */
     /** Connects static controls to feature modules and performs initial rendering. */
     let deleteArmed=false;
-    /** Theme state (Justin 2026-09-10): two families. Cruciferous (default light)
-        with Asterid as its dark; Matcha with Rosé as its light. themeName is
-        'cruciferous', 'rosepine' (displayed "Rosé"), 'macchiato' (displayed
-        "Asterid"), or 'mocha' (displayed "Matcha"). The dark toggle flips
-        light/dark WITHIN the current family: Cruciferous <-> Asterid (the
-        Cruciferous pill stays active in both), Rosé <-> Matcha. Tapping an
-        already-active non-default pill toggles back to Cruciferous light.
-        Persisted as workout-theme (dark/light) + workout-theme-name
-        (+ legacy workout-theme-light, kept for stored prefs). */
+    /** Theme state (Justin 2026-09-10): four themes in two visual columns.
+        The dark toggle moves between the matching pills: Cruciferous <->
+        Asterid, Rosé <-> Matcha — the newly active theme's pill is always
+        the one shown selected. Tapping the Cruciferous pill always lands on
+        Cruciferous light; tapping an already-active non-default pill also
+        resets to Cruciferous light. Persisted as workout-theme (dark/light)
+        + workout-theme-name (+ legacy workout-theme-light, kept for stored
+        prefs). */
     let themeName='cruciferous', darkMode=false, ctpDark='mocha', lightTheme='cruciferous';
     const ROSEPINE='rosepine', DARK_FLAVORS=['macchiato','mocha'], LIGHT_THEMES=['cruciferous','rosepine'];
     function applyTheme(){
@@ -25,7 +24,10 @@
     function setThemeName(name){
       themeName=name;
       if(name===ROSEPINE){darkMode=false;lightTheme=ROSEPINE;}
-      else if(name==='cruciferous'){lightTheme='cruciferous';}
+      /* Cruciferous always means Cruciferous light — tapping the pill must show
+         the default theme, never linger in a dark palette (Justin 2026-09-10).
+         The Cruciferous<->Asterid dark relationship lives in the dark toggle. */
+      else if(name==='cruciferous'){darkMode=false;lightTheme='cruciferous';}
       else{ /* dark Catppuccin flavor */ darkMode=true;ctpDark=name;}
       applyTheme();
     }
@@ -123,17 +125,26 @@
     $('#closeCustomDialog').addEventListener('click', closeCustomDialog);
     $('#cancelCustomExercise').addEventListener('click', closeCustomDialog);
 
+    /* "By weighted volume" <-> "By number of sets" toggle on the stats page (Justin 2026-09-10). */
+    $('#topExercisesMode').addEventListener('click',()=>{
+      state.topExercisesMode=state.topExercisesMode==='sets'?'volume':'sets';
+      schedulePersist();renderStats();
+    });
+
     $('#darkModeToggle').addEventListener('click',()=>{
       darkMode=!darkMode;
-      if(darkMode){ if(themeName===ROSEPINE)themeName='mocha'; }
-      else{ if(themeName==='mocha')themeName=ROSEPINE; else if(themeName==='macchiato')themeName='cruciferous'; }
+      /* The toggle walks to the matching theme pill (Justin 2026-09-10):
+         Cruciferous <-> Asterid, Rosé <-> Matcha. */
+      if(darkMode){ if(themeName==='cruciferous')themeName='macchiato'; else if(themeName===ROSEPINE)themeName='mocha'; }
+      else{ if(themeName==='macchiato')themeName='cruciferous'; else if(themeName==='mocha')themeName=ROSEPINE; }
       applyTheme();
     });
     document.querySelectorAll('#themePills [data-theme-name]').forEach(button=>button.addEventListener('click',()=>{
       const name=button.dataset.themeName;
-      /* Tapping the active pill toggles back to Cruciferous light — except on
-         Cruciferous itself, where it would silently kill dark mode (Justin 2026-09-10). */
-      if(name===themeName){ if(name!=='cruciferous'){themeName='cruciferous';darkMode=false;lightTheme='cruciferous';applyTheme();} return; }
+      /* Tapping the active pill resets to Cruciferous light. Tapping
+         "Cruciferous" always shows Cruciferous light (Justin 2026-09-10) —
+         the dark side of that column is reached via the dark toggle. */
+      if(name===themeName){ themeName='cruciferous';darkMode=false;lightTheme='cruciferous';applyTheme(); return; }
       setThemeName(name);
     }));
     document.querySelectorAll('#settingsUnitPills [data-units]').forEach(button=>button.addEventListener('click',()=>{
@@ -143,11 +154,11 @@
     $('#settingsRpeThreshold').addEventListener('input',e=>{progressionSetup.threshold=Math.min(10,Math.max(1,Number(e.target.value)||8));schedulePersist();});
     $('#settingsIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;syncSettingsIncrementUnit();schedulePersist();});
     $('#settingsIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Math.max(0,Number(e.target.value)||0);schedulePersist();});
-    $('#settingsRepMin').addEventListener('input',e=>{progressionSetup.defaultRange.min=Math.max(1,Number(e.target.value)||1);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
-    $('#settingsRepMax').addEventListener('input',e=>{progressionSetup.defaultRange.max=Math.max(progressionSetup.defaultRange.min,Number(e.target.value)||progressionSetup.defaultRange.min);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
-    const syncAllTimeStepPills=()=>{syncTimeStepPills($('#settingsTimeStepPills'),progressionSetup.timeStep);syncTimeStepPills($('#programTimeStepPills'),progressionSetup.timeStep);};
+    $('#settingsRepMin').addEventListener('input',e=>{progressionSetup.defaultRange.min=Math.max(1,Number(e.target.value)||1);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('#settingsRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
+    $('#settingsRepMax').addEventListener('input',e=>{const v=e.target.value.trim();progressionSetup.defaultRange.max=v===''?null:Math.max(progressionSetup.defaultRange.min,Number(v)||progressionSetup.defaultRange.min);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('#settingsRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
+    const syncAllTimeStepPills=()=>{syncTimeStepPills($('#settingsTimeStepPills'),progressionSetup.timeStep);syncTimeStepPills($('#programTimeStepPills'),programFormProgression().timeStep);};
     wireTimeStepPills($('#settingsTimeStepPills'),()=>progressionSetup.timeStep,v=>{progressionSetup.timeStep=v;syncAllTimeStepPills();schedulePersist();});
-    wireTimeStepPills($('#programTimeStepPills'),()=>progressionSetup.timeStep,v=>{progressionSetup.timeStep=v;syncAllTimeStepPills();schedulePersist();});
+    wireTimeStepPills($('#programTimeStepPills'),()=>programFormProgression().timeStep,v=>{programFormProgression().timeStep=v;syncAllTimeStepPills();schedulePersist();});
     $('#settingsStallToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;const toggle=$('#settingsStallToggle');toggle.setAttribute('aria-pressed',String(progressionSetup.stallDetection));toggle.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);schedulePersist();});
     $('#progressionInfoButton').addEventListener('click',()=>$('#progressionInfoDialog').showModal());
     $('#closeProgressionInfo').addEventListener('click',()=>$('#progressionInfoDialog').close());
@@ -161,6 +172,9 @@
       try{localStorage.removeItem(PERSIST_KEY);}catch(_){}
       workoutState.completed=[];workoutState.templates=[];workoutState.tags=[];workoutState.exerciseTagPresets=[];workoutState.draft=null;workoutState.activeProgram=null;workoutState.archivedPrograms=[];
       state.customExercises=[];exercises=exercises.filter(ex=>!ex.custom);
+      /* Favorites are user data too: clear them in memory so the pagehide
+       * persist-on-reload below can't resurrect them. */
+      state.favorites.clear();
       location.reload();
     });
     try{
@@ -181,6 +195,12 @@
     $('#unfinishedSetsCancel').addEventListener('click',()=>$('#unfinishedSetsDialog').close());
     $('#unfinishedSetsComplete').addEventListener('click',()=>{$('#unfinishedSetsDialog').close();const draft=workoutState.draft;if(draft){draft.exercises.forEach(item=>item.sets.forEach(set=>{set.complete=true;}));renderWorkoutExercises();markDraftSaved();}finishWorkout();});
     $('#unfinishedSetsDelete').addEventListener('click',()=>{$('#unfinishedSetsDialog').close();const draft=workoutState.draft;if(draft){let removed=0;draft.exercises.forEach(item=>{const before=item.sets.length;item.sets=item.sets.filter(set=>set.complete);removed+=before-item.sets.length;});draft.exercises=draft.exercises.filter(item=>item.sets.length);renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();if(removed)showToast(`Deleted ${removed} unfinished set${removed===1?'':'s'}.`);}finishWorkout();});
+    /* Unfilled-sets dialog (Justin 2026-09-10): finish anyway, delete the
+       unfilled sets, or back out. */
+    $('#closeInvalidSets').addEventListener('click',()=>$('#invalidSetsDialog').close());
+    $('#invalidSetsCancel').addEventListener('click',()=>$('#invalidSetsDialog').close());
+    $('#invalidSetsFinish').addEventListener('click',()=>{$('#invalidSetsDialog').close();finishWorkout(true);});
+    $('#invalidSetsDelete').addEventListener('click',()=>{$('#invalidSetsDialog').close();const draft=workoutState.draft;if(draft){let removed=0;draft.exercises.forEach(item=>{const before=item.sets.length;item.sets=item.sets.filter(set=>!isInvalidSet(item,set));removed+=before-item.sets.length;});draft.exercises=draft.exercises.filter(item=>item.sets.length);renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();if(removed)showToast(`Deleted ${removed} unfilled set${removed===1?'':'s'}.`);}finishWorkout();});
     $('#dashboardNav').addEventListener('click', () => goTab(showDashboard, 'dashboard'));
     $('#workoutsNav').addEventListener('click', () => {
       // Re-tapping the active Workout tab pops a completed-workout review back to the
@@ -194,21 +214,26 @@
     $('#programNav').addEventListener('click', () => goTab(showProgram, 'program'));
     $('#statsNav').addEventListener('click', () => goTab(showStats, 'stats'));
     $('#topBarSettings').addEventListener('click', () => goTab(showSettings, 'settings'));
+    $('#detailFavToggle')?.addEventListener('click', () => toggleFavorite(state.selected));
     $('#topBarBack').addEventListener('click', () => {
       if (state.activeView === 'detail') backFromExerciseDetail();
+      else if (state.activeView === 'settings') backFromSettings();
       else history.back();
     });
-    $('#progressionThreshold').addEventListener('input',e=>{progressionSetup.threshold=Number(e.target.value)||8;schedulePersist();});
-    $('#progressionIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;schedulePersist();});
-    $('#progressionIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Number(e.target.value)||5;schedulePersist();});
-    $('#programRepMin').addEventListener('input',e=>{progressionSetup.defaultRange.min=Math.max(1,Number(e.target.value)||1);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
-    $('#programRepMax').addEventListener('input',e=>{progressionSetup.defaultRange.max=Math.max(progressionSetup.defaultRange.min,Number(e.target.value)||progressionSetup.defaultRange.min);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
-    document.querySelectorAll('[data-rep-preset]').forEach(button=>button.addEventListener('click',()=>{applyRepPreset(button.dataset.repPreset);schedulePersist();}));
-    $('#undulatingToggle').addEventListener('click',()=>{progressionSetup.undulating=!progressionSetup.undulating;$('#undulatingToggle').setAttribute('aria-pressed',String(progressionSetup.undulating));$('#undulatingToggle').setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);renderWeekRanges();schedulePersist();});
-    $('#programLength').addEventListener('input',renderWeekRanges);
+    /* Program setup form controls edit the form draft, never the global
+       defaults (Justin 2026-09-10). */
+    $('#progressionThreshold').addEventListener('input',e=>{programFormProgression().threshold=Number(e.target.value)||8;schedulePersist();});
+    $('#progressionIncrementType').addEventListener('change',e=>{programFormProgression().incrementType=e.target.value;schedulePersist();});
+    $('#progressionIncrementValue').addEventListener('input',e=>{programFormProgression().incrementValue=Number(e.target.value)||5;schedulePersist();});
+    $('#programRepMin').addEventListener('input',e=>{const d=programFormProgression();d.defaultRange.min=Math.max(1,Number(e.target.value)||1);d.defaultRange.preset='custom';document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
+    $('#programRepMax').addEventListener('input',e=>{const d=programFormProgression(),v=e.target.value.trim();d.defaultRange.max=v===''?null:Math.max(d.defaultRange.min,Number(v)||d.defaultRange.min);d.defaultRange.preset='custom';document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
+    document.querySelectorAll('#settingsRepPresets [data-rep-preset]').forEach(button=>button.addEventListener('click',()=>{applyRepPreset(button.dataset.repPreset);schedulePersist();}));
+    document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.addEventListener('click',()=>{applyRepPreset(button.dataset.repPreset,programFormProgression());schedulePersist();}));
+    $('#undulatingToggle').addEventListener('click',()=>{const d=programFormProgression();d.undulating=!d.undulating;$('#undulatingToggle').setAttribute('aria-pressed',String(d.undulating));$('#undulatingToggle').setAttribute('aria-label',`Vary rep ranges by week ${d.undulating?'on':'off'}`);renderWeekRanges(d);schedulePersist();});
+    $('#programLength').addEventListener('input',()=>renderWeekRanges());
     $('#manageProgramOverrides').addEventListener('click',()=>{if(workoutState.activeProgram){$('#programSetup').hidden=true;document.querySelector('#programWorkouts')?.scrollIntoView({behavior:'smooth'});}else{$('#programError').textContent='Create the program first, then edit overrides inside each workout.';}});
     document.querySelectorAll('[data-treatment]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.treatment=button.dataset.treatment;document.querySelectorAll('[data-treatment]').forEach(row=>row.setAttribute('aria-pressed',String(row===button)));schedulePersist();}));
-    $('#stallDetectorToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;$('#stallDetectorToggle').setAttribute('aria-pressed',String(progressionSetup.stallDetection));$('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);schedulePersist();});
+    $('#stallDetectorToggle').addEventListener('click',()=>{const d=programFormProgression();d.stallDetection=!d.stallDetection;$('#stallDetectorToggle').setAttribute('aria-pressed',String(d.stallDetection));$('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${d.stallDetection?'on':'off'}`);schedulePersist();});
     $('#createProgram').addEventListener('click', createProgram);
     $('#startBlankWorkout').addEventListener('click', () => startBlankWorkout());
     $('#repeatLastWorkout').addEventListener('click',()=>repeatWorkout(workoutState.completed.slice().sort((a,b)=>b.date.localeCompare(a.date))[0]));
@@ -217,6 +242,7 @@
       $('#exercisePickerTitle').textContent='Add exercise';
       $('#exercisePickerTitle').nextElementSibling.textContent='Choose one or more movements for this workout.';
       $('#exercisePickerSearch').value = '';
+      preparePickerFilters();
       renderExercisePicker();
       $('#exercisePickerDialog').showModal();
       requestAnimationFrame(() => $('#exercisePickerSearch').focus());
@@ -227,8 +253,13 @@
        reps-tracked exercise in the draft. Explicit choice, so profiles become
        custom (the engine follows the chosen zone instead of last session's). */
     document.querySelectorAll('[data-workout-focus]').forEach(button=>button.addEventListener('click',()=>{
-      const preset=REP_PRESETS[button.dataset.workoutFocus]; if(!preset||!workoutState.draft)return;
-      workoutState.draft.focusPreset=button.dataset.workoutFocus;
+      if(!workoutState.draft)return;
+      const key=button.dataset.workoutFocus;
+      /* "No focus" clears the workout-level selection (Justin 2026-09-10);
+         per-exercise ranges already applied stay as the exercises' own settings. */
+      if(!key){workoutState.draft.focusPreset=null;syncWorkoutFocusPills();markDraftSaved();return;}
+      const preset=REP_PRESETS[key]; if(!preset)return;
+      workoutState.draft.focusPreset=key;
       workoutState.draft.exercises.forEach(item=>{
         const ex=exercises.find(row=>row.id===item.exerciseId);
         if(exerciseTracking(item,ex)==='time')return;
@@ -238,6 +269,22 @@
       renderWorkoutExercises(); renderWorkoutProgression(); syncWorkoutFocusPills(); markDraftSaved();
     }));
     $('#exercisePickerSearch').addEventListener('input', renderPickerList);
+    /* Picker filter panel: the Exercises tab's selector interface inside the
+       add-exercise dialog (Justin 2026-09-10). */
+    $('#pickerFilterToggle').addEventListener('click',()=>{
+      const panel=$('#pickerFilterPanel'),open=panel.classList.toggle('open');
+      $('#pickerFilterToggle').setAttribute('aria-expanded',String(open));
+    });
+    $('#pickerMuscleOptions').addEventListener('click',event=>{
+      const b=event.target.closest('[data-picker-muscle]');if(!b)return;
+      const m=b.dataset.pickerMuscle;
+      if(pickerFilters.muscles.has(m))pickerFilters.muscles.delete(m);else pickerFilters.muscles.add(m);
+      renderPickerFilterState();renderPickerList();
+    });
+    $('#pickerFavoritesToggle').addEventListener('click',()=>{pickerFilters.onlyFavorites=!pickerFilters.onlyFavorites;renderPickerFilterState();renderPickerList();});
+    $('#pickerCustomToggle').addEventListener('click',()=>{pickerFilters.onlyCustom=!pickerFilters.onlyCustom;renderPickerFilterState();renderPickerList();});
+    $('#pickerEquipmentFilter').addEventListener('change',event=>{pickerFilters.equipment=event.target.value;renderPickerList();});
+    $('#pickerClearMuscles').addEventListener('click',()=>{pickerFilters.muscles.clear();renderPickerFilterState();renderPickerList();});
     $('#workoutName').addEventListener('input', event => { if (workoutState.draft) { workoutState.draft.name = event.target.value; markDraftSaved(); } });
     /* The native date input sits invisibly over the pretty date display, so
        tapping it opens the OS date picker directly (showPicker on a hidden
@@ -267,7 +314,9 @@
     $('#closeDiscardDraft').addEventListener('click', () => $('#discardDraftDialog').close());
     $('#keepDraftButton').addEventListener('click', () => $('#discardDraftDialog').close());
     $('#confirmDiscardDraft').addEventListener('click', () => { $('#discardDraftDialog').close(); doDiscardDraft(); });
-    $('#finishWorkout').addEventListener('click', finishWorkout);
+    /* The click event must not leak into finishWorkout(skipInvalid) (Justin
+       2026-09-10: the event object is truthy and was skipping the check). */
+    $('#finishWorkout').addEventListener('click', () => finishWorkout());
 
     $('#searchInput').addEventListener('input', e => {
       state.query = e.target.value;
@@ -284,7 +333,6 @@
     });
     $('#clearMuscles').addEventListener('click', () => { state.muscles.clear(); renderMuscleSelection(); renderLibrary(); });
     $('#equipmentFilter').addEventListener('change', e => { state.equipment = e.target.value; renderLibrary(); });
-    $('#backButton').addEventListener('click', () => backFromExerciseDetail());
     $('#libraryNav').addEventListener('click', () => goTab(showLibrary, 'library'));
     window.addEventListener('popstate', e => {
       const hash = decodeURIComponent(location.hash.slice(1)); const id = e.state?.exercise || hash;

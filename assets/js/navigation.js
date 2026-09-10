@@ -43,8 +43,20 @@
       }
       rememberScroll(); state.selected = null; state.activeView = 'settings'; hideAllViews();
       if (from !== 'settings' && TOP_BAR_TITLES[from]) state.settingsReturn = from;
+      /* Whether this visit pushed a history entry: only then can Back truly pop it.
+       * A directly-opened (deep-linked) Settings has no entry to pop, so Back must
+       * navigate explicitly to the recorded return tab instead of leaving the app. */
+      state.settingsPushed = !!push;
       $('#settingsView').classList.add('active'); setActiveNav('settings'); renderSettings(); restoreScroll('settings');
       if (push) history.pushState({view:'settings'}, '', '#settings');
+    }
+    /** Back from Settings honors the recorded return tab. When this visit pushed a
+     *  history entry, pop it for real; otherwise navigate explicitly to the return
+     *  tab (safe in-app fallback instead of ejecting from the app). */
+    function backFromSettings() {
+      if (state.settingsPushed) { history.back(); return; }
+      const show = { dashboard: showDashboard, library: showLibrary, workout: showWorkouts, program: showProgram, stats: showStats }[state.settingsReturn];
+      if (show) show(false); else showDashboard(false);
     }
     /** Bottom-tab taps always land at the top of the destination page. In-flow
      *  back/forward (popstate) keeps per-view scroll restoration; only explicit

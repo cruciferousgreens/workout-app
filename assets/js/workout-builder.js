@@ -1,13 +1,46 @@
 
 /* ===== module: workout-builder.js ===== */
     /** Builds reusable workouts from the library and keeps exercise-level configuration intact. */
+    /* Picker-scoped filters: the add-exercise dialog carries the Exercises tab's
+       search + filter interface (Justin 2026-09-10). Separate from the library's
+       filters; reset every time the dialog opens. */
+    const pickerFilters={muscles:new Set(),equipment:'',onlyFavorites:false,onlyCustom:false};
+    function resetPickerFilters(){pickerFilters.muscles.clear();pickerFilters.equipment='';pickerFilters.onlyFavorites=false;pickerFilters.onlyCustom=false;}
+    function pickerFilterMatch(x){
+      const allMuscles=[...(x.primary||[]),...(x.secondary||[])];
+      const muscleMatch=!pickerFilters.muscles.size||[...pickerFilters.muscles].every(m=>allMuscles.includes(m));
+      const favMatch=!pickerFilters.onlyFavorites||state.favorites.has(x.id);
+      const customMatch=!pickerFilters.onlyCustom||x.custom;
+      return muscleMatch&&favMatch&&customMatch&&(!pickerFilters.equipment||x.equipment===pickerFilters.equipment);
+    }
+    function pickerFilterActive(){return pickerFilters.muscles.size>0||!!pickerFilters.equipment||pickerFilters.onlyFavorites||pickerFilters.onlyCustom;}
+    function populatePickerFilters(){
+      const muscles=[...new Set(exercises.flatMap(x=>[...(x.primary||[]),...(x.secondary||[])]))].sort();
+      const equipment=[...new Set(exercises.map(x=>x.equipment).filter(Boolean))].sort();
+      $('#pickerMuscleOptions').innerHTML=muscles.map(x=>`<button class="muscle-option" type="button" data-picker-muscle="${x}" aria-pressed="false">${titleCase(x)}</button>`).join('');
+      $('#pickerEquipmentFilter').innerHTML='<option value="">All equipment</option>'+equipment.map(x=>`<option value="${x}">${titleCase(x)}</option>`).join('');
+      renderPickerFilterState();
+    }
+    function renderPickerFilterState(){
+      document.querySelectorAll('#pickerMuscleOptions .muscle-option').forEach(b=>b.setAttribute('aria-pressed',String(pickerFilters.muscles.has(b.dataset.pickerMuscle))));
+      $('#pickerFavoritesToggle')?.setAttribute('aria-pressed',String(pickerFilters.onlyFavorites));
+      $('#pickerCustomToggle')?.setAttribute('aria-pressed',String(pickerFilters.onlyCustom));
+      $('#pickerEquipmentFilter').value=pickerFilters.equipment;
+      $('#pickerClearMuscles').hidden=pickerFilters.muscles.size===0;
+    }
+    function preparePickerFilters(){
+      resetPickerFilters();
+      populatePickerFilters();
+      const panel=$('#pickerFilterPanel');panel.classList.remove('open');
+      $('#pickerFilterToggle').setAttribute('aria-expanded','false');
+    }
     function cloneTemplateExercises(rows){return (rows||[]).map(item=>({exerciseId:item.exerciseId,tracking:item.tracking||item.progression?.mode||null,note:item.note||'',exerciseTags:[...(item.exerciseTags||[])],supersetId:item.supersetId||null,progression:item.progression?{...item.progression}:null,sets:(item.sets?.length?item.sets:[{w:'',r:'',seconds:'',rpe:'',tags:[]}]).map(set=>({w:'',r:set.r??'',seconds:set.seconds??'',rpe:set.rpe??'',tags:[...(set.tags||[])],complete:false}))}));}
     function pickerProgramWorkout(){return workoutState.activeProgram?.workouts.find(row=>row.uid===workoutState.programWorkoutTarget)||null;}
     function openProgramWorkoutBuilder(program,workout){
       workoutState.pickerMode='program';workoutState.programWorkoutTarget=workout.uid;
       $('#exercisePickerTitle').textContent=`Build ${workout.name}`;
       $('#exercisePickerTitle').nextElementSibling.textContent='Add exercises from the library, or start from one of your saved templates.';
-      $('#exercisePickerSearch').value='';renderExercisePicker();$('#exercisePickerDialog').showModal();
+      $('#exercisePickerSearch').value='';preparePickerFilters();renderExercisePicker();$('#exercisePickerDialog').showModal();
       requestAnimationFrame(()=>$('#exercisePickerSearch').focus());
     }
     function pickerCollection(){const programMode=workoutState.pickerMode==='program';return programMode?(pickerProgramWorkout()?.template?.exercises||[]):(workoutState.draft?.exercises||[]);}
@@ -22,7 +55,7 @@
       const templateBox=$('#pickerTemplateOptions');
       templateBox.hidden=false;
       const templateButtons=programMode&&workoutState.templates.length?`<strong>START FROM A TEMPLATE</strong><div class="picker-template-buttons">${workoutState.templates.map(template=>`<button class="picker-template-button" type="button" data-use-program-template="${escapeHtml(template.id)}">${escapeHtml(template.name)}</button>`).join('')}</div>`:'';
-      const ruleRangeSummary=(profile,time,setCount)=>`${setCount} set${setCount===1?'':'s'} · `+(time?`${profile.timeMin}–${profile.timeMax} sec`:(profile.amrap?(profile.min>1?`AMRAP from ${profile.min} reps`:'AMRAP'):profile.openTop?`${profile.min}+ reps`:`${profile.min??''}–${profile.max??''} reps`));
+      const ruleRangeSummary=(profile,time,setCount)=>`${setCount} set${setCount===1?'':'s'} · `+(time?`${profile.timeMin}–${profile.timeMax} sec`:(profile.amrap?(profile.min>1?`AMRAP from ${profile.min} reps`:'AMRAP'):(profile.openTop||profile.max==null)?`${profile.min}+ reps`:`${profile.min??''}–${profile.max??''} reps`));
       const ruleRows=collection.length?`<div class="exercise-rules-list">${collection.map(item=>{
         const ex=exercises.find(row=>row.id===item.exerciseId);
         const defaults=(programMode?workoutState.activeProgram?.progression:progressionSetup)||progressionSetup;
@@ -135,11 +168,14 @@
       const q=normalize($('#exercisePickerSearch').value);
       const collection=pickerCollection();
       const chosen=new Set(collection.map(item=>item.exerciseId));
-      const matches = q ? rankedExerciseMatches($('#exercisePickerSearch').value,80) : exercises.slice(0,80);
-      const recentIds = q ? [] : recentExerciseIds().filter(id => matches.some(ex => ex.id === id)).slice(0,5);
+      const matches = q ? rankedExerciseMatches($('#exercisePickerSearch').value,exercises.length).filter(pickerFilterMatch).slice(0,80) : exercises.filter(pickerFilterMatch).slice(0,80);
+      /* Recents first, favorites pinned to the top of recents (Justin 2026-09-10). Skipped while searching or filtering. */
+      const recentIds = (q||pickerFilterActive()) ? [] : recentExerciseIds().filter(id => matches.some(ex => ex.id === id))
+        .sort((a, b) => Number(state.favorites.has(b)) - Number(state.favorites.has(a))).slice(0,5);
       const recentSet = new Set(recentIds);
       const rows = [...recentIds.map(id => matches.find(ex => ex.id === id)), ...matches.filter(ex => !recentSet.has(ex.id))].filter(Boolean);
-      list.innerHTML = rows.length ? rows.map((ex,index) => `${index === 0 && recentIds.length ? '<div class="picker-section-label">RECENT</div>' : ''}${index === recentIds.length && recentIds.length && rows.length > recentIds.length ? '<div class="picker-section-label">ALL EXERCISES</div>' : ''}<button class="picker-item" type="button" data-id="${escapeHtml(ex.id)}" aria-pressed="${chosen.has(ex.id)}"><span><strong>${escapeHtml(ex.name)}</strong><span>${escapeHtml(ex.primary.join(', ') || 'Unspecified muscle')} · ${escapeHtml(ex.equipment || 'No equipment')}</span></span><span class="picker-state">${chosen.has(ex.id) ? '✓' : '+'}</span></button>`).join('') : '<div class="dialog-empty">No matching exercises.</div>';
+      const clockIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+      list.innerHTML = rows.length ? rows.map((ex,index) => `${index === 0 && recentIds.length ? `<div class="picker-section-label">${clockIcon}<span>RECENT</span></div>` : ''}${index === recentIds.length && recentIds.length && rows.length > recentIds.length ? '<div class="picker-section-label">ALL EXERCISES</div>' : ''}<button class="picker-item" type="button" data-id="${escapeHtml(ex.id)}" aria-pressed="${chosen.has(ex.id)}"><span><strong>${escapeHtml(ex.name)}</strong><span>${escapeHtml(ex.primary.join(', ') || 'Unspecified muscle')} · ${escapeHtml(ex.equipment || 'No equipment')}</span></span><span class="picker-state">${chosen.has(ex.id) ? '✓' : '+'}</span></button>`).join('') : '<div class="dialog-empty">No matching exercises.</div>';
       if(list)list.scrollTop=prevScroll;
       document.querySelectorAll('#exercisePickerList .picker-item').forEach(button => button.addEventListener('click', () => {
         let nowChosen;

@@ -54,7 +54,7 @@
           <div class="sets">${session.sets.map((s,i) => `<div class="set-row"><span class="set-num">SET ${i+1}</span><span class="set-cell"><strong>${s.w == null ? '—' : displayWeight(s.w)}</strong>${s.w == null ? '' : ` ${weightUnit()}`}</span><span class="set-cell"><strong>${session.tracking === 'time' ? (s.seconds ?? '—') : s.r}</strong> ${session.tracking === 'time' ? 'sec' : 'reps'}</span><span class="set-cell">${s.rpe == null ? '—' : `RPE <strong>${s.rpe}</strong>`}${s.tags?.length ? `<br><small>${s.tags.map(escapeHtml).join(' · ')}</small>` : ''}</span></div>`).join('')}</div>
         </div>`;
       }).join('') : `<div class="history-empty">No history for this movement yet.</div>`;
-      document.querySelectorAll('[data-history-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=workoutState.completed.find(row=>row.id===button.dataset.historyWorkout);if(workout){state.workoutDetailReturn='library';showWorkouts();renderCompletedWorkout(workout);}}));
+      document.querySelectorAll('[data-history-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=workoutState.completed.find(row=>row.id===button.dataset.historyWorkout);if(workout){state.workoutDetailReturn='exercise-detail';state.workoutDetailExerciseId=id;state.workoutDetailExerciseReturn=state.exerciseDetailReturn;showWorkouts(false);renderCompletedWorkout(workout);}}));
       $('#formulaNote').textContent = '';
     }
 
@@ -77,7 +77,15 @@
         state.exerciseDetailReturn = {view: state.activeView};
       }
       $('#detailTitle').textContent = ex.name;
-      $('#detailTags').innerHTML = [...ex.primary.map(x => `<span class="tag primary">${escapeHtml(x)}</span>`), ...ex.secondary.map(x => `<span class="tag">${escapeHtml(x)}</span>`), `<span class="tag">${escapeHtml(ex.equipment || 'no equipment')}</span>`, ...(ex.custom ? ['<span class="tag custom">Custom</span>'] : [])].join('');
+      const detailFav = $('#detailFavToggle');
+      if (detailFav) {
+        const fav = state.favorites.has(id);
+        detailFav.setAttribute('aria-pressed', String(fav));
+        detailFav.setAttribute('aria-label', fav ? 'Remove from favorites' : 'Add to favorites');
+      }
+      /* Muscle names live with the "Muscles worked" heat map below (Justin
+         2026-09-10); the top keeps only equipment/custom context. */
+      $('#detailTags').innerHTML = [`<span class="tag">${escapeHtml(ex.equipment || 'no equipment')}</span>`, ...(ex.custom ? ['<span class="tag custom">Custom</span>'] : [])].join('');
       const realStats = statsFor(id);
       const st = realStats;
       const isBodyweight = ex.equipment === 'body only';
@@ -99,14 +107,18 @@
       $('#exerciseProgressChart').innerHTML=isBodyweight?'<div class="chart-empty">Bodyweight progress will use reps and added load from your workouts.</div>':lineChart(trend,value=>`${Math.round(displayWeight(value))} ${weightUnit()}`);
       renderHistory(id);
       $('#noteCard').innerHTML = `No notes for this movement yet.<span class="note-meta">Exercise-specific note</span>`;
-      $('#movementCard').innerHTML = `<dl><dt>Force</dt><dd>${escapeHtml(ex.force || '—')}</dd><dt>Mechanic</dt><dd>${escapeHtml(ex.mechanic || '—')}</dd><dt>Primary</dt><dd>${escapeHtml(ex.primary.join(', ') || '—')}</dd><dt>Secondary</dt><dd>${escapeHtml(ex.secondary.join(', ') || '—')}</dd></dl>${ex.custom ? `<div class="custom-tools"><button class="custom-tool" id="editCustomExercise" type="button">Edit</button><button class="custom-tool danger" id="deleteCustomExercise" type="button">Delete</button></div>` : ''}`;
+      $('#movementCard').innerHTML = `<dl><dt>Force</dt><dd>${escapeHtml(ex.force || '—')}</dd><dt>Mechanic</dt><dd>${escapeHtml(ex.mechanic || '—')}</dd><dt>Primary</dt><dd>${escapeHtml(ex.primary.join(', ') || '—')}</dd><dt>Secondary</dt><dd>${escapeHtml(ex.secondary.join(', ') || '—')}</dd></dl>${ex.custom ? `<div class="custom-tools"><button class="custom-tool" id="editCustomExercise" type="button">Edit</button></div>` : ''}`;
+      /* Delete lives at the very bottom of the exercise page (Justin 2026-09-10),
+         below the How-to instructions — not buried in the Movement card. */
+      $('#customDeleteRow').innerHTML = ex.custom ? `<button class="custom-tool danger custom-delete-btn" id="deleteCustomExercise" type="button">Delete exercise</button>` : '';
+      $('#editCustomExercise')?.addEventListener('click', () => openCustomDialog(ex));
+      $('#deleteCustomExercise')?.addEventListener('click', () => deleteCustomExercise(ex.id));
       $('#instructions').innerHTML = ex.instructions.length ? ex.instructions.map(x => `<li>${escapeHtml(x)}</li>`).join('') : '<li>No instructions added.</li>';
-      if (ex.custom) {
-        $('#editCustomExercise').addEventListener('click', () => openCustomDialog(ex));
-        $('#deleteCustomExercise').addEventListener('click', () => deleteCustomExercise(ex.id));
-      }
       $('#similarGrid').innerHTML = `<div class="action-list">${similarTo(ex).map(x => `<button class="action-row" type="button" data-id="${escapeHtml(x.id)}" aria-label="Open ${escapeHtml(x.name)}"><span><strong>${escapeHtml(x.name)}</strong><span>${escapeHtml(x.primary[0] || 'Unspecified muscle')} · ${escapeHtml(x.equipment || 'No equipment')}</span></span><span class="similar-chevron" aria-hidden="true">›</span></button>`).join('')}</div>`;
       document.querySelectorAll('#similarGrid [data-id]').forEach(btn => btn.addEventListener('click', () => openExercise(btn.dataset.id)));
+      /* Anatomical muscle map for this exercise (Justin 2026-09-10). */
+      $('#exerciseBodyMap').innerHTML = exerciseBodyMapMarkup(ex);
+      hydrateBodyMaps();
       state.activeView = 'detail';
       hideAllViews();
       $('#detailView').classList.add('active');
@@ -117,28 +129,29 @@
       updateExerciseBackLabel();
       if (push) history.pushState({exercise:id}, '', `#${encodeURIComponent(id)}`);
     }
-    /** Names the destination on the Back button's accessible label. */
+    /** Names the destination on the top-bar Back button's accessible label. */
     function updateExerciseBackLabel() {
-      const back = $('#backButton'); if (!back) return;
-      const names = {'completed-workout':'workout', workout:'training', stats:'stats', dashboard:'home', program:'program', library:'library'};
+      const topBack = $('#topBarBack'); if (!topBack) return;
+      const names = {'completed-workout':'workout', workout:'workout', stats:'stats', dashboard:'home', program:'program', library:'library'};
       const dest = names[state.exerciseDetailReturn?.view] || 'library';
-      const label = `Back to ${dest}`;
-      back.setAttribute('aria-label', label);
-      const topBack = $('#topBarBack'); if (topBack) topBack.setAttribute('aria-label', label);
+      topBack.setAttribute('aria-label', `Back to ${dest}`);
     }
 
     /** Returns from the exercise detail to the recorded origin (library, stats, dashboard,
-     *  the workout tab, or the completed workout it was drilled into). */
+     *  the workout tab, or the completed workout it was drilled into). Back pops one
+     *  navigation level: it navigates without pushing a new history entry, so tapping
+     *  Back then the browser back button never ping-pongs. */
     function backFromExerciseDetail() {
       const ret = state.exerciseDetailReturn;
       if (ret && ret.view === 'completed-workout' && ret.workoutId) {
         const workout = workoutState.completed.find(w => w.id === ret.workoutId);
         if (workout) { showWorkouts(false); renderCompletedWorkout(workout); return; }
+        showWorkouts(false); return;
       }
-      if (ret && ret.view === 'stats') { showStats(); return; }
-      if (ret && ret.view === 'dashboard') { showDashboard(); return; }
-      if (ret && ret.view === 'program') { showProgram(); return; }
-      if (ret && ret.view === 'workout') { showWorkouts(); return; }
-      showLibrary();
+      if (ret && ret.view === 'stats') { showStats(false); return; }
+      if (ret && ret.view === 'dashboard') { showDashboard(false); return; }
+      if (ret && ret.view === 'program') { showProgram(false); return; }
+      if (ret && ret.view === 'workout') { showWorkouts(false); return; }
+      showLibrary(false);
     }
     
