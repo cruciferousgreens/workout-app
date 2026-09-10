@@ -359,10 +359,15 @@
     .set-swipe.is-open { background: #a9322a; }
     .set-swipe .swipe-delete-action { width: 64px; }
     .set-swipe.is-open .swipe-content { transform: translateX(-64px); }
-    .complete-set { width: 34px; height: 34px; padding: 0; align-self: center; border-radius: 8px; }
-    .complete-set svg { width: 17px; height: 17px; fill: none; stroke: #8a9188; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .set-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+    .complete-set, .delete-set-inline { width: 34px; height: 34px; padding: 0; align-self: center; border-radius: 8px; cursor: pointer; display: grid; place-items: center; }
+    .complete-set svg, .delete-set-inline svg { width: 17px; height: 17px; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .complete-set svg { stroke: #8a9188; }
     .complete-set[aria-pressed="true"] svg { stroke: #fff; }
-    .log-labels, .log-set { grid-template-columns: 34px minmax(82px,.8fr) minmax(72px,.65fr) minmax(72px,.65fr) 34px; }
+    .delete-set-inline { border: 1px solid #e5c4c0; background: #fff; color: #9a3328; }
+    .delete-set-inline svg { stroke: currentColor; }
+    .delete-set-inline:hover, .delete-set-inline:focus-visible { border-color: #9a3328; background: #fff5f3; outline: none; }
+    .log-labels, .log-set { grid-template-columns: 34px minmax(82px,.8fr) minmax(72px,.65fr) minmax(72px,.65fr) 73px; }
     .exercise-tools { display: flex; align-items: center; gap: 6px; }
     .drag-handle, .superset-button { min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); cursor: grab; font-size: 11px; font-weight: 750; touch-action: none; }
     .drag-handle { font-size: 18px; letter-spacing: -3px; }
@@ -387,8 +392,8 @@
       .week-strip { gap: 4px; }
       .day-chip { border-radius: 16px; }
       .dashboard-card { padding: 16px; }
-      .log-set { grid-template-columns: 28px repeat(3,minmax(0,1fr)) 34px; }
-      .log-set .complete-set { grid-column: 5; }
+      .log-set { grid-template-columns: 28px repeat(3,minmax(0,1fr)) 73px; }
+      .log-set .set-actions { grid-column: 5; }
       .exercise-tools { flex-wrap: wrap; justify-content: flex-end; }
       .bottom-nav { bottom: max(7px, env(safe-area-inset-bottom)); padding: 4px; border-radius: 16px; }
       .nav-item { min-height: 48px; font-size: 9px; }
@@ -1157,7 +1162,7 @@
           <section class="workout-exercise swipe-content" data-workout-exercise="${escapeHtml(item.uid)}">
             ${grouped ? `<div class="superset-band">Superset ${draft.exercises.filter((row, index) => row.supersetId && draft.exercises.findIndex(first => first.supersetId === row.supersetId) === index).findIndex(row => row.supersetId === item.supersetId) + 1}</div>` : ''}
             <div class="workout-exercise-head"><div><h3>${escapeHtml(ex.name)}</h3><p>${escapeHtml(ex.primary.join(', ') || 'Unspecified muscle')} · ${escapeHtml(ex.equipment || 'No equipment')}</p></div><div class="exercise-tools">${draft.exercises.length > 1 ? `<button class="superset-button ${grouped ? 'active' : ''}" type="button" data-superset-uid="${escapeHtml(item.uid)}">${grouped ? 'Edit superset' : 'Superset'}</button>` : ''}<button class="drag-handle" type="button" data-drag-uid="${escapeHtml(item.uid)}" aria-label="Drag to reorder ${escapeHtml(ex.name)}">⋮⋮</button></div></div>
-            <div class="log-labels"><span>SET</span><span>${isBodyweight ? 'ADDED LB' : 'WEIGHT (LB)'}</span><span>REPS</span><span>RPE</span><span>DONE</span></div>
+            <div class="log-labels"><span>SET</span><span>${isBodyweight ? 'ADDED LB' : 'WEIGHT (LB)'}</span><span>REPS</span><span>RPE</span><span>ACTIONS</span></div>
             <div>${item.sets.map((set,index) => `<div class="swipe-item set-swipe" data-set-wrapper="${escapeHtml(set.uid)}">
               <button class="swipe-delete-action delete-set" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-label="Delete set ${index + 1}">Delete</button>
               <div class="log-set swipe-content ${set.complete ? 'is-complete' : ''}" data-set-uid="${escapeHtml(set.uid)}">
@@ -1165,7 +1170,10 @@
                 <input class="log-input weight-input" data-field="w" type="number" min="0" step="0.5" inputmode="decimal" value="${escapeHtml(set.w)}" placeholder="${isBodyweight ? 'Optional' : 'Weight'}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : 'weight'} in pounds" />
                 <input class="log-input reps-input" data-field="r" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(set.r)}" placeholder="Reps" aria-label="Set ${index + 1} reps" />
                 <input class="log-input rpe-input" data-field="rpe" type="number" min="1" max="10" step="0.5" inputmode="decimal" value="${escapeHtml(set.rpe)}" placeholder="RPE optional" aria-label="Set ${index + 1} optional RPE" />
-                <button class="complete-set" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-pressed="${set.complete}" aria-label="${set.complete ? 'Mark set incomplete' : 'Mark set complete'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
+                <div class="set-actions">
+                  <button class="complete-set" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-pressed="${set.complete}" aria-label="${set.complete ? 'Mark set incomplete' : 'Mark set complete'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>
+                  <button class="delete-set delete-set-inline" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-label="Delete set ${index + 1}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                </div>
                 <div class="selected-set-tags" aria-label="Selected tags">${set.tags.map(tag => `<span class="set-tag-chip">${escapeHtml(tag)}</span>`).join('')}</div>
               </div></div>`).join('')}</div>
             <button class="add-set" type="button" data-uid="${escapeHtml(item.uid)}">+ Add set</button>
