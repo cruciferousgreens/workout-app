@@ -514,17 +514,30 @@
 
     .exercise-rules { margin: 0 0 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
     .exercise-rules summary { padding: 11px 0; color: var(--accent); cursor: pointer; font-size: 11px; font-weight: 800; }
-    .exercise-rule-row { display: grid; grid-template-columns: minmax(130px,1fr) 62px 62px 90px 74px auto; gap: 7px; align-items: end; padding: 10px 0; border-top: 1px solid var(--line); }
-    .exercise-rule-row > strong { align-self: center; min-width: 0; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .exercise-rule-row { padding: 14px 0; border-top: 1px solid var(--line); }
+    .exercise-rule-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+    .exercise-rule-head > strong { min-width: 0; font-size: 13px; line-height: 1.25; }
+    .set-count-field { width: 72px; flex: 0 0 72px; }
+    .exercise-rule-controls { display: grid; grid-template-columns: 96px 72px 72px minmax(190px,1fr); gap: 8px; align-items: end; }
     .rule-field { display: grid; gap: 4px; }
-    .rule-field span { color: var(--muted); font-size: 8px; font-weight: 800; text-transform: uppercase; }
-    .rule-field input, .rule-field select { width: 100%; min-height: 34px; height: 34px; margin: 0; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 11px; }
-    .reps-only-label { min-height: 34px; display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; white-space: nowrap; }
-    .reps-only-label input { accent-color: var(--accent); }
+    .rule-field span, .load-control-title { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
+    .rule-field input, .rule-field select { width: 100%; min-height: 38px; height: 38px; margin: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 12px; }
+    .load-progression { display: grid; gap: 5px; }
+    .load-progression-row { display: grid; grid-template-columns: minmax(0,1fr) 76px auto; gap: 6px; align-items: center; }
+    .load-progression select, .load-progression input { width: 100%; min-width: 0; height: 38px; margin: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 12px; }
+    .reps-only-toggle { min-height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .reps-only-toggle[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .load-progression.is-disabled select, .load-progression.is-disabled input { opacity: .45; pointer-events: none; }
     @media (max-width: 700px) {
-      .exercise-rule-row { grid-template-columns: minmax(0,1fr) 60px 60px; }
-      .exercise-rule-row > strong { grid-column: 1 / -1; }
-      .exercise-rule-row .rule-field:nth-of-type(3), .exercise-rule-row .rule-field:nth-of-type(4), .exercise-rule-row .reps-only-label { grid-column: span 1; }
+      .exercise-rule-controls { grid-template-columns: 1fr 1fr 1fr; }
+      .load-progression { grid-column: 1 / -1; }
+    }
+    @media (max-width: 430px) {
+      .exercise-rule-controls { grid-template-columns: 1fr 1fr; }
+      .exercise-rule-controls .rule-field:first-child { grid-column: 1 / -1; }
+      .load-progression { grid-column: 1 / -1; }
+      .load-progression-row { grid-template-columns: minmax(0,1fr) 72px; }
+      .reps-only-toggle { grid-column: 1 / -1; }
     }
 
     .progression-setup { margin: 20px 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: #f8faf7; }
@@ -649,6 +662,30 @@
       .program-workout { grid-template-columns: 30px minmax(0,1fr); }
       .program-row-actions { grid-column: 2; justify-content: flex-start; }
     }
+    .add-set { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; margin: 12px 0 0 42px; padding: 0 13px; border: 1px solid #b9d6c5; border-radius: var(--radius-sm); background: #f4faf6; color: var(--accent); }
+    .set-count-badge { display: inline-flex; align-items: center; min-height: 22px; margin-top: 7px; padding: 2px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 10px; font-weight: 750; }
+    .suggestion-basis { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--line); color: var(--ink); font-size: 9px; line-height: 1.4; }
+    .muscle-analysis-grid { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(250px,.85fr); gap: 12px; margin-top: 12px; }
+    .analysis-panel { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+    .analysis-panel h2 { margin: 0 0 4px; font-size: 17px; }
+    .analysis-panel > p { margin: 0 0 16px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .muscle-volume-list, .balance-list, .muscle-trend-list { display: grid; gap: 11px; }
+    .muscle-volume-row { display: grid; grid-template-columns: minmax(82px,.65fr) minmax(100px,1fr) auto; gap: 9px; align-items: center; font-size: 11px; }
+    .analysis-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
+    .analysis-track { height: 7px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+    .analysis-fill { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+    .analysis-value { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .balance-row { display: grid; grid-template-columns: 60px minmax(0,1fr) 38px; gap: 8px; align-items: center; font-size: 11px; }
+    .balance-row strong { font-size: 11px; }
+    .trend-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+    .trend-row:first-child { padding-top: 0; border-top: 0; }
+    .trend-row strong, .trend-row span { display: block; }
+    .trend-row strong { font-size: 12px; text-transform: capitalize; }
+    .trend-row span { margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .trend-change { padding: 4px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 10px; font-weight: 800; }
+    .trend-change.up { background: var(--accent-soft); color: var(--accent); }
+    .trend-change.down { background: #fff0ea; color: #8d4325; }
+    @media (max-width: 700px) { .muscle-analysis-grid { grid-template-columns: 1fr; } }
     .tracking-toggle { min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 750; }
     .tracking-toggle.time { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .sample-pr-note { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; color: #8c4c13; font-size: 10px; font-weight: 750; }

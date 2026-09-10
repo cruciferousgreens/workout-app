@@ -29,7 +29,7 @@
         <div class="dashboard-grid">
           <section class="dashboard-card" aria-labelledby="dashProgramTitle"><h2 id="dashProgramTitle">Active program</h2><div id="dashboardProgram"></div></section>
           <section class="dashboard-card" aria-labelledby="dashStatsTitle">
-            <div class="dashboard-card-head"><h2 id="dashStatsTitle">At a glance</h2><div class="period-wrap"><button class="period-trigger" id="periodTrigger" type="button" aria-expanded="false" aria-haspopup="menu"><span id="periodLabel">Today</span> ⌄</button><div class="period-menu" id="periodMenu" role="menu" hidden></div></div></div>
+            <div class="dashboard-card-head"><h2 id="dashStatsTitle">At a glance</h2><div class="period-wrap"><button class="period-trigger" id="periodTrigger" type="button" aria-expanded="false" aria-haspopup="menu"><span id="periodLabel">This week</span> ⌄</button><div class="period-menu" id="periodMenu" role="menu" hidden></div></div></div>
             <div class="mini-stats" id="dashboardStats"></div><div class="muscle-summary" id="dashboardMuscles"></div><div class="compact-heatmap" id="dashboardHeatmap"></div>
           </section>
           <section class="dashboard-card wide" aria-labelledby="dashRecentTitle"><h2 id="dashRecentTitle">Recent workouts</h2><div class="recent-workouts" id="dashboardRecent"></div></section>
@@ -139,8 +139,8 @@
             <p>Defaults for this program. Each exercise can use a rep range or a time range with its own step and optional load progression.</p>
             <div class="progression-fields">
               <div class="field"><label for="progressionThreshold">TOP-SET RPE TRIGGER</label><input id="progressionThreshold" type="number" inputmode="decimal" min="1" max="10" step="0.5" value="8"></div>
-              <div class="field"><label for="progressionIncrementType">INCREMENT</label><select id="progressionIncrementType"><option value="lb">Fixed lb</option><option value="percent">Percent</option></select></div>
-              <div class="field"><label for="progressionIncrementValue">SIZE</label><input id="progressionIncrementValue" type="number" inputmode="decimal" min="0.5" step="0.5" value="5"></div>
+              <div class="field"><label for="progressionIncrementType">LOAD STEP TYPE</label><select id="progressionIncrementType"><option value="lb">Pounds</option><option value="percent">Percent</option></select></div>
+              <div class="field"><label for="progressionIncrementValue">LOAD STEP VALUE</label><input id="progressionIncrementValue" type="number" inputmode="decimal" min="0.5" step="0.5" value="5"></div>
               <div class="progression-choice"><span class="filter-label">NEXT-SESSION SUGGESTIONS</span><p class="field-help">Targets appear as cards you can tap to apply. Nothing changes until you choose a suggestion.</p></div>
               <div class="switch-row"><span class="switch-copy"><strong>Stall detector</strong><span>After 2–3 flat sessions with rising RPE, suggest scheduling a deload week. Never schedules one automatically.</span></span><button class="switch" id="stallDetectorToggle" type="button" role="switch" aria-pressed="true" aria-label="Stall detector on"></button></div>
             </div>
@@ -150,7 +150,6 @@
           <p class="session-note">Program edits are kept while this preview remains open.</p>
         </div>
         <div id="programCover" class="program-cover" hidden></div>
-        <section class="progression-preview" id="progressionPreview" aria-labelledby="progressionPreviewTitle"></section>
         <section class="dashboard-card archived-programs" id="archivedPrograms" aria-labelledby="archivedProgramsTitle" hidden><h2 id="archivedProgramsTitle">Archived programs</h2><div id="archivedProgramList"></div></section>
       </section>
 
@@ -160,6 +159,11 @@
         <div class="stats-sample-note" id="statsSampleNote"><span><strong>Sample</strong> workouts power the demo views and labeled sample-derived PRs. They never affect real progression.</span><button class="clear-sample-data" type="button">Clear sample data</button></div>
         <div class="stats-grid" id="statsGrid"></div>
         <section class="dashboard-card"><div class="section-head"><h2>Muscle heat map</h2><p class="section-note" id="muscleHeatmapNote">Training volume by primary muscle</p></div><div id="muscleHeatmap"></div><div id="muscleStats"></div></section>
+        <div class="muscle-analysis-grid">
+          <section class="analysis-panel"><h2>Volume by muscle</h2><p>Weighted volume. Secondary muscles receive 45% of the set’s volume.</p><div class="muscle-volume-list" id="muscleVolumeBreakdown"></div></section>
+          <section class="analysis-panel"><h2>Training balance</h2><p>Share of muscle volume across push, pull, lower body, and core.</p><div class="balance-list" id="muscleBalance"></div></section>
+        </div>
+        <section class="analysis-panel chart-card"><div class="section-head"><div><h2>Muscle trends</h2><p class="section-note" id="muscleTrendNote">Compared with the previous period</p></div></div><div class="muscle-trend-list" id="muscleTrends"></div></section>
         <section class="dashboard-card chart-card"><div class="section-head"><h2>Weekly volume</h2><p class="section-note">Last 10 weeks · lb × reps</p></div><div class="chart-wrap" id="volumeChart"></div></section>
       </section>
 

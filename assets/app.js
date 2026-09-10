@@ -99,7 +99,7 @@
       'Barbell_Squat':'Use the second rack height. Brace before unracking and keep the walkout to two steps.'
     };
 
-    const state = { query:'', muscles:new Set(), equipment:'', selected:null, customExercises:[], activeView:'dashboard', dashboardPeriod:'today', statsPeriod:'all', selectedDashboardDate:null, calendarWeekOffset:0, samplePromptShown:false, scroll:{dashboard:0, library:0, workout:0, program:0, stats:0, detail:0} };
+    const state = { query:'', muscles:new Set(), equipment:'', selected:null, customExercises:[], activeView:'dashboard', dashboardPeriod:'week', statsPeriod:'week', selectedDashboardDate:null, calendarWeekOffset:0, samplePromptShown:false, scroll:{dashboard:0, library:0, workout:0, program:0, stats:0, detail:0} };
     const customDraft = { primary:new Set(), secondary:new Set(), equipment:'', force:'', mechanic:'', tracking:'reps' };
     const workoutState = {
       draft: null,
@@ -451,7 +451,7 @@
           <button class="swipe-delete-action remove-workout-exercise" type="button" data-uid="${escapeHtml(item.uid)}" aria-label="Remove ${escapeHtml(ex.name)}">Delete</button>
           <section class="workout-exercise swipe-content" data-workout-exercise="${escapeHtml(item.uid)}">
             ${grouped ? `<div class="superset-band">Superset ${draft.exercises.filter((row, index) => row.supersetId && draft.exercises.findIndex(first => first.supersetId === row.supersetId) === index).findIndex(row => row.supersetId === item.supersetId) + 1}</div>` : ''}
-            <div class="workout-exercise-head"><div><h3>${escapeHtml(ex.name)}</h3><p>${escapeHtml(ex.primary.join(', ') || 'Unspecified muscle')} · ${escapeHtml(ex.equipment || 'No equipment')}</p></div><div class="exercise-tools"><button class="tracking-toggle ${tracking === 'time' ? 'time' : ''}" type="button" data-tracking-uid="${escapeHtml(item.uid)}" aria-label="Switch to ${tracking === 'time' ? 'rep' : 'time'} tracking">${tracking === 'time' ? 'Seconds' : 'Reps'}</button>${draft.exercises.length > 1 ? `<button class="superset-button ${grouped ? 'active' : ''}" type="button" data-superset-uid="${escapeHtml(item.uid)}">${grouped ? 'Edit superset' : 'Superset'}</button>` : ''}<button class="drag-handle" type="button" data-drag-uid="${escapeHtml(item.uid)}" aria-label="Drag to reorder ${escapeHtml(ex.name)}">⋮⋮</button></div></div>
+            <div class="workout-exercise-head"><div><h3>${escapeHtml(ex.name)}</h3><p>${escapeHtml(ex.primary.join(', ') || 'Unspecified muscle')} · ${escapeHtml(ex.equipment || 'No equipment')}</p><span class="set-count-badge">${item.sets.length} set${item.sets.length===1?'':'s'}</span></div><div class="exercise-tools"><button class="tracking-toggle ${tracking === 'time' ? 'time' : ''}" type="button" data-tracking-uid="${escapeHtml(item.uid)}" aria-label="Switch to ${tracking === 'time' ? 'rep' : 'time'} tracking">${tracking === 'time' ? 'Seconds' : 'Reps'}</button>${draft.exercises.length > 1 ? `<button class="superset-button ${grouped ? 'active' : ''}" type="button" data-superset-uid="${escapeHtml(item.uid)}">${grouped ? 'Edit superset' : 'Superset'}</button>` : ''}<button class="drag-handle" type="button" data-drag-uid="${escapeHtml(item.uid)}" aria-label="Drag to reorder ${escapeHtml(ex.name)}">⋮⋮</button></div></div>
             <div class="log-labels"><span>SET</span><span>${isBodyweight ? 'ADDED LB' : 'WEIGHT (LB)'}</span><span>${tracking === 'time' ? 'SECONDS' : 'REPS'}</span><span>RPE</span><span>ACTIONS</span></div>
             <div>${item.sets.map((set,index) => `<div class="swipe-item set-swipe" data-set-wrapper="${escapeHtml(set.uid)}">
               <button class="swipe-delete-action delete-set" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-label="Delete set ${index + 1}">Delete</button>
@@ -471,7 +471,7 @@
           </section></div>`;
       }).join('') : '<div class="history-empty">No exercises yet. Add your first movement to begin logging.</div>';
 
-      document.querySelectorAll('.remove-workout-exercise').forEach(button => button.addEventListener('click', () => { draft.exercises = draft.exercises.filter(item => item.uid !== button.dataset.uid); renderWorkoutExercises(); markDraftSaved(); }));
+      document.querySelectorAll('.remove-workout-exercise').forEach(button => button.addEventListener('click', () => { draft.exercises = draft.exercises.filter(item => item.uid !== button.dataset.uid); prepareDraftProgression(draft, workoutState.activeProgram?.id===draft.programId?workoutState.activeProgram.progression:{...progressionSetup,stallDetection:false}); renderWorkoutExercises(); renderWorkoutProgression(); markDraftSaved(); }));
       document.querySelectorAll('.add-set').forEach(button => button.addEventListener('click', () => { draft.exercises.find(item => item.uid === button.dataset.uid)?.sets.push(newSet()); renderWorkoutExercises(); markDraftSaved(); }));
       document.querySelectorAll('.delete-set').forEach(button => button.addEventListener('click', () => { const item = draft.exercises.find(row => row.uid === button.dataset.exerciseUid); if (!item) return; item.sets = item.sets.filter(set => set.uid !== button.dataset.setUid); if (!item.sets.length) item.sets.push(newSet()); renderWorkoutExercises(); markDraftSaved(); }));
       document.querySelectorAll('.log-input').forEach(input => input.addEventListener('input', () => { const row=input.closest('.log-set'); const exerciseUid = input.closest('.workout-exercise').dataset.workoutExercise; const setUid = row.dataset.setUid; const set = draft.exercises.find(item => item.uid === exerciseUid)?.sets.find(itemSet => itemSet.uid === setUid); if (set) { set[input.dataset.field] = input.value; if (set.complete) { set.complete = false; row.classList.remove('is-complete'); const check=row.querySelector('.complete-set'); check?.setAttribute('aria-pressed','false'); check?.setAttribute('aria-label','Mark set complete'); } } $('#workoutError').textContent = ''; markDraftSaved(); }));
@@ -549,7 +549,7 @@
       const flat=recent.length>=3 && recent.every((row,i)=>i===0 || (row.weight<=recent[i-1].weight && row.performance<=recent[i-1].performance));
       const rising=recent.length>=3 && recent.every((row,i)=>i===0 || row.rpe==null || recent[i-1].rpe==null || row.rpe>=recent[i-1].rpe);
       const stall=!!programConfig.stallDetection && flat && rising;
-      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall,sampleDerived:includeSamples};
+      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,sourceDate:logs[0].isoDate,sourceWorkout:logs[0].name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall,sampleDerived:includeSamples};
     }
 
     function sampleSuggestions() {
@@ -562,7 +562,8 @@
       const oldTarget=formatTarget(suggestion.latest.weight,suggestion.mode==='time'?suggestion.latest.seconds:suggestion.latest.reps);
       const nextTarget=formatTarget(suggestion.nextWeight,suggestion.mode==='time'?suggestion.nextSeconds:suggestion.nextReps);
       const label=suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='time'?'Time +':'Rep +';
-      return `<${interactive?'button':'div'} class="suggestion-card ${suggestion.applied?'applied':''}" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name">${escapeHtml(ex?.name||'Exercise')}<span>${label}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div><div class="suggestion-reason">${escapeHtml(suggestion.reason)}</div></${interactive?'button':'div'}>`;
+      const basis=suggestion.sampleDerived?'':`<div class="suggestion-basis">Based on ${escapeHtml(suggestion.sourceWorkout||'your last workout')} · ${escapeHtml(formatLogDate(suggestion.sourceDate))} · latest top set ${oldTarget}${suggestion.latest.rpe==null?' without RPE':` @ RPE ${suggestion.latest.rpe}`}</div>`;
+      return `<${interactive?'button':'div'} class="suggestion-card ${suggestion.applied?'applied':''}" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name">${escapeHtml(ex?.name||'Exercise')}<span>${label}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div><div class="suggestion-reason">${escapeHtml(suggestion.reason)}</div>${basis}</${interactive?'button':'div'}>`;
     }
 
     function renderProgressionPreview() {
@@ -570,7 +571,7 @@
       const fallback='<div class="chart-empty">Sample history is cleared. Complete workouts to generate progression targets.</div>';
       const ruleMarkup=suggestions.map(item=>{
         const ex=exercises.find(x=>x.id===item.exerciseId),profile=sampleProgressionProfiles[item.exerciseId],time=profile.mode==='time';
-        return `<div class="exercise-rule-row" data-rule-id="${escapeHtml(item.exerciseId)}"><strong title="${escapeHtml(ex?.name||'Exercise')}">${escapeHtml(ex?.name||'Exercise')}</strong><label class="rule-field"><span>Track</span><select data-rule-field="mode"><option value="reps" ${time?'':'selected'}>Reps</option><option value="time" ${time?'selected':''}>Seconds</option></select></label><label class="rule-field"><span>${time?'Min sec':'Min reps'}</span><input type="number" min="1" max="600" value="${time?profile.timeMin:profile.min}" data-rule-field="${time?'timeMin':'min'}"></label><label class="rule-field"><span>${time?'Max sec':'Max reps'}</span><input type="number" min="1" max="600" value="${time?profile.timeMax:profile.max}" data-rule-field="${time?'timeMax':'max'}"></label><label class="rule-field"><span>${time?'Sec step':'Load step'}</span><input type="number" min="0.5" step="0.5" value="${time?profile.timeStep:profile.incrementValue}" data-rule-field="${time?'timeStep':'incrementValue'}"></label><label class="reps-only-label"><input type="checkbox" data-rule-field="repsOnly" ${profile.repsOnly?'checked':''}> No load increase</label></div>`;
+        return `<div class="exercise-rule-row" data-rule-id="${escapeHtml(item.exerciseId)}"><strong title="${escapeHtml(ex?.name||'Exercise')}">${escapeHtml(ex?.name||'Exercise')}</strong><label class="rule-field"><span>Track</span><select data-rule-field="mode"><option value="reps" ${time?'':'selected'}>Reps</option><option value="time" ${time?'selected':''}>Seconds</option></select></label><label class="rule-field"><span>${time?'Min sec':'Min reps'}</span><input type="number" min="1" max="600" value="${time?profile.timeMin:profile.min}" data-rule-field="${time?'timeMin':'min'}"></label><label class="rule-field"><span>${time?'Max sec':'Max reps'}</span><input type="number" min="1" max="600" value="${time?profile.timeMax:profile.max}" data-rule-field="${time?'timeMax':'max'}"></label><label class="rule-field"><span>${time?'Sec step':'Load step'}</span><input type="number" min="0.5" step="0.5" value="${time?profile.timeStep:profile.incrementValue}" data-rule-field="${time?'timeStep':'incrementValue'}"></label><label class="reps-only-label"><input type="checkbox" data-rule-field="repsOnly" ${profile.repsOnly?'checked':''}> Increase reps only</label></div>`;
       }).join('');
       $('#progressionPreview').innerHTML=`<div class="progression-preview-head"><div><h2 id="progressionPreviewTitle">Next-session suggestions</h2><p>Tap a card to apply its target. Rep- and time-range progression use the same RPE 8 trigger.</p></div><span class="sample-derived">Sample-derived preview</span></div>${suggestions.length?`<details class="exercise-rules"><summary>Adjust sample exercise rules</summary>${ruleMarkup}</details><div class="suggestion-list">${suggestions.map((item,i)=>suggestionCardMarkup(item,i,true)).join('')}</div>`:fallback}<p class="progression-footnote">These preview values come only from labeled sample history. In an actual program, cards use real completed workouts. The engine never schedules a deload automatically.</p>`;
       document.querySelectorAll('[data-demo-suggestion]').forEach(button=>button.addEventListener('click',()=>{const suggestion=suggestions[Number(button.dataset.demoSuggestion)];if(!suggestion)return;suggestion.applied=!suggestion.applied;button.classList.toggle('applied',suggestion.applied);button.querySelector('.suggestion-name span').textContent=suggestion.applied?'Applied ✓':(suggestion.kind==='load'?'Load +':suggestion.kind==='time'?'Time +':suggestion.kind==='hold'?'Hold':'Rep +');}));
@@ -600,9 +601,10 @@
       const program=workoutState.activeProgram && draft?.programId===workoutState.activeProgram.id?workoutState.activeProgram:null;
       context.hidden=!program; context.textContent=program?`${program.name} · ${draft.name}`:'';
       const suggestions=draft?.progressionSuggestions||[];
-      if(!suggestions.length){box.hidden=true;return;}
+      if(!draft?.exercises?.length){box.hidden=true;return;}
       box.hidden=false;
-      box.innerHTML=`<div class="progression-banner-head"><div><h3>Next-session targets</h3><p>Computed from your real logs. Tap a card to apply its target to every set.</p></div><span class="real-data-label">Real logs only</span></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
+      if(!suggestions.length){box.innerHTML=`<div class="progression-banner-head"><div><h3>No progression suggestions yet</h3><p>Suggestions only appear for exercises in this workout after you have real completed history. Sample workouts are never used.</p></div><span class="real-data-label">Real logs only</span></div>`;return;}
+      box.innerHTML=`<div class="progression-banner-head"><div><h3>Suggestions for this workout</h3><p>Only exercises below with real completed history appear. Tap a card to apply its target to every set.</p></div><span class="real-data-label">Real logs only</span></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
       document.querySelectorAll('[data-real-suggestion]').forEach(button=>button.addEventListener('click',()=>applyProgressionSuggestion(draft,suggestions[Number(button.dataset.realSuggestion)])));
     }
 
@@ -680,10 +682,49 @@
       const templateBox=$('#pickerTemplateOptions');
       templateBox.hidden=!programMode;
       const templateButtons=workoutState.templates.length?`<strong>START FROM A TEMPLATE</strong><div class="picker-template-buttons">${workoutState.templates.map(template=>`<button class="picker-template-button" type="button" data-use-program-template="${escapeHtml(template.id)}">${escapeHtml(template.name)}</button>`).join('')}</div>`:'';
-      const ruleRows=programMode&&collection.length?`<details class="exercise-rules" open><summary>Tracking & progression</summary>${collection.map(item=>{const ex=exercises.find(row=>row.id===item.exerciseId),profile=item.progression||sampleProgressionProfiles[item.exerciseId]||{mode:item.tracking||ex?.tracking||'reps',min:5,max:8,timeMin:30,timeMax:60,timeStep:5,incrementValue:5,repsOnly:false},time=profile.mode==='time';return `<div class="exercise-rule-row" data-program-rule-id="${escapeHtml(item.exerciseId)}"><strong>${escapeHtml(ex?.name||'Exercise')}</strong><label class="rule-field"><span>Track</span><select data-program-rule="mode"><option value="reps" ${time?'':'selected'}>Reps</option><option value="time" ${time?'selected':''}>Seconds</option></select></label><label class="rule-field"><span>${time?'Min sec':'Min reps'}</span><input type="number" min="1" value="${time?profile.timeMin:profile.min}" data-program-rule="${time?'timeMin':'min'}"></label><label class="rule-field"><span>${time?'Max sec':'Max reps'}</span><input type="number" min="1" value="${time?profile.timeMax:profile.max}" data-program-rule="${time?'timeMax':'max'}"></label><label class="rule-field"><span>${time?'Sec step':'Load step'}</span><input type="number" min="0.5" step="0.5" value="${time?profile.timeStep:profile.incrementValue}" data-program-rule="${time?'timeStep':'incrementValue'}"></label><label class="reps-only-label"><input type="checkbox" data-program-rule="repsOnly" ${profile.repsOnly?'checked':''}> No load increase</label></div>`}).join('')}</details>`:'<span class="field-help">Choose exercises below, then set rep or time ranges here.</span>';
+      const ruleRows=programMode&&collection.length?`<details class="exercise-rules" open><summary>Sets, targets & progression</summary>${collection.map(item=>{
+        const ex=exercises.find(row=>row.id===item.exerciseId);
+        const profile=item.progression||sampleProgressionProfiles[item.exerciseId]||{mode:item.tracking||ex?.tracking||'reps',min:5,max:8,timeMin:30,timeMax:60,timeStep:5,incrementType:progressionSetup.incrementType,incrementValue:progressionSetup.incrementValue,repsOnly:false};
+        const time=profile.mode==='time', setCount=Math.max(1,item.sets?.length||1), incrementType=profile.incrementType||progressionSetup.incrementType||'lb';
+        return `<div class="exercise-rule-row" data-program-rule-id="${escapeHtml(item.exerciseId)}">
+          <div class="exercise-rule-head"><strong>${escapeHtml(ex?.name||'Exercise')}</strong><label class="rule-field set-count-field"><span>Sets</span><input type="number" inputmode="numeric" min="1" max="20" step="1" value="${setCount}" data-program-rule="setCount" aria-label="Number of sets for ${escapeHtml(ex?.name||'exercise')}"></label></div>
+          <div class="exercise-rule-controls">
+            <label class="rule-field"><span>Track</span><select data-program-rule="mode"><option value="reps" ${time?'':'selected'}>Reps</option><option value="time" ${time?'selected':''}>Seconds</option></select></label>
+            <label class="rule-field"><span>${time?'Min sec':'Min reps'}</span><input type="number" min="1" value="${time?profile.timeMin:profile.min}" data-program-rule="${time?'timeMin':'min'}"></label>
+            <label class="rule-field"><span>${time?'Max sec':'Max reps'}</span><input type="number" min="1" value="${time?profile.timeMax:profile.max}" data-program-rule="${time?'timeMax':'max'}"></label>
+            <div class="load-progression ${profile.repsOnly?'is-disabled':''}"><span class="load-control-title">Load progression</span><div class="load-progression-row"><select data-program-rule="incrementType" aria-label="Load increment type"><option value="lb" ${incrementType==='lb'?'selected':''}>Pounds</option><option value="percent" ${incrementType==='percent'?'selected':''}>Percent</option></select><input type="number" min="0.5" step="0.5" value="${profile.incrementValue??progressionSetup.incrementValue}" data-program-rule="incrementValue" aria-label="Load increment value"><button class="reps-only-toggle" type="button" data-program-reps-only aria-pressed="${!!profile.repsOnly}">Increase reps only</button></div></div>
+          </div>
+        </div>`;
+      }).join('')}</details>`:'<span class="field-help">Choose exercises below, then set the number of sets, rep or time range, and load progression.</span>';
       templateBox.innerHTML=templateButtons+ruleRows;
       document.querySelectorAll('[data-use-program-template]').forEach(button=>button.addEventListener('click',()=>{const template=workoutState.templates.find(row=>row.id===button.dataset.useProgramTemplate);if(!template||!programWorkout)return;programWorkout.template={name:programWorkout.name,exercises:cloneTemplateExercises(template.exercises)};renderExercisePicker();}));
-      document.querySelectorAll('[data-program-rule-id]').forEach(row=>row.querySelectorAll('[data-program-rule]').forEach(control=>control.addEventListener('change',()=>{const item=programWorkout?.template?.exercises.find(entry=>entry.exerciseId===row.dataset.programRuleId);if(!item)return;const ex=exercises.find(entry=>entry.id===item.exerciseId);const profile=item.progression||{mode:item.tracking||ex?.tracking||'reps',min:5,max:8,timeMin:30,timeMax:60,timeStep:5,incrementType:progressionSetup.incrementType,incrementValue:progressionSetup.incrementValue,repsOnly:false};const field=control.dataset.programRule;if(field==='repsOnly')profile[field]=control.checked;else if(field==='mode'){profile.mode=control.value;item.tracking=control.value;}else profile[field]=Number(control.value);item.progression=profile;renderExercisePicker();})));
+      document.querySelectorAll('[data-program-rule-id]').forEach(row=>{
+        const getItem=()=>programWorkout?.template?.exercises.find(entry=>entry.exerciseId===row.dataset.programRuleId);
+        row.querySelectorAll('[data-program-rule]').forEach(control=>control.addEventListener('change',()=>{
+          const item=getItem(); if(!item)return;
+          const ex=exercises.find(entry=>entry.id===item.exerciseId);
+          const profile=item.progression||{mode:item.tracking||ex?.tracking||'reps',min:5,max:8,timeMin:30,timeMax:60,timeStep:5,incrementType:progressionSetup.incrementType,incrementValue:progressionSetup.incrementValue,repsOnly:false};
+          const field=control.dataset.programRule;
+          if(field==='setCount'){
+            const count=Math.max(1,Math.min(20,Number(control.value)||1));
+            const existing=item.sets||[];
+            item.sets=Array.from({length:count},(_,index)=>existing[index]||{w:'',r:'',seconds:'',rpe:'',tags:[],complete:false});
+          }else if(field==='mode'){
+            profile.mode=control.value; item.tracking=control.value;
+          }else if(field==='incrementType'){
+            profile.incrementType=control.value;
+          }else{
+            profile[field]=Number(control.value);
+          }
+          item.progression=profile; renderExercisePicker();
+        }));
+        row.querySelector('[data-program-reps-only]')?.addEventListener('click',()=>{
+          const item=getItem(); if(!item)return;
+          const ex=exercises.find(entry=>entry.id===item.exerciseId);
+          const profile=item.progression||{mode:item.tracking||ex?.tracking||'reps',min:5,max:8,timeMin:30,timeMax:60,timeStep:5,incrementType:progressionSetup.incrementType,incrementValue:progressionSetup.incrementValue,repsOnly:false};
+          profile.repsOnly=!profile.repsOnly; item.progression=profile; renderExercisePicker();
+        });
+      });
       const matches = exercises.filter(ex => !q || normalize([ex.name, ...ex.primary, ...ex.secondary, ex.equipment].join(' ')).includes(q)).slice(0,80);
       const recentIds = q ? [] : recentExerciseIds().filter(id => matches.some(ex => ex.id === id)).slice(0,5);
       const recentSet = new Set(recentIds);
@@ -695,12 +736,13 @@
           if(!programWorkout.template)programWorkout.template={name:programWorkout.name,exercises:[]};
           const existing=programWorkout.template.exercises.find(item=>item.exerciseId===button.dataset.id);
           if(existing)programWorkout.template.exercises=programWorkout.template.exercises.filter(item=>item.exerciseId!==button.dataset.id);
-          else { const ex=exercises.find(row=>row.id===button.dataset.id); programWorkout.template.exercises.push({exerciseId:button.dataset.id,tracking:ex?.tracking||'reps',note:'',supersetId:null,progression:sampleProgressionProfiles[button.dataset.id]||null,sets:[{w:'',r:'',seconds:'',rpe:'',tags:[],complete:false}]}); }
+          else { const ex=exercises.find(row=>row.id===button.dataset.id); programWorkout.template.exercises.push({exerciseId:button.dataset.id,tracking:ex?.tracking||'reps',note:'',supersetId:null,progression:sampleProgressionProfiles[button.dataset.id]?{...sampleProgressionProfiles[button.dataset.id]}:null,sets:Array.from({length:3},()=>({w:'',r:'',seconds:'',rpe:'',tags:[],complete:false}))}); }
         }else{
           const existing = workoutState.draft.exercises.find(item => item.exerciseId === button.dataset.id);
           if (existing) workoutState.draft.exercises = workoutState.draft.exercises.filter(item => item.exerciseId !== button.dataset.id);
           else { const ex=exercises.find(row=>row.id===button.dataset.id); workoutState.draft.exercises.push({uid:uid('exercise'), exerciseId:button.dataset.id, tracking:ex?.tracking||'reps', sets:[newSet()], note:'', supersetId:null}); }
-          renderWorkoutExercises();markDraftSaved();
+          prepareDraftProgression(workoutState.draft, workoutState.activeProgram?.id===workoutState.draft.programId?workoutState.activeProgram.progression:{...progressionSetup,stallDetection:false});
+          renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();
         }
         renderExercisePicker();
       }));
@@ -822,6 +864,56 @@
       if(period==='year') start=`${today.slice(0,4)}-01-01`;
       return workoutState.completed.filter(w=>(!start||w.date>=start)&&w.date<=today);
     }
+    function comparisonPeriods(period) {
+      const now=new Date(); now.setHours(12,0,0,0);
+      let currentStart, currentEnd, previousStart, previousEnd, label;
+      if(period==='today'){
+        currentStart=new Date(now); currentEnd=new Date(now); currentEnd.setDate(now.getDate()+1);
+        previousStart=new Date(now); previousStart.setDate(now.getDate()-1); previousEnd=new Date(now);
+        label='today vs yesterday';
+      }else if(period==='week'){
+        currentStart=new Date(now); currentStart.setDate(now.getDate()-((now.getDay()+6)%7)); currentEnd=new Date(currentStart); currentEnd.setDate(currentStart.getDate()+7);
+        previousStart=new Date(currentStart); previousStart.setDate(currentStart.getDate()-7); previousEnd=new Date(currentStart);
+        label='this week vs last week';
+      }else if(period==='month'){
+        currentStart=new Date(now.getFullYear(),now.getMonth(),1,12); currentEnd=new Date(now.getFullYear(),now.getMonth()+1,1,12);
+        previousStart=new Date(now.getFullYear(),now.getMonth()-1,1,12); previousEnd=new Date(currentStart);
+        label='this month vs last month';
+      }else if(period==='year'){
+        currentStart=new Date(now.getFullYear(),0,1,12); currentEnd=new Date(now.getFullYear()+1,0,1,12);
+        previousStart=new Date(now.getFullYear()-1,0,1,12); previousEnd=new Date(currentStart);
+        label='this year vs last year';
+      }else{
+        currentEnd=new Date(now); currentEnd.setDate(now.getDate()+1); currentStart=new Date(currentEnd); currentStart.setDate(currentEnd.getDate()-28);
+        previousEnd=new Date(currentStart); previousStart=new Date(previousEnd); previousStart.setDate(previousEnd.getDate()-28);
+        label='last 4 weeks vs prior 4 weeks';
+      }
+      const inWindow=(workout,start,end)=>workout.date>=isoForDate(start)&&workout.date<isoForDate(end);
+      return {current:workoutState.completed.filter(workout=>inWindow(workout,currentStart,currentEnd)),previous:workoutState.completed.filter(workout=>inWindow(workout,previousStart,previousEnd)),label};
+    }
+    function muscleBalanceGroups(volumes) {
+      const groups={Push:0,Pull:0,Lower:0,Core:0,Other:0};
+      const groupFor=muscle=>{
+        if(['chest','shoulders','triceps'].includes(muscle))return 'Push';
+        if(['lats','middle back','lower back','traps','biceps','forearms'].includes(muscle))return 'Pull';
+        if(['quadriceps','hamstrings','glutes','calves','adductors','abductors'].includes(muscle))return 'Lower';
+        if(['abdominals'].includes(muscle))return 'Core';
+        return 'Other';
+      };
+      Object.entries(volumes).forEach(([muscle,value])=>{groups[groupFor(muscle)]+=Number(value)||0;});
+      return groups;
+    }
+    function renderMuscleAnalysis(workouts,period) {
+      const volumes=muscleVolumes(workouts), rows=Object.entries(volumes).filter(([,value])=>value>0).sort((a,b)=>b[1]-a[1]);
+      const max=Math.max(1,...rows.map(([,value])=>value));
+      $('#muscleVolumeBreakdown').innerHTML=rows.length?rows.slice(0,10).map(([muscle,value])=>`<div class="muscle-volume-row"><strong class="analysis-label">${escapeHtml(muscle)}</strong><span class="analysis-track"><i class="analysis-fill" style="width:${Math.max(3,(value/max)*100).toFixed(1)}%"></i></span><span class="analysis-value">${formatVolume(value)}</span></div>`).join(''):'<p class="section-note">No weighted muscle volume in this period.</p>';
+      const groups=muscleBalanceGroups(volumes), total=Object.values(groups).reduce((sum,value)=>sum+value,0), groupRows=Object.entries(groups).filter(([,value])=>value>0);
+      $('#muscleBalance').innerHTML=groupRows.length?groupRows.map(([group,value])=>{const share=total?Math.round(value/total*100):0;return `<div class="balance-row"><strong>${group}</strong><span class="analysis-track"><i class="analysis-fill" style="width:${share}%"></i></span><span class="analysis-value">${share}%</span></div>`;}).join(''):'<p class="section-note">Log weighted sets to see your training balance.</p>';
+      const comparison=comparisonPeriods(period), current=muscleVolumes(comparison.current), previous=muscleVolumes(comparison.previous);
+      const trendRows=[...new Set([...Object.keys(current),...Object.keys(previous)])].map(muscle=>({muscle,current:Number(current[muscle]||0),previous:Number(previous[muscle]||0)})).filter(row=>row.current>0||row.previous>0).sort((a,b)=>b.current-a.current).slice(0,8);
+      $('#muscleTrendNote').textContent=titleCase(comparison.label);
+      $('#muscleTrends').innerHTML=trendRows.length?trendRows.map(row=>{const change=row.previous?Math.round((row.current-row.previous)/row.previous*100):null;const changeText=change==null?(row.current?'New':'—'):`${change>0?'+':''}${change}%`;const direction=change>0?'up':change<0?'down':'';return `<div class="trend-row"><div><strong>${escapeHtml(row.muscle)}</strong><span>${formatVolume(row.current)} now · ${formatVolume(row.previous)} before</span></div><span class="trend-change ${direction}">${changeText}</span></div>`;}).join(''):'<p class="section-note">No muscle trend is available for these periods yet.</p>';
+    }
     function muscleCounts(workouts) {
       const muscles={}; workouts.forEach(w=>w.exercises.forEach(item=>{const ex=exercises.find(x=>x.id===item.exerciseId);(ex?.primary||[]).forEach(m=>muscles[m]=(muscles[m]||0)+item.sets.length);})); return muscles;
     }
@@ -932,6 +1024,7 @@
       $('#muscleHeatmapNote').textContent=`${labels[state.statsPeriod]} · weighted volume by primary and secondary muscle`;
       $('#muscleHeatmap').innerHTML=muscleHeatmapMarkup(volumes,false);hydrateBodyMaps();
       $('#muscleStats').innerHTML=Object.keys(muscles).length?`<div class="tag-row">${Object.entries(muscles).sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<span class="tag primary">${escapeHtml(m)} · ${n} sets</span>`).join('')}</div>`:'<p class="section-note">Complete a workout to start building muscle-level stats.</p>';
+      renderMuscleAnalysis(workouts,state.statsPeriod);
       const allWorkouts=workoutState.completed,monday=new Date();monday.setHours(12,0,0,0);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));const weeks=Array.from({length:10},(_,i)=>{const d=new Date(monday);d.setDate(monday.getDate()-(7*(9-i)));const next=new Date(d);next.setDate(d.getDate()+7);const startIso=isoForDate(d),endIso=isoForDate(next);const value=allWorkouts.filter(w=>w.date>=startIso&&w.date<endIso).flatMap(w=>w.exercises.flatMap(e=>e.sets)).reduce((n,s)=>n+(Number(s.w)*Number(s.r)||0),0);return{label:new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric'}).format(d),shortLabel:new Intl.DateTimeFormat('en-US',{month:'numeric',day:'numeric'}).format(d),value};});
       $('#volumeChart').innerHTML=allWorkouts.length?lineChart(weeks,value=>`${Math.round(value).toLocaleString()} lb`):'<div class="chart-empty">Complete a workout to start the weekly volume chart.</div>';
     }
@@ -963,7 +1056,6 @@
       prepareDraftProgression(workoutState.draft,program.progression);renderWorkoutScreen();
     }
     function renderProgram() {
-      renderProgressionPreview();
       const program = workoutState.activeProgram;
       $('#programSetup').hidden = !!program;
       $('#programCover').hidden = !program;
@@ -1134,8 +1226,8 @@
     $('#programNav').addEventListener('click', () => showProgram());
     $('#statsNav').addEventListener('click', () => showStats());
     $('#progressionThreshold').addEventListener('input',e=>progressionSetup.threshold=Number(e.target.value)||8);
-    $('#progressionIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;renderProgressionPreview();});
-    $('#progressionIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Number(e.target.value)||5;renderProgressionPreview();});
+    $('#progressionIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;});
+    $('#progressionIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Number(e.target.value)||5;});
     document.querySelectorAll('[data-treatment]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.treatment=button.dataset.treatment;document.querySelectorAll('[data-treatment]').forEach(row=>row.setAttribute('aria-pressed',String(row===button)));}));
     $('#stallDetectorToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;$('#stallDetectorToggle').setAttribute('aria-pressed',String(progressionSetup.stallDetection));$('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);});
     $('#createProgram').addEventListener('click', createProgram);
@@ -1203,7 +1295,7 @@
       else if (id && exercises.some(x => x.id === id)) openExercise(id, false); else showDashboard(false);
     });
 
-    populateFilters(); renderLibrary(); renderDashboard(); renderStats(); renderProgressionPreview();
+    populateFilters(); renderLibrary(); renderDashboard(); renderStats();
     const initialId = decodeURIComponent(location.hash.slice(1));
     if (initialId === 'library') showLibrary(false); else if (initialId === 'workout') showWorkouts(false); else if (initialId === 'program') showProgram(false); else if (initialId === 'stats') showStats(false); else if (initialId && exercises.some(x => x.id === initialId)) openExercise(initialId, false); else showDashboard(false);
   
