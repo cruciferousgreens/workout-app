@@ -518,6 +518,91 @@
       .compact-heatmap .heatmap-row { grid-template-columns: 8px minmax(0,1fr); }
       .compact-heatmap .heatmap-row strong { display: none; }
     }
+
+
+    /* Progression engine comparison and per-program controls */
+
+    .exercise-rules { margin: 0 0 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .exercise-rules summary { padding: 11px 0; color: var(--accent); cursor: pointer; font-size: 11px; font-weight: 800; }
+    .exercise-rule-row { display: grid; grid-template-columns: minmax(130px,1fr) 62px 62px 90px 74px auto; gap: 7px; align-items: end; padding: 10px 0; border-top: 1px solid var(--line); }
+    .exercise-rule-row > strong { align-self: center; min-width: 0; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rule-field { display: grid; gap: 4px; }
+    .rule-field span { color: var(--muted); font-size: 8px; font-weight: 800; text-transform: uppercase; }
+    .rule-field input, .rule-field select { width: 100%; min-height: 34px; height: 34px; margin: 0; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 11px; }
+    .reps-only-label { min-height: 34px; display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; white-space: nowrap; }
+    .reps-only-label input { accent-color: var(--accent); }
+    @media (max-width: 700px) {
+      .exercise-rule-row { grid-template-columns: minmax(0,1fr) 60px 60px; }
+      .exercise-rule-row > strong { grid-column: 1 / -1; }
+      .exercise-rule-row .rule-field:nth-of-type(3), .exercise-rule-row .rule-field:nth-of-type(4), .exercise-rule-row .reps-only-label { grid-column: span 1; }
+    }
+
+    .progression-setup { margin: 20px 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: #f8faf7; }
+    .progression-setup h3 { margin: 0 0 5px; font-size: 16px; }
+    .progression-setup > p { margin: 0 0 16px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .progression-fields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+    .progression-choice { grid-column: 1 / -1; }
+    .choice-pills { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 8px; }
+    .choice-pill { min-height: 58px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; text-align: left; }
+    .choice-pill strong, .choice-pill span { display: block; }
+    .choice-pill strong { font-size: 12px; }
+    .choice-pill span { margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.35; }
+    .choice-pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+    .switch-row { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 4px; }
+    .switch-copy strong, .switch-copy span { display: block; }
+    .switch-copy strong { font-size: 12px; }
+    .switch-copy span { margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .switch { position: relative; flex: 0 0 auto; width: 46px; height: 28px; padding: 0; border: 0; border-radius: 999px; background: #cdd2cb; cursor: pointer; }
+    .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); transition: transform .16s ease; }
+    .switch[aria-pressed="true"] { background: var(--accent); }
+    .switch[aria-pressed="true"]::after { transform: translateX(18px); }
+    .progression-preview { margin-top: 18px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+    .progression-preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    .progression-preview-head h2 { margin: 0 0 5px; font-size: 18px; }
+    .progression-preview-head p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .sample-derived { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; border-radius: 999px; background: #fff0df; color: #8c4c13; font-size: 9px; font-weight: 850; letter-spacing: .03em; text-transform: uppercase; }
+    .comparison-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+    .treatment-panel { min-width: 0; padding: 15px; border: 1px solid var(--line); border-radius: var(--radius-md); background: #fbfcfa; }
+    .treatment-label { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .treatment-letter { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: #fff; font-size: 11px; font-weight: 850; }
+    .treatment-panel h3 { margin: 0; font-size: 15px; }
+    .treatment-intro { min-height: 34px; margin: 0 0 13px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .suggestion-list { display: grid; gap: 8px; }
+    .suggestion-card { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); text-align: left; }
+    button.suggestion-card { cursor: pointer; }
+    button.suggestion-card:hover, button.suggestion-card.applied { border-color: var(--accent); background: var(--accent-soft); }
+    .suggestion-name { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 7px; font-size: 12px; font-weight: 800; }
+    .suggestion-name span { color: var(--accent); font-size: 10px; white-space: nowrap; }
+    .suggestion-change { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+    .suggestion-change strong { color: var(--ink); }
+    .suggestion-reason { margin-top: 6px; color: var(--muted); font-size: 9px; line-height: 1.35; }
+    .autofill-row { display: grid; grid-template-columns: minmax(0,1fr) 62px 56px; gap: 6px; align-items: center; }
+    .autofill-row + .autofill-row { margin-top: 8px; }
+    .autofill-row label { min-width: 0; font-size: 11px; font-weight: 750; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .autofill-row input { min-width: 0; width: 100%; height: 36px; padding: 0 7px; border: 1px solid #b9d6c5; border-radius: 7px; background: #f4faf6; text-align: center; }
+    .progression-footnote { margin: 14px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .progression-banner { margin: 0 0 16px; padding: 14px; border: 1px solid #b9d6c5; border-radius: var(--radius-md); background: #f4faf6; }
+    .progression-banner-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .progression-banner h3 { margin: 0 0 3px; font-size: 14px; }
+    .progression-banner p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .real-data-label { color: var(--accent); font-size: 9px; font-weight: 850; text-transform: uppercase; }
+    .workout-context { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; padding: 6px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 750; }
+    .stall-card { margin-top: 10px; padding: 10px; border-radius: 9px; background: #fff4e8; color: #714214; font-size: 10px; line-height: 1.45; }
+    .program-progression-summary { margin: 18px 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: #f8faf7; }
+    .program-progression-summary h3 { margin: 0 0 8px; font-size: 14px; }
+    .program-progression-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+    @media (max-width: 700px) {
+      .comparison-grid { grid-template-columns: 1fr; }
+      .progression-fields { grid-template-columns: 1fr 1fr; }
+      .progression-choice, .switch-row { grid-column: 1 / -1; }
+    }
+    @media (max-width: 420px) {
+      .progression-fields { grid-template-columns: 1fr; }
+      .progression-choice, .switch-row { grid-column: auto; }
+      .choice-pills { grid-template-columns: 1fr; }
+      .progression-preview { padding: 16px 12px; }
+      .progression-preview-head { flex-direction: column; }
+    }
   </style>
 </head>
 <body>
@@ -593,6 +678,8 @@
           </div>
         </div>
         <div id="workoutEditor" hidden>
+          <div class="workout-context" id="workoutContext" hidden></div>
+          <div class="progression-banner" id="workoutProgression" hidden></div>
           <div class="workout-meta">
             <div class="field"><label for="workoutName">WORKOUT NAME</label><input id="workoutName" type="text" value="Workout" autocomplete="off" aria-label="Workout name" /></div>
             <div class="field"><label for="workoutDate">DATE</label><input id="workoutDate" type="date" aria-label="Workout date" /></div>
@@ -634,11 +721,23 @@
             <div class="field"><label for="programLength">LENGTH (WEEKS)</label><input id="programLength" type="number" inputmode="numeric" min="1" max="52" value="8" aria-label="Program length in weeks" /></div>
             <div class="field wide"><label for="programFocus">FOCUS / NOTES</label><textarea id="programFocus" placeholder="What this block is meant to build"></textarea></div>
           </div>
+          <div class="progression-setup" aria-labelledby="progressionSetupTitle">
+            <h3 id="progressionSetupTitle">Progression rules</h3>
+            <p>Defaults for this program. Rep ranges and reps-only exceptions can be set on each exercise.</p>
+            <div class="progression-fields">
+              <div class="field"><label for="progressionThreshold">TOP-SET RPE TRIGGER</label><input id="progressionThreshold" type="number" inputmode="decimal" min="1" max="10" step="0.5" value="8"></div>
+              <div class="field"><label for="progressionIncrementType">INCREMENT</label><select id="progressionIncrementType"><option value="lb">Fixed lb</option><option value="percent">Percent</option></select></div>
+              <div class="field"><label for="progressionIncrementValue">SIZE</label><input id="progressionIncrementValue" type="number" inputmode="decimal" min="0.5" step="0.5" value="5"></div>
+              <div class="progression-choice"><span class="filter-label">NEXT-SESSION TREATMENT</span><div class="choice-pills" id="progressionTreatmentChoices"><button class="choice-pill" type="button" data-treatment="suggestions" aria-pressed="true"><strong>Clickable suggestions</strong><span>Show targets; tap to apply them.</span></button><button class="choice-pill" type="button" data-treatment="autofill" aria-pressed="false"><strong>Autofill</strong><span>Pre-fill targets; edit before logging.</span></button></div></div>
+              <div class="switch-row"><span class="switch-copy"><strong>Stall detector</strong><span>After 2–3 flat sessions with rising RPE, suggest scheduling a deload week. Never schedules one automatically.</span></span><button class="switch" id="stallDetectorToggle" type="button" role="switch" aria-pressed="true" aria-label="Stall detector on"></button></div>
+            </div>
+          </div>
           <p class="form-error" id="programError" role="alert"></p>
           <button class="primary-button" id="createProgram" type="button">Create active program</button>
           <p class="session-note">Program edits are kept while this preview remains open.</p>
         </div>
         <div id="programCover" class="program-cover" hidden></div>
+        <section class="progression-preview" id="progressionPreview" aria-labelledby="progressionPreviewTitle"></section>
         <section class="dashboard-card archived-programs" id="archivedPrograms" aria-labelledby="archivedProgramsTitle" hidden><h2 id="archivedProgramsTitle">Archived programs</h2><div id="archivedProgramList"></div></section>
       </section>
 
@@ -891,7 +990,7 @@
           ['Barbell_Bench_Press_-_Medium_Grip',145,5,3],['Bent_Over_Barbell_Row',115,6,3],['Incline_Dumbbell_Press',45,8,3],['Triceps_Pushdown',50,10,3]
         ]},
         {day:1,name:'Lower A',moves:[
-          ['Barbell_Squat',205,5,3],['Romanian_Deadlift',155,6,3],['Leg_Extensions',80,10,3],['Standing_Calf_Raises',90,10,3]
+          ['Barbell_Deadlift',265,2,3],['Barbell_Squat',205,5,3],['Romanian_Deadlift',155,6,3],['Leg_Extensions',80,10,3],['Standing_Calf_Raises',90,10,3]
         ]},
         {day:3,name:'Upper B',moves:[
           ['Standing_Military_Press',75,6,3],['Wide-Grip_Lat_Pulldown',110,8,3],['Seated_Cable_Rows',105,8,3],['Dumbbell_Bicep_Curl',25,10,3]
@@ -908,7 +1007,7 @@
           if (date > today) return;
           const exercisesForSession = plan.moves.map((move, moveIndex) => {
             const [exerciseId, baseWeight, baseReps, setCount] = move;
-            const increment = ['Barbell_Squat','Leg_Press','Romanian_Deadlift'].includes(exerciseId) ? 5 * Math.floor(week / 2) : 5 * Math.floor(week / 3);
+            const increment = ['Barbell_Deadlift','Barbell_Squat','Leg_Press','Romanian_Deadlift'].includes(exerciseId) ? 5 * Math.floor(week / 2) : 5 * Math.floor(week / 3);
             const weight = baseWeight + increment;
             return {exerciseId,note:'',supersetId:null,sets:Array.from({length:setCount},(_,setIndex) => {
               const reps = baseReps + ((week + setIndex + moveIndex) % 3 === 0 ? 1 : 0);
@@ -940,6 +1039,13 @@
       supersetTarget: null,
       activeProgram: null,
       archivedPrograms: []
+    };
+    const progressionSetup = { threshold:8, incrementType:'lb', incrementValue:5, treatment:'suggestions', stallDetection:true };
+    const sampleProgressionProfiles = {
+      'Barbell_Deadlift': {min:2,max:4,incrementType:'lb',incrementValue:5,repsOnly:false},
+      'Barbell_Bench_Press_-_Medium_Grip': {min:5,max:8,incrementType:'lb',incrementValue:5,repsOnly:false},
+      'Wide-Grip_Lat_Pulldown': {min:8,max:12,incrementType:'percent',incrementValue:5,repsOnly:false},
+      'Side_Lateral_Raise': {min:10,max:15,incrementType:'lb',incrementValue:0,repsOnly:true}
     };
     const $ = (s) => document.querySelector(s);
     const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -1195,6 +1301,7 @@
       $('#workoutName').value = workoutState.draft.name;
       $('#workoutDate').value = workoutState.draft.date;
       renderWorkoutExercises();
+      renderWorkoutProgression();
     }
 
     function attachSwipeDelete(scope = document) {
@@ -1285,6 +1392,90 @@
       document.querySelectorAll('[data-superset-uid]').forEach(button => button.addEventListener('click', () => openSupersetDialog(button.dataset.supersetUid)));
       attachReorderHandles();
       attachSwipeDelete($('#workoutExercises'));
+    }
+
+    function topSetForSession(session) {
+      if (!session?.sets?.length) return null;
+      return session.sets.reduce((best,set,index) => {
+        const weight=Number(set.w)||0, reps=Number(set.r)||0;
+        if(!best || weight>best.weight || (weight===best.weight && reps>best.reps)) return {weight,reps,rpe:set.rpe==null?null:Number(set.rpe),index};
+        return best;
+      },null);
+    }
+
+    function roundedIncrement(weight,type,value) {
+      if(type==='percent') return Math.round((weight*(1+Number(value)/100))*2)/2;
+      return Math.round((weight+Number(value))*2)/2;
+    }
+
+    function progressionForExercise(exerciseId, profile, includeSamples=false, config=null) {
+      const programConfig=config || workoutState.activeProgram?.progression || progressionSetup;
+      const logs=getExerciseLogs(exerciseId,includeSamples).filter(log=>includeSamples?log.sample:!log.sample).sort((a,b)=>b.isoDate.localeCompare(a.isoDate));
+      if(!logs.length)return null;
+      const latest=topSetForSession(logs[0]); if(!latest)return null;
+      const threshold=Number(programConfig.threshold ?? 8), min=Number(profile?.min ?? 5), max=Number(profile?.max ?? 8);
+      const incrementType=profile?.incrementType || programConfig.incrementType || 'lb';
+      const incrementValue=Number(profile?.incrementValue ?? programConfig.incrementValue ?? 5);
+      const repsOnly=!!profile?.repsOnly;
+      let nextWeight=latest.weight,nextReps=latest.reps,kind='hold',reason='Top-set RPE is above the progression trigger.';
+      if(latest.rpe!=null && latest.rpe<=threshold){
+        if(latest.reps<max){nextReps=Math.max(min,latest.reps+1);kind='reps';reason=`Top set was at or below RPE ${threshold}; add one rep inside the ${min}–${max} range.`;}
+        else if(repsOnly){kind='hold';reason=`Rep ceiling reached. This exercise is set to reps-only, so load stays at ${latest.weight||0} lb.`;}
+        else{nextWeight=roundedIncrement(latest.weight,incrementType,incrementValue);nextReps=min;kind='load';reason=`Rep ceiling reached at RPE ${latest.rpe}; add ${incrementType==='percent'?`${incrementValue}%`:`${incrementValue} lb`} and reset to ${min} reps.`;}
+      } else if(latest.rpe==null){reason='No RPE on the latest top set, so the engine holds the target.';}
+      const recent=logs.slice(0,3).map(topSetForSession).filter(Boolean).reverse();
+      const flat=recent.length>=3 && recent.every((row,i)=>i===0 || (row.weight<=recent[i-1].weight && row.reps<=recent[i-1].reps));
+      const rising=recent.length>=3 && recent.every((row,i)=>i===0 || row.rpe==null || recent[i-1].rpe==null || row.rpe>=recent[i-1].rpe);
+      const stall=!!programConfig.stallDetection && flat && rising;
+      return {exerciseId,latest,nextWeight,nextReps,kind,reason,range:[min,max],repsOnly,stall,sampleDerived:includeSamples};
+    }
+
+    function sampleSuggestions() {
+      return Object.entries(sampleProgressionProfiles).map(([id,profile])=>progressionForExercise(id,profile,true,{...progressionSetup})).filter(Boolean).slice(0,3);
+    }
+
+    function suggestionCardMarkup(suggestion,index,interactive=true) {
+      const ex=exercises.find(x=>x.id===suggestion.exerciseId);
+      const oldTarget=`${suggestion.latest.weight||0} × ${suggestion.latest.reps}`;
+      const nextTarget=`${suggestion.nextWeight||0} × ${suggestion.nextReps}`;
+      return `<${interactive?'button':'div'} class="suggestion-card" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name">${escapeHtml(ex?.name||'Exercise')}<span>${suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':'Rep +'}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div><div class="suggestion-reason">${escapeHtml(suggestion.reason)}</div></${interactive?'button':'div'}>`;
+    }
+
+    function renderProgressionPreview() {
+      const suggestions=sampleSuggestions();
+      const fallback='<div class="chart-empty">Sample history is cleared. Complete workouts to generate progression targets.</div>';
+      $('#progressionPreview').innerHTML=`<div class="progression-preview-head"><div><h2 id="progressionPreviewTitle">Choose the next-session experience</h2><p>Same double-progression math, two different ways to act on it.</p></div><span class="sample-derived">Sample-derived preview</span></div>${suggestions.length?`<details class="exercise-rules"><summary>Adjust sample exercise rules</summary>${suggestions.map(item=>{const ex=exercises.find(x=>x.id===item.exerciseId),profile=sampleProgressionProfiles[item.exerciseId];return `<div class="exercise-rule-row" data-rule-id="${escapeHtml(item.exerciseId)}"><strong title="${escapeHtml(ex?.name||'Exercise')}">${escapeHtml(ex?.name||'Exercise')}</strong><label class="rule-field"><span>Min reps</span><input type="number" min="1" max="50" value="${profile.min}" data-rule-field="min"></label><label class="rule-field"><span>Max reps</span><input type="number" min="1" max="50" value="${profile.max}" data-rule-field="max"></label><label class="rule-field"><span>Increment</span><select data-rule-field="incrementType"><option value="lb" ${profile.incrementType==='lb'?'selected':''}>Fixed lb</option><option value="percent" ${profile.incrementType==='percent'?'selected':''}>Percent</option></select></label><label class="rule-field"><span>Size</span><input type="number" min="0.5" step="0.5" value="${profile.incrementValue}" data-rule-field="incrementValue"></label><label class="reps-only-label"><input type="checkbox" data-rule-field="repsOnly" ${profile.repsOnly?'checked':''}> Reps only</label></div>`}).join('')}</details><div class="comparison-grid"><article class="treatment-panel"><div class="treatment-label"><span class="treatment-letter">A</span><h3>Clickable suggestions</h3></div><p class="treatment-intro">Targets stay out of the log until you tap one. Try the cards.</p><div class="suggestion-list">${suggestions.map((item,i)=>suggestionCardMarkup(item,i,true)).join('')}</div></article><article class="treatment-panel"><div class="treatment-label"><span class="treatment-letter">B</span><h3>Autofill</h3></div><p class="treatment-intro">Targets arrive in the next workout already filled, but remain editable.</p><div>${suggestions.map(item=>{const ex=exercises.find(x=>x.id===item.exerciseId);return `<div class="autofill-row"><label title="${escapeHtml(ex?.name||'Exercise')}">${escapeHtml(ex?.name||'Exercise')}</label><input type="number" value="${item.nextWeight}" aria-label="${escapeHtml(ex?.name||'Exercise')} prefilled weight"><input type="number" value="${item.nextReps}" aria-label="${escapeHtml(ex?.name||'Exercise')} prefilled reps"></div>`}).join('')}</div></article></div>`:fallback}<p class="progression-footnote">Preview values are computed only from the labeled sample history. In actual programs, progression targets use real completed workouts only; sample workouts are always excluded. The engine never schedules a deload automatically.</p>`;
+      document.querySelectorAll('[data-demo-suggestion]').forEach(button=>button.addEventListener('click',()=>{button.classList.toggle('applied');const badge=button.querySelector('.suggestion-name span');badge.textContent=button.classList.contains('applied')?'Applied ✓':(sampleSuggestions()[Number(button.dataset.demoSuggestion)]?.kind==='load'?'Load +':'Rep +');}));
+      document.querySelectorAll('[data-rule-id]').forEach(row=>row.querySelectorAll('[data-rule-field]').forEach(control=>control.addEventListener('change',()=>{const profile=sampleProgressionProfiles[row.dataset.ruleId],field=control.dataset.ruleField;if(!profile)return;if(field==='repsOnly')profile[field]=control.checked;else if(field==='incrementType')profile[field]=control.value;else profile[field]=Number(control.value);if(profile.min>profile.max)profile.max=profile.min;renderProgressionPreview();})));
+    }
+
+    function progressionProfileForDraftItem(item) {
+      return item.progression || sampleProgressionProfiles[item.exerciseId] || {min:5,max:8,incrementType:workoutState.activeProgram?.progression?.incrementType||'lb',incrementValue:workoutState.activeProgram?.progression?.incrementValue||5,repsOnly:false};
+    }
+
+    function prepareDraftProgression(draft,programConfig) {
+      if(!draft)return;
+      draft.progressionSuggestions=draft.exercises.map(item=>progressionForExercise(item.exerciseId,progressionProfileForDraftItem(item),false,programConfig)).filter(Boolean);
+      if(programConfig?.treatment==='autofill') draft.progressionSuggestions.forEach(s=>applyProgressionSuggestion(draft,s,false));
+    }
+
+    function applyProgressionSuggestion(draft,suggestion,rerender=true) {
+      const item=draft?.exercises.find(row=>row.exerciseId===suggestion.exerciseId); if(!item)return;
+      item.sets.forEach(set=>{set.w=String(suggestion.nextWeight);set.r=String(suggestion.nextReps);set.complete=false;});
+      suggestion.applied=true;
+      if(rerender){renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();}
+    }
+
+    function renderWorkoutProgression() {
+      const draft=workoutState.draft, box=$('#workoutProgression'), context=$('#workoutContext');
+      const program=workoutState.activeProgram && draft?.programId===workoutState.activeProgram.id?workoutState.activeProgram:null;
+      context.hidden=!program; context.textContent=program?`${program.name} · ${draft.name}`:'';
+      const suggestions=draft?.progressionSuggestions||[];
+      if(!suggestions.length){box.hidden=true;return;}
+      const treatment=program?.progression?.treatment || draft.progressionTreatment || 'suggestions';
+      box.hidden=false;
+      box.innerHTML=`<div class="progression-banner-head"><div><h3>${treatment==='autofill'?'Targets pre-filled':'Next-session targets'}</h3><p>${treatment==='autofill'?'Computed from your real logs and editable before you train.':'Computed from your real logs. Tap a target to apply it to every set.'}</p></div><span class="real-data-label">Real logs only</span></div>${treatment==='suggestions'?`<div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>`:''}${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
+      document.querySelectorAll('[data-real-suggestion]').forEach(button=>button.addEventListener('click',()=>applyProgressionSuggestion(draft,suggestions[Number(button.dataset.realSuggestion)])));
     }
 
     function normalizeSupersets() {
@@ -1551,14 +1742,14 @@
     }
     function saveCurrentTemplate() {
       const d=workoutState.draft; if(!d||!d.exercises.length){$('#workoutSaveStatus').textContent='Add at least one exercise first.';return;}
-      const template={id:uid('template'),name:($('#workoutName').value.trim()||'Workout template'),exercises:d.exercises.map(x=>({exerciseId:x.exerciseId,note:x.note||'',supersetId:x.supersetId||null,sets:x.sets.map(set=>({w:set.w,r:set.r,rpe:set.rpe,tags:[...(set.tags||[])],complete:false}))}))}; workoutState.templates.unshift(template); $('#workoutSaveStatus').textContent=`Saved “${template.name}” as a template.`;
+      const template={id:uid('template'),name:($('#workoutName').value.trim()||'Workout template'),exercises:d.exercises.map(x=>({exerciseId:x.exerciseId,note:x.note||'',supersetId:x.supersetId||null,progression:x.progression||sampleProgressionProfiles[x.exerciseId]||null,sets:x.sets.map(set=>({w:set.w,r:set.r,rpe:set.rpe,tags:[...(set.tags||[])],complete:false}))}))}; workoutState.templates.unshift(template); $('#workoutSaveStatus').textContent=`Saved “${template.name}” as a template.`;
     }
     function renderSavedWorkouts() {
       $('#savedWorkoutList').innerHTML=workoutState.templates.length?`<div class="picker-list">${workoutState.templates.map(t=>`<button class="picker-item start-template" type="button" data-template-id="${escapeHtml(t.id)}"><span><strong>${escapeHtml(t.name)}</strong><span>${t.exercises.length} exercises</span></span><span class="picker-state">›</span></button>`).join('')}</div>`:'<div class="dialog-empty"><strong>No templates yet.</strong><br>Build a workout, then choose Save as template.</div>';
-      document.querySelectorAll('.start-template').forEach(b=>b.addEventListener('click',()=>{const t=workoutState.templates.find(x=>x.id===b.dataset.templateId);if(!t)return; workoutState.draft={name:t.name,date:localIsoDate(),programId:null,programWorkoutUid:null,editingId:null,exercises:t.exercises.map(x=>({uid:uid('exercise'),exerciseId:x.exerciseId,note:x.note||'',noteOpen:!!x.note,supersetId:x.supersetId||null,sets:x.sets.map(set=>({uid:uid('set'),w:set.w??'',r:set.r??'',rpe:set.rpe??'',tags:[...(set.tags||[])],complete:false}))}))};$('#savedWorkoutDialog').close();renderWorkoutScreen();}));
+      document.querySelectorAll('.start-template').forEach(b=>b.addEventListener('click',()=>{const t=workoutState.templates.find(x=>x.id===b.dataset.templateId);if(!t)return; workoutState.draft={name:t.name,date:localIsoDate(),programId:null,programWorkoutUid:null,editingId:null,progressionTreatment:'suggestions',exercises:t.exercises.map(x=>({uid:uid('exercise'),exerciseId:x.exerciseId,note:x.note||'',noteOpen:!!x.note,supersetId:x.supersetId||null,progression:x.progression||null,sets:x.sets.map(set=>({uid:uid('set'),w:set.w??'',r:set.r??'',rpe:set.rpe??'',tags:[...(set.tags||[])],complete:false}))}))};prepareDraftProgression(workoutState.draft,{...progressionSetup,treatment:'suggestions',stallDetection:false});$('#savedWorkoutDialog').close();renderWorkoutScreen();}));
     }
     function addCurrentWorkoutToProgram() {
-      const d=workoutState.draft;if(!d||!d.exercises.length){$('#workoutSaveStatus').textContent='Add at least one exercise first.';return;} if(!workoutState.activeProgram){$('#workoutSaveStatus').textContent='Create an active program first.';return;} const name=$('#workoutName').value.trim()||'Workout'; workoutState.activeProgram.workouts.push({uid:uid('program-workout'),name,template:{name,exercises:d.exercises.map(x=>({exerciseId:x.exerciseId,note:x.note||'',supersetId:x.supersetId||null,sets:x.sets.map(set=>({w:set.w,r:set.r,rpe:set.rpe,tags:[...(set.tags||[])],complete:false}))}))}}); $('#workoutSaveStatus').textContent=`Added “${name}” to ${workoutState.activeProgram.name}.`; renderProgram();renderDashboard();
+      const d=workoutState.draft;if(!d||!d.exercises.length){$('#workoutSaveStatus').textContent='Add at least one exercise first.';return;} if(!workoutState.activeProgram){$('#workoutSaveStatus').textContent='Create an active program first.';return;} const name=$('#workoutName').value.trim()||'Workout'; workoutState.activeProgram.workouts.push({uid:uid('program-workout'),name,template:{name,exercises:d.exercises.map(x=>({exerciseId:x.exerciseId,note:x.note||'',supersetId:x.supersetId||null,progression:x.progression||sampleProgressionProfiles[x.exerciseId]||null,sets:x.sets.map(set=>({w:set.w,r:set.r,rpe:set.rpe,tags:[...(set.tags||[])],complete:false}))}))}}); $('#workoutSaveStatus').textContent=`Added “${name}” to ${workoutState.activeProgram.name}.`; renderProgram();renderDashboard();
     }
 
     function programWeek(program) {
@@ -1572,17 +1763,18 @@
     }
     function startProgramWorkout(program, workout) {
       showWorkouts();
-      if (workout.template) { workoutState.draft={name:workout.name,date:localIsoDate(),programId:program.id,programWorkoutUid:workout.uid,editingId:null,exercises:workout.template.exercises.map(x=>({uid:uid('exercise'),exerciseId:x.exerciseId,note:x.note||'',noteOpen:!!x.note,supersetId:x.supersetId||null,sets:x.sets.map(set=>({uid:uid('set'),w:set.w??'',r:set.r??'',rpe:set.rpe??'',tags:[...(set.tags||[])],complete:false}))}))}; renderWorkoutScreen(); }
+      if (workout.template) { workoutState.draft={name:workout.name,date:localIsoDate(),programId:program.id,programWorkoutUid:workout.uid,editingId:null,exercises:workout.template.exercises.map(x=>({uid:uid('exercise'),exerciseId:x.exerciseId,note:x.note||'',noteOpen:!!x.note,supersetId:x.supersetId||null,progression:x.progression||sampleProgressionProfiles[x.exerciseId]||null,sets:x.sets.map(set=>({uid:uid('set'),w:set.w??'',r:set.r??'',rpe:set.rpe??'',tags:[...(set.tags||[])],complete:false}))}))}; prepareDraftProgression(workoutState.draft,program.progression); renderWorkoutScreen(); }
       else startBlankWorkout(workout.name, program.id, workout.uid);
     }
     function renderProgram() {
+      renderProgressionPreview();
       const program = workoutState.activeProgram;
       $('#programSetup').hidden = !!program;
       $('#programCover').hidden = !program;
       renderArchivedPrograms();
       if (!program) return;
       const week=programWeek(program), completedThisWeek=workoutState.completed.filter(w=>w.programId===program.id&&Math.max(1,Math.floor((new Date(`${w.date}T12:00:00`)-new Date(`${program.startedAt}T12:00:00`))/604800000)+1)===week).length;
-      $('#programCover').innerHTML = `<div class="program-cover-head"><div class="program-cover-kicker">ACTIVE PROGRAM · WEEK ${week} OF ${program.length}</div><h2>${escapeHtml(program.name)}</h2><p class="program-cover-meta">${escapeHtml(program.focus || 'No focus note added.')}</p></div><div class="program-body"><div class="program-progress"><span>${program.workouts.length} workout${program.workouts.length === 1 ? '' : 's'} in rotation</span><span>${completedThisWeek} completed this week</span></div><div class="week-progress" style="--program-weeks:${program.length}" aria-label="Week ${week} of ${program.length}">${Array.from({length:program.length},(_,i)=>`<span class="week-segment ${i+1<week?'past':i+1===week?'current':''}"></span>`).join('')}</div><div class="section-head"><h2>Workouts</h2><p class="section-note">Choose any workout, in any order</p></div><div class="program-workouts" id="programWorkouts">${program.workouts.length ? program.workouts.map((workout,index) => {const count=workoutState.completed.filter(w=>w.programId===program.id&&w.programWorkoutUid===workout.uid).length;return `<div class="swipe-item program-swipe"><button class="swipe-delete-action delete-program-workout" type="button" data-uid="${escapeHtml(workout.uid)}" aria-label="Remove ${escapeHtml(workout.name)}">Delete</button><div class="program-workout swipe-content"><span class="program-workout-index">${index + 1}</span><div><strong>${escapeHtml(workout.name)}</strong><span>${count?`${count} completed session${count===1?'':'s'}`:'Not completed yet'}</span></div><button class="start-program-row" type="button" data-start-program-workout="${escapeHtml(workout.uid)}">Start</button></div></div>`;}).join('') : '<div class="history-empty">No workouts yet. Add the first one below.</div>'}</div><div class="program-add"><label class="sr-only" for="newProgramWorkout">Workout name</label><input id="newProgramWorkout" type="text" autocomplete="off" placeholder="Add a workout name"><button class="secondary-button" id="addProgramWorkout" type="button">Add workout</button></div><div class="program-actions"><button class="secondary-button" id="endProgram" type="button">Archive program</button></div><p class="session-note">Workout order is flexible. Week progress follows the program start date, not skipped sessions.</p></div>`;
+      $('#programCover').innerHTML = `<div class="program-cover-head"><div class="program-cover-kicker">ACTIVE PROGRAM · WEEK ${week} OF ${program.length}</div><h2>${escapeHtml(program.name)}</h2><p class="program-cover-meta">${escapeHtml(program.focus || 'No focus note added.')}</p></div><div class="program-body"><div class="program-progress"><span>${program.workouts.length} workout${program.workouts.length === 1 ? '' : 's'} in rotation</span><span>${completedThisWeek} completed this week</span></div><div class="week-progress" style="--program-weeks:${program.length}" aria-label="Week ${week} of ${program.length}">${Array.from({length:program.length},(_,i)=>`<span class="week-segment ${i+1<week?'past':i+1===week?'current':''}"></span>`).join('')}</div><div class="program-progression-summary"><h3>Progression engine</h3><div class="program-progression-meta"><span class="tag primary">Top set ≤ RPE ${program.progression?.threshold??8}</span><span class="tag">${program.progression?.incrementType==='percent'?(program.progression.incrementValue+'%'):(program.progression?.incrementValue??5)+' lb'} default jump</span><span class="tag">${program.progression?.treatment==='autofill'?'Autofill':'Clickable suggestions'}</span><span class="tag">Stall detector ${program.progression?.stallDetection===false?'off':'on'}</span></div></div><div class="section-head"><h2>Workouts</h2><p class="section-note">Choose any workout, in any order</p></div><div class="program-workouts" id="programWorkouts">${program.workouts.length ? program.workouts.map((workout,index) => {const count=workoutState.completed.filter(w=>w.programId===program.id&&w.programWorkoutUid===workout.uid).length;return `<div class="swipe-item program-swipe"><button class="swipe-delete-action delete-program-workout" type="button" data-uid="${escapeHtml(workout.uid)}" aria-label="Remove ${escapeHtml(workout.name)}">Delete</button><div class="program-workout swipe-content"><span class="program-workout-index">${index + 1}</span><div><strong>${escapeHtml(workout.name)}</strong><span>${count?`${count} completed session${count===1?'':'s'}`:'Not completed yet'}</span></div><button class="start-program-row" type="button" data-start-program-workout="${escapeHtml(workout.uid)}">Start</button></div></div>`;}).join('') : '<div class="history-empty">No workouts yet. Add the first one below.</div>'}</div><div class="program-add"><label class="sr-only" for="newProgramWorkout">Workout name</label><input id="newProgramWorkout" type="text" autocomplete="off" placeholder="Add a workout name"><button class="secondary-button" id="addProgramWorkout" type="button">Add workout</button></div><div class="program-actions"><button class="secondary-button" id="endProgram" type="button">Archive program</button></div><p class="session-note">Workout order is flexible. Week progress follows the program start date, not skipped sessions.</p></div>`;
       document.querySelectorAll('.delete-program-workout').forEach(button => button.addEventListener('click', () => {program.workouts=program.workouts.filter(workout=>workout.uid!==button.dataset.uid);renderProgram();}));
       document.querySelectorAll('[data-start-program-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=program.workouts.find(w=>w.uid===button.dataset.startProgramWorkout);if(workout)startProgramWorkout(program,workout);}));
       $('#addProgramWorkout').addEventListener('click', addProgramWorkout);
@@ -1607,7 +1799,7 @@
         $('#programError').textContent = 'Add a program name and a length from 1 to 52 weeks.';
         return;
       }
-      workoutState.activeProgram = {id:uid('program'), name, length, focus:$('#programFocus').value.trim(), workouts:[], startedAt:localIsoDate()};
+      workoutState.activeProgram = {id:uid('program'), name, length, focus:$('#programFocus').value.trim(), workouts:[], startedAt:localIsoDate(), progression:{...progressionSetup}};
       $('#programError').textContent = '';
       renderProgram();
     }
@@ -1739,6 +1931,11 @@
     $('#workoutsNav').addEventListener('click', () => showWorkouts());
     $('#programNav').addEventListener('click', () => showProgram());
     $('#statsNav').addEventListener('click', () => showStats());
+    $('#progressionThreshold').addEventListener('input',e=>progressionSetup.threshold=Number(e.target.value)||8);
+    $('#progressionIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;renderProgressionPreview();});
+    $('#progressionIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Number(e.target.value)||5;renderProgressionPreview();});
+    document.querySelectorAll('[data-treatment]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.treatment=button.dataset.treatment;document.querySelectorAll('[data-treatment]').forEach(row=>row.setAttribute('aria-pressed',String(row===button)));}));
+    $('#stallDetectorToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;$('#stallDetectorToggle').setAttribute('aria-pressed',String(progressionSetup.stallDetection));$('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);});
     $('#createProgram').addEventListener('click', createProgram);
     $('#startBlankWorkout').addEventListener('click', () => startBlankWorkout());
     $('#startSavedWorkout').addEventListener('click', () => { renderSavedWorkouts(); $('#savedWorkoutDialog').showModal(); });
@@ -1801,7 +1998,7 @@
       else if (id && exercises.some(x => x.id === id)) openExercise(id, false); else showDashboard(false);
     });
 
-    populateFilters(); renderLibrary(); renderDashboard(); renderStats();
+    populateFilters(); renderLibrary(); renderDashboard(); renderStats(); renderProgressionPreview();
     const initialId = decodeURIComponent(location.hash.slice(1));
     if (initialId === 'library') showLibrary(false); else if (initialId === 'workout') showWorkouts(false); else if (initialId === 'program') showProgram(false); else if (initialId === 'stats') showStats(false); else if (initialId && exercises.some(x => x.id === initialId)) openExercise(initialId, false); else showDashboard(false);
   </script>
