@@ -70,12 +70,13 @@
       state.selected = id;
       if (returnTo !== undefined) {
         state.exerciseDetailReturn = returnTo;
-      } else if (state.activeView !== 'detail') {
+      } else if (state.activeView !== 'detail' && state.activeView !== 'settings') {
+        // History navigation can land on a detail straight from Settings; keep the
+        // previous return so the breadcrumb/back don't point at Settings itself.
         state.exerciseDetailReturn = {view: state.activeView};
       }
       $('#detailTitle').textContent = ex.name;
       $('#detailTags').innerHTML = [...ex.primary.map(x => `<span class="tag primary">${escapeHtml(x)}</span>`), ...ex.secondary.map(x => `<span class="tag">${escapeHtml(x)}</span>`), `<span class="tag">${escapeHtml(ex.equipment || 'no equipment')}</span>`, ...(ex.custom ? ['<span class="tag custom">Custom</span>'] : [])].join('');
-      $('#sourceId').innerHTML = ex.custom ? 'Created in this session' : `Source record <strong>${escapeHtml(ex.id)}</strong><br><a href="${SOURCE_URL}" target="_blank" rel="noreferrer">View dataset ↗</a>`;
       const realStats = statsFor(id);
       const st = realStats;
       const isBodyweight = ex.equipment === 'body only';
@@ -106,13 +107,10 @@
       $('#similarGrid').innerHTML = `<div class="action-list">${similarTo(ex).map(x => `<button class="action-row" type="button" data-id="${escapeHtml(x.id)}" aria-label="Open ${escapeHtml(x.name)}"><span><strong>${escapeHtml(x.name)}</strong><span>${escapeHtml(x.primary[0] || 'Unspecified muscle')} · ${escapeHtml(x.equipment || 'No equipment')}</span></span><span class="similar-chevron" aria-hidden="true">›</span></button>`).join('')}</div>`;
       document.querySelectorAll('#similarGrid [data-id]').forEach(btn => btn.addEventListener('click', () => openExercise(btn.dataset.id)));
       state.activeView = 'detail';
-      $('#dashboardView').classList.remove('active');
-      $('#statsView').classList.remove('active');
-      $('#libraryView').classList.add('hidden');
-      $('#workoutView').classList.remove('active');
-      $('#programView').classList.remove('active');
+      hideAllViews();
       $('#detailView').classList.add('active');
       setActiveNav('library');
+      updateTopBar('detail', ex.name);
       if (fromDetail) state.scroll['detail'] = 0;
       restoreScroll('detail');
       updateExerciseBackLabel();
@@ -123,7 +121,9 @@
       const back = $('#backButton'); if (!back) return;
       const names = {'completed-workout':'workout', workout:'training', stats:'stats', dashboard:'home', program:'program', library:'library'};
       const dest = names[state.exerciseDetailReturn?.view] || 'library';
-      back.setAttribute('aria-label', `Back to ${dest}`);
+      const label = `Back to ${dest}`;
+      back.setAttribute('aria-label', label);
+      const topBack = $('#topBarBack'); if (topBack) topBack.setAttribute('aria-label', label);
     }
 
     /** Returns from the exercise detail to the recorded origin (library, stats, dashboard,

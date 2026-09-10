@@ -32,10 +32,10 @@
     }
 
     let toastTimer;
-    function showToast(message,kind='') {
+    function showToast(message,kind='',durationMs=3600) {
       const toast=$('#appToast'); if(!toast)return;
       toast.textContent=message; toast.className=`app-toast ${kind}`.trim(); toast.hidden=false;
-      clearTimeout(toastTimer); toastTimer=setTimeout(()=>{toast.hidden=true;},3600);
+      clearTimeout(toastTimer); toastTimer=setTimeout(()=>{toast.hidden=true;},durationMs);
     }
 
     let saveStatusTimer;

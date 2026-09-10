@@ -2,9 +2,9 @@
     /** Finalizes editable workout records and renders detailed set-by-set history. */
     function finishWorkout() {
       const draft = workoutState.draft;
-      if (!draft || !draft.exercises.length) { const message='Add at least one exercise before finishing.'; $('#workoutError').textContent = message; showToast(message); return; }
+      if (!draft || !draft.exercises.length) { const message='Add at least one exercise before finishing.'; $('#workoutError').textContent = message; showToast(message,'',6500); return; }
       const invalid = draft.exercises.some(item => { const ex=exercises.find(row=>row.id===item.exerciseId); const weightOptional=ex?.equipment==='body only',tracking=exerciseTracking(item,ex); return !item.sets.length || item.sets.some(set => ((!weightOptional && set.w === '') || (tracking==='time'?set.seconds:set.r) === '' || Number(set.w||0) < 0 || Number(tracking==='time'?set.seconds:set.r) < 1 || (set.rpe !== '' && (Number(set.rpe) < 1 || Number(set.rpe) > 10)))); });
-      if (invalid) { const message='Finish blocked: complete reps or seconds for every set, plus weight for weighted exercises. RPE is optional.'; $('#workoutError').textContent = message; showToast(message); return; }
+      if (invalid) { const message='Finish blocked: complete reps or seconds for every set, plus weight for weighted exercises. RPE is optional.'; $('#workoutError').textContent = message; showToast(message,'',6500); return; }
       const unmarked=draft.exercises.flatMap(item=>item.sets.map((set,index)=>({set,index,item}))).filter(row=>!row.set.complete);
       if (unmarked.length) { const first=unmarked[0],ex=exercises.find(row=>row.id===first.item.exerciseId);const message=`Finish blocked: ${unmarked.length} set${unmarked.length===1?' is':'s are'} not marked complete. Start with ${ex?.name||'the first exercise'}, set ${first.index+1}.`; $('#workoutError').textContent = message; showToast(message);document.querySelector(`[data-workout-exercise="${CSS.escape(first.item.uid)}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}); return; }
       draft.name = $('#workoutName').value.trim() || 'Workout'; draft.date = $('#workoutDate').value || localIsoDate();

@@ -35,10 +35,20 @@
       if (push) history.pushState({view:'stats'}, '', '#stats');
     }
     function showSettings(push = true) {
+      let from = state.activeView;
+      if (from === 'detail') {
+        const ret = state.exerciseDetailReturn && state.exerciseDetailReturn.view;
+        from = { library: 'library', workout: 'workout', program: 'program', dashboard: 'dashboard', stats: 'stats', 'completed-workout': 'workout' }[ret] || 'dashboard';
+      }
       rememberScroll(); state.selected = null; state.activeView = 'settings'; hideAllViews();
+      if (from !== 'settings' && TOP_BAR_TITLES[from]) state.settingsReturn = from;
       $('#settingsView').classList.add('active'); setActiveNav('settings'); renderSettings(); restoreScroll('settings');
       if (push) history.pushState({view:'settings'}, '', '#settings');
     }
+    /** Bottom-tab taps always land at the top of the destination page. In-flow
+     *  back/forward (popstate) keeps per-view scroll restoration; only explicit
+     *  tab taps reset. Tapping the already-active tab also returns to top. */
+    function goTab(show, view) { show(); state.scroll[view] = 0; window.scrollTo({top:0, behavior:'auto'}); }
     /** Tints the Workout tab and adds a dot badge while a draft is live. Called on every
      *  render of the workout screen, after finish/discard, and once at boot (restored drafts). */
     function updateLiveWorkoutIndicator() {

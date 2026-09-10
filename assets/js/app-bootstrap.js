@@ -1,6 +1,11 @@
 
     /** Connects static controls to feature modules and performs initial rendering. */
     let deleteArmed=false;
+    /** Light unit suffix inside the increment value field; follows the type (Justin 2026-09-10). */
+    function syncSettingsIncrementUnit(){
+      const unit=$('#settingsIncrementUnit');
+      if(unit) unit.textContent = progressionSetup.incrementType==='percent' ? '%' : 'lb';
+    }
     function renderSettings(){
       const dark=document.documentElement.dataset.theme==='dark';
       const darkToggle=$('#darkModeToggle');
@@ -8,9 +13,10 @@
       $('#settingsRpeThreshold').value=progressionSetup.threshold;
       $('#settingsIncrementType').value=progressionSetup.incrementType;
       $('#settingsIncrementValue').value=progressionSetup.incrementValue;
+      syncSettingsIncrementUnit();
       $('#settingsRepMin').value=progressionSetup.defaultRange.min;
       $('#settingsRepMax').value=progressionSetup.defaultRange.max;
-      $('#settingsTimeStep').value=progressionSetup.timeStep;
+      syncTimeStepPills($('#settingsTimeStepPills'),progressionSetup.timeStep);
       const stall=$('#settingsStallToggle');
       stall.setAttribute('aria-pressed',String(!!progressionSetup.stallDetection));
       stall.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);
@@ -86,11 +92,13 @@
 
     $('#darkModeToggle').addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
     $('#settingsRpeThreshold').addEventListener('input',e=>{progressionSetup.threshold=Math.min(10,Math.max(1,Number(e.target.value)||8));schedulePersist();});
-    $('#settingsIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;schedulePersist();});
+    $('#settingsIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;syncSettingsIncrementUnit();schedulePersist();});
     $('#settingsIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Math.max(0,Number(e.target.value)||0);schedulePersist();});
     $('#settingsRepMin').addEventListener('input',e=>{progressionSetup.defaultRange.min=Math.max(1,Number(e.target.value)||1);progressionSetup.defaultRange.preset='custom';schedulePersist();});
     $('#settingsRepMax').addEventListener('input',e=>{progressionSetup.defaultRange.max=Math.max(progressionSetup.defaultRange.min,Number(e.target.value)||progressionSetup.defaultRange.min);progressionSetup.defaultRange.preset='custom';schedulePersist();});
-    $('#settingsTimeStep').addEventListener('input',e=>{progressionSetup.timeStep=Math.max(1,Number(e.target.value)||5);schedulePersist();});
+    const syncAllTimeStepPills=()=>{syncTimeStepPills($('#settingsTimeStepPills'),progressionSetup.timeStep);syncTimeStepPills($('#programTimeStepPills'),progressionSetup.timeStep);};
+    wireTimeStepPills($('#settingsTimeStepPills'),()=>progressionSetup.timeStep,v=>{progressionSetup.timeStep=v;syncAllTimeStepPills();schedulePersist();});
+    wireTimeStepPills($('#programTimeStepPills'),()=>progressionSetup.timeStep,v=>{progressionSetup.timeStep=v;syncAllTimeStepPills();schedulePersist();});
     $('#settingsStallToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;const toggle=$('#settingsStallToggle');toggle.setAttribute('aria-pressed',String(progressionSetup.stallDetection));toggle.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);schedulePersist();});
     $('#exportDataButton').addEventListener('click',()=>{downloadWorkoutBackup();showToast('Backup downloaded.');});
     $('#addSampleDataButton').addEventListener('click',()=>{addSampleData();});
@@ -108,23 +116,26 @@
     $('#closeReplaceDraft').addEventListener('click',()=>{pendingRepeatWorkout=null;$('#replaceDraftDialog').close();});
     $('#keepCurrentDraft').addEventListener('click',()=>{pendingRepeatWorkout=null;$('#replaceDraftDialog').close();});
     $('#confirmReplaceDraft').addEventListener('click',()=>{const workout=pendingRepeatWorkout;pendingRepeatWorkout=null;$('#replaceDraftDialog').close();if(workout)repeatWorkout(workout,true);});
-    $('#dashboardNav').addEventListener('click', () => showDashboard());
+    $('#dashboardNav').addEventListener('click', () => goTab(showDashboard, 'dashboard'));
     $('#workoutsNav').addEventListener('click', () => {
       // Re-tapping the active Workout tab pops a completed-workout review back to the
       // start screen; otherwise it just scrolls to top. A live draft is never disturbed.
       if (state.activeView === 'workout' && !workoutState.draft && !$('#workoutComplete').hidden) {
         $('#workoutComplete').hidden = true; renderWorkoutScreen(); window.scrollTo({top:0}); return;
       }
-      if (state.activeView === 'workout') { window.scrollTo({top:0, behavior:'smooth'}); return; }
-      showWorkouts();
+      if (state.activeView === 'workout') { state.scroll.workout = 0; window.scrollTo({top:0}); return; }
+      goTab(showWorkouts, 'workout');
     });
-    $('#programNav').addEventListener('click', () => showProgram());
-    $('#statsNav').addEventListener('click', () => showStats());
-    $('#settingsNav').addEventListener('click', () => showSettings());
+    $('#programNav').addEventListener('click', () => goTab(showProgram, 'program'));
+    $('#statsNav').addEventListener('click', () => goTab(showStats, 'stats'));
+    $('#topBarSettings').addEventListener('click', () => goTab(showSettings, 'settings'));
+    $('#topBarBack').addEventListener('click', () => {
+      if (state.activeView === 'detail') backFromExerciseDetail();
+      else history.back();
+    });
     $('#progressionThreshold').addEventListener('input',e=>{progressionSetup.threshold=Number(e.target.value)||8;schedulePersist();});
     $('#progressionIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;schedulePersist();});
     $('#progressionIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Number(e.target.value)||5;schedulePersist();});
-    $('#programTimeStep').addEventListener('input',e=>{progressionSetup.timeStep=Math.max(1,Number(e.target.value)||5);schedulePersist();});
     $('#programRepMin').addEventListener('input',e=>{progressionSetup.defaultRange.min=Math.max(1,Number(e.target.value)||1);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
     $('#programRepMax').addEventListener('input',e=>{progressionSetup.defaultRange.max=Math.max(progressionSetup.defaultRange.min,Number(e.target.value)||progressionSetup.defaultRange.min);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
     document.querySelectorAll('[data-rep-preset]').forEach(button=>button.addEventListener('click',()=>{applyRepPreset(button.dataset.repPreset);schedulePersist();}));
@@ -186,7 +197,7 @@
     $('#clearMuscles').addEventListener('click', () => { state.muscles.clear(); renderMuscleSelection(); renderLibrary(); });
     $('#equipmentFilter').addEventListener('change', e => { state.equipment = e.target.value; renderLibrary(); });
     $('#backButton').addEventListener('click', () => backFromExerciseDetail());
-    $('#libraryNav').addEventListener('click', () => showLibrary());
+    $('#libraryNav').addEventListener('click', () => goTab(showLibrary, 'library'));
     window.addEventListener('popstate', e => {
       const hash = decodeURIComponent(location.hash.slice(1)); const id = e.state?.exercise || hash;
       if (hash === 'dashboard' || e.state?.view === 'dashboard' || !hash) showDashboard(false);
