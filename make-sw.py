@@ -15,10 +15,12 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # User-facing app version shown in Settings → About ("Cruciferous Greens
 # Workout · vX"). Bump this whenever a build ships user-visible changes.
-APP_VERSION = "0.6"
+APP_VERSION = "0.991"
 
 now = datetime.datetime.now(datetime.timezone.utc)
-version = sys.argv[1] if len(sys.argv) > 1 else now.strftime("%Y%m%d-%H%M")
+# Seconds in the stamp (user 2026-09-11): two builds in the same minute
+# produced byte-identical sw.js, which the browser treats as "no update".
+version = sys.argv[1] if len(sys.argv) > 1 else now.strftime("%Y%m%d-%H%M%S")
 
 # Build metadata consumed by Settings → About ("Last updated"). Written before
 # the asset scan so it lands in the service worker cache list too.
@@ -55,7 +57,19 @@ const ASSETS = [
 
 self.addEventListener("install", (event) => {{
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      /* Per-asset add under allSettled (user 2026-09-11): addAll is
+         all-or-nothing, so one flaky fetch on cellular silently pinned the
+         old version. A partial install is safe — the fetch handler falls
+         back to network on a cache miss. cache:'reload' bypasses the HTTP
+         cache (GitHub Pages sends max-age=600), so a fast follow-up build
+         can't precache stale assets. */
+      .then((cache) =>
+        Promise.allSettled(
+          ASSETS.map((u) => cache.add(new Request(u, {{cache: "reload"}})))
+        )
+      )
+      .then(() => self.skipWaiting())
   );
 }});
 
@@ -89,7 +103,13 @@ self.addEventListener("fetch", (event) => {{
             }}
             return res;
           }})
-          .catch(() => caches.match("index.html"))
+          .catch((err) => {{
+            /* The index.html fallback is for navigations only (user
+               2026-09-11): a failed JS/data fetch resolving with HTML and
+               status 200 broke version probes and confused debugging. */
+            if (event.request.mode === "navigate") return caches.match("index.html");
+            throw err;
+          }})
     )
   );
 }});

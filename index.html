@@ -21,8 +21,8 @@
   <div class="status-scrim" aria-hidden="true"></div>
   <div class="app">
     <header class="top-bar">
-      <button class="top-bar-btn back-pill" id="topBarBack" type="button" aria-label="Back" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg><span>Back</span>
+      <button class="top-bar-btn" id="topBarBack" type="button" aria-label="Back" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
       </button>
       <h1 class="top-bar-title" id="topBarTitle">Home</h1>
       <button class="top-bar-btn" id="topBarSettings" type="button" aria-label="Settings">
@@ -91,6 +91,7 @@
             <p>Build from scratch, use a template, or pick up your last session.</p>
             <div class="workout-start-options">
               <button class="start-option primary" id="startBlankWorkout" type="button"><strong>Blank workout</strong><span>Add exercises and targets as you go.</span></button>
+              <button class="start-option" id="startNewTemplate" type="button"><strong>New template</strong><span>Name it, then add exercises.</span></button>
               <details class="template-disclosure" id="templateDisclosure">
                 <summary class="start-option"><strong>From template</strong><span>Use a saved or built-in workout.</span></summary>
                 <div id="workoutTemplateList" class="template-disclosure-list"></div>
@@ -99,6 +100,12 @@
             </div>
           </section>
           <section class="training-recent" aria-labelledby="trainingRecentTitle"><div class="section-head"><div><h2 id="trainingRecentTitle">Recent workouts</h2><p class="section-note">Open details or repeat any session</p></div></div><div class="recent-workouts" id="workoutRecent"></div></section>
+        </div>
+        <div id="workoutHistory" hidden>
+          <div class="history-top"><button class="back" id="backFromWorkoutHistory" type="button" aria-label="Back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>Back</button></div>
+          <div class="section-head"><div><h2>Workout history</h2><p class="section-note" id="historyCountNote">All completed sessions</p></div></div>
+          <div class="history-search"><input id="historySearch" type="search" placeholder="Search workouts…" autocomplete="off" aria-label="Search workouts by name"></div>
+          <div id="workoutHistoryList"></div>
         </div>
         <div id="workoutEditor" hidden>
           <div class="workout-context" id="workoutContext" hidden></div>
@@ -114,7 +121,10 @@
           </div>
           <div class="workout-toolbar">
             <h2>Exercises</h2>
-            <button class="exercise-info-button plain-glyph" id="addWorkoutExercise" type="button" aria-label="Add exercises">+</button>
+            <div class="workout-toolbar-actions">
+              <button class="exercise-info-button plain-glyph" id="reorderWorkoutExercises" type="button" aria-label="Reorder exercises"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3v18M8 3 4 7m4-4 4 4M16 21V3m0 18 4-4m-4 4-4-4"/></svg></button>
+              <button class="exercise-info-button plain-glyph" id="addWorkoutExercise" type="button" aria-label="Add exercises">+</button>
+            </div>
           </div>
           <div class="draft-status" id="draftStatus" role="status">Changes are saved on this device</div>
           <div class="workout-exercises" id="workoutExercises"></div>
@@ -142,7 +152,7 @@
           <section class="program-progression" aria-labelledby="progressionSetupTitle">
             <div class="section-head settings-head"><div class="settings-title-row"><h3 class="program-progression-title" id="progressionSetupTitle">Progression rules</h3><button class="exercise-info-button" id="programProgressionInfoButton" type="button" aria-label="About progression rules">i</button></div><p class="section-note">Defaults for this program. Exercise-level overrides remain editable inside each workout.</p></div>
             <div class="settings-grid">
-              <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="programSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button></div><p class="field-help">Linear adds the increment every session, no RPE needed. RPE-based adds reps first, then weight, gated by the RPE trigger.</p></div>
+              <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="programSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button><button class="rep-preset" type="button" data-scheme="onerm" aria-pressed="false">%1RM</button></div><p class="field-help">Linear adds the increment every session, no RPE needed. RPE-based adds reps first, then weight, gated by the RPE trigger. %1RM prescribes each exercise's load as a percentage of its estimated 1RM.</p></div>
               <label class="rule-field"><span>Top-set RPE trigger</span><input id="progressionThreshold" type="number" inputmode="decimal" min="1" max="10" step="0.5" value="8"></label>
               <div class="settings-pair">
                 <label class="rule-field"><span>Increment type</span><select id="progressionIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
@@ -176,14 +186,16 @@
         <div class="stats-grid" id="statsGrid"></div>
         <section class="dashboard-card"><div class="section-head"><h2>Muscle map</h2></div><div id="muscleHeatmap"></div><div id="muscleStats"></div><div id="blindspotWrap"></div></section>
         <div class="muscle-analysis-grid">
-          <section class="analysis-panel"><h2>Volume by muscle</h2><p>Weighted volume. Secondary muscles receive 45% of the set’s volume.</p><div class="muscle-volume-list" id="muscleVolumeBreakdown"></div></section>
+          <section class="analysis-panel"><div class="section-head"><div><h2>Volume by muscle</h2><p class="section-note" id="muscleVolumeNote">Weighted volume. Secondary muscles receive 45% of the set’s volume.</p></div><div class="mini-segmented" role="group" aria-label="Volume by muscle metric" id="muscleVolumeMode"><button type="button" data-muscle-mode="volume">Volume</button><button type="button" data-muscle-mode="sets">Sets</button></div></div><div class="muscle-volume-list" id="muscleVolumeBreakdown"></div></section>
           <section class="analysis-panel"><h2>Training focus</h2><p>Share of completed rep-based sets: strength 1–5, hypertrophy 6–12, endurance 13+. Timed sets are excluded.</p><div class="balance-list" id="trainingFocus"></div></section>
         </div>
         <div class="muscle-analysis-grid actionable-stats">
-          <section class="analysis-panel"><div class="section-head"><h2>Top exercises</h2><button class="section-note mode-toggle" id="topExercisesMode" type="button">By weighted volume</button></div><div id="topExercises"></div></section>
+          <section class="analysis-panel"><div class="section-head"><h2>Top exercises</h2><div class="mini-segmented" role="group" aria-label="Top exercises metric" id="topExercisesMode"><button type="button" data-top-mode="volume">Volume</button><button type="button" data-top-mode="sets">Sets</button></div></div><div id="topExercises"></div></section>
           <section class="analysis-panel"><div class="section-head"><h2>Recent PRs</h2></div><div id="recentPRs"></div></section>
         </div>
         <section class="analysis-panel chart-card"><div class="section-head"><div><h2>Muscle trends</h2><p class="section-note" id="muscleTrendNote">Compared with the previous period</p></div></div><div class="muscle-trend-list" id="muscleTrends"></div></section>
+        <section class="dashboard-card chart-card"><div class="section-head"><div><h2>Exercise trends</h2><p class="section-note">Estimated 1RM and volume per session</p></div></div><div class="trend-picker" id="exerciseTrendPicker" role="group" aria-label="Choose exercise for trends"></div><div class="chart-wrap" id="exerciseTrendChart"></div><div class="chart-wrap" id="exerciseVolumeChart"></div></section>
+        <section class="dashboard-card chart-card"><div class="section-head"><div><h2>Exercise trends</h2><p class="section-note">Estimated 1RM and volume per session</p></div></div><div class="trend-picker" id="exerciseTrendPicker" role="group" aria-label="Choose exercise for trends"></div><div class="chart-wrap" id="exerciseTrendChart"></div><div class="chart-wrap" id="exerciseVolumeChart"></div></section>
         <section class="dashboard-card chart-card"><div class="section-head"><h2>Weekly volume</h2><p class="section-note">Last 10 weeks · weight × reps</p></div><div class="chart-wrap" id="volumeChart"></div></section>
       </section>
 
@@ -192,7 +204,12 @@
           <div class="section-head settings-head"><h2>Account</h2></div>
           <div id="accountSignedOut">
             <label class="rule-field"><span>Email</span><input id="accountEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com"></label>
-            <div class="settings-actions"><button class="small-button" id="sendMagicLinkButton" type="button">Email me a sign-in link</button></div>
+            <div class="settings-actions"><button class="small-button" id="sendMagicLinkButton" type="button">Email me a code</button></div>
+            <div id="otpStep" hidden>
+              <label class="rule-field"><span>Code from the email</span><input id="accountOtp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from the email" maxlength="12"></label>
+              <div class="settings-actions"><button class="small-button" id="verifyOtpButton" type="button">Sign in</button></div>
+              <p class="section-note">Or tap the sign-in link in the email.</p>
+            </div>
           </div>
           <div id="accountSignedIn" hidden>
             <button class="account-row" id="accountRowButton" type="button" aria-haspopup="dialog">
@@ -216,11 +233,12 @@
               </div>
             </div>
           </div>
+          <div class="switch-row wide"><span class="switch-copy"><strong>Swipe to delete sets</strong><span>On touch devices, swipe a set row left to reveal Delete. The × button stays on desktop.</span></span><button class="switch" id="swipeDeleteSetsToggle" type="button" role="switch" aria-pressed="true" aria-label="Swipe to delete sets on"></button></div>
         </section>
         <section class="dashboard-card">
           <div class="section-head settings-head"><div class="settings-title-row"><h2>Progression defaults</h2><button class="exercise-info-button" id="progressionInfoButton" type="button" aria-label="About progression defaults">i</button></div><p class="section-note">Used for new exercises and programs.</p></div>
           <div class="settings-grid">
-            <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="settingsSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button></div></div>
+            <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="settingsSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button><button class="rep-preset" type="button" data-scheme="onerm" aria-pressed="false">%1RM</button></div></div>
             <label class="rule-field"><span>RPE trigger threshold</span><input id="settingsRpeThreshold" type="number" min="1" max="10" step="1" value="8"></label>
             <div class="settings-pair">
               <label class="rule-field"><span>Increment type</span><select id="settingsIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
@@ -245,11 +263,14 @@
         <section class="dashboard-card">
           <div class="section-head settings-head"><h2>Units</h2><p class="section-note">Pounds or kilograms for weight entry and display.</p></div>
           <div class="step-pills" id="settingsUnitPills" role="group" aria-label="Weight units"><button type="button" data-units="imperial" aria-pressed="true">Pounds (lb)</button><button type="button" data-units="metric" aria-pressed="false">Kilograms (kg)</button></div>
+          <p class="section-note stats-default-label">Stats default metric</p>
+          <div class="step-pills" id="settingsStatsDefaultPills" role="group" aria-label="Stats default metric"><button type="button" data-stats-default="volume" aria-pressed="true">Volume</button><button type="button" data-stats-default="sets" aria-pressed="false">Sets</button></div>
         </section>
         <section class="dashboard-card">
           <div class="section-head settings-head"><h2>About</h2></div>
           <p class="section-note" id="appVersionLine">Cruciferous Greens Workout</p>
           <p class="section-note" id="buildUpdatedLine">Last updated: —</p>
+          <p class="section-note"><button class="small-button" id="checkUpdatesButton" type="button">Check for updates</button></p>
           <p class="section-note"><a href="https://github.com/cruciferousgreens/workout-app-accounts/blob/main/RELEASES.md" target="_blank" rel="noreferrer">Release notes</a></p>
         </section>
         <section class="dashboard-card">
@@ -321,14 +342,14 @@
     </main>
 
     <div class="app-toast" id="appToast" role="status" aria-live="polite" hidden></div>
+    <dialog class="custom-dialog compact-dialog" id="updateAvailableDialog" aria-labelledby="updateAvailableTitle">
+      <div class="custom-form"><div class="custom-form-head"><div><h2 id="updateAvailableTitle">Update ready</h2><p>A new version of the app has finished downloading.</p></div><button class="dialog-close" id="closeUpdateAvailable" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="updateRefreshNow" type="button">Refresh now</button><button class="secondary-button" id="updateLater" type="button">Later</button></div></div>
+    </dialog>
     <dialog class="custom-dialog compact-dialog" id="replaceDraftDialog" aria-labelledby="replaceDraftTitle">
       <div class="custom-form"><div class="custom-form-head"><div><h2 id="replaceDraftTitle">Replace current workout?</h2><p>Your in-progress workout will be discarded and replaced with the selected session.</p></div><button class="dialog-close" id="closeReplaceDraft" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepCurrentDraft" type="button">Keep current</button><button class="primary-button" id="confirmReplaceDraft" type="button">Replace workout</button></div></div>
     </dialog>
     <dialog class="custom-dialog compact-dialog" id="discardDraftDialog" aria-labelledby="discardDraftTitle">
       <div class="custom-form"><div class="custom-form-head"><div><h2 id="discardDraftTitle">Discard workout?</h2><p>This permanently deletes the in-progress workout.</p></div><button class="dialog-close" id="closeDiscardDraft" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepDraftButton" type="button">Keep editing</button><button class="primary-button danger-button" id="confirmDiscardDraft" type="button">Discard</button></div></div>
-    </dialog>
-    <dialog class="custom-dialog compact-dialog" id="reviewSetsDialog" aria-labelledby="reviewSetsTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="reviewSetsTitle">Review sets</h2><p id="reviewSetsCopy"></p></div><button class="dialog-close" id="closeReviewSets" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="reviewSetsComplete" type="button">Mark all complete</button><button class="secondary-button danger-button" id="reviewSetsDelete" type="button">Delete them</button><button class="secondary-button" id="reviewSetsCancel" type="button">Keep editing</button></div></div>
     </dialog>
     <dialog class="custom-dialog compact-dialog" id="focusConfirmDialog" aria-labelledby="focusConfirmTitle">
       <div class="custom-form"><div class="custom-form-head"><div><h2 id="focusConfirmTitle">Apply to every exercise?</h2><p id="focusConfirmCopy"></p></div><button class="dialog-close" id="closeFocusConfirm" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="focusConfirmApply" type="button">Apply</button><button class="secondary-button" id="focusConfirmCancel" type="button">Cancel</button></div></div>
@@ -427,9 +448,78 @@
         </div>
       </div>
     </dialog>
+    <dialog class="custom-dialog" id="deleteProgramWorkoutDialog" aria-labelledby="deleteProgramWorkoutTitle">
+      <div class="custom-form">
+        <div class="custom-form-head">
+          <div><h2 id="deleteProgramWorkoutTitle">Delete workout?</h2><p id="deleteProgramWorkoutDesc">This removes the workout from your program.</p></div>
+          <button class="dialog-close" id="cancelDeleteProgramWorkout" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="form-actions">
+          <button class="form-action secondary" id="keepProgramWorkout" type="button">Keep</button>
+          <button class="form-action danger" id="confirmDeleteProgramWorkout" type="button">Delete</button>
+        </div>
+      </div>
+    </dialog>
+    <dialog class="custom-dialog" id="removeExerciseDialog" aria-labelledby="removeExerciseTitle">
+      <div class="custom-form">
+        <div class="custom-form-head">
+          <div><h2 id="removeExerciseTitle">Remove exercise?</h2><p id="removeExerciseDesc">This removes the exercise from your workout.</p></div>
+          <button class="dialog-close" id="cancelRemoveExercise" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="form-actions">
+          <button class="form-action secondary" id="keepExercise" type="button">Keep</button>
+          <button class="form-action danger" id="confirmRemoveExercise" type="button">Remove</button>
+        </div>
+      </div>
+    </dialog>
+    <dialog class="custom-dialog" id="reorderExercisesDialog" aria-labelledby="reorderExercisesTitle">
+      <div class="custom-form">
+        <div class="custom-form-head">
+          <div><h2 id="reorderExercisesTitle">Reorder exercises</h2><p>Use the arrows to change the order.</p></div>
+          <button class="dialog-close" id="cancelReorderExercises" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="reorder-list" id="reorderExercisesList"></div>
+        <div class="form-actions">
+          <button class="form-action primary" id="doneReorderExercises" type="button">Done</button>
+        </div>
+      </div>
+    </dialog>
+    <dialog class="custom-dialog compact-dialog" id="renameTemplateDialog" aria-labelledby="renameTemplateTitle">
+      <div class="custom-form"><div class="custom-form-head"><div><h2 id="renameTemplateTitle">Rename template</h2></div><button class="dialog-close" id="cancelRenameTemplate" type="button" aria-label="Close">×</button></div><label class="rule-field"><span>Template name</span><input id="renameTemplateInput" type="text" maxlength="80" autocomplete="off"></label><div class="form-actions"><button class="form-action primary" id="saveRenameTemplate" type="button">Save</button></div></div>
+    </dialog>
+    <dialog class="custom-dialog compact-dialog" id="newTemplateDialog" aria-labelledby="newTemplateTitle">
+      <div class="custom-form"><div class="custom-form-head"><div><h2 id="newTemplateTitle">New template</h2></div><button class="dialog-close" id="cancelNewTemplate" type="button" aria-label="Close">×</button></div><label class="rule-field"><span>Template name</span><input id="newTemplateInput" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Push day"></label><div class="form-actions"><button class="form-action primary" id="saveNewTemplate" type="button">Create</button></div></div>
+    </dialog>
+    <dialog class="custom-dialog" id="deleteTemplateDialog" aria-labelledby="deleteTemplateTitle">
+      <div class="custom-form">
+        <div class="custom-form-head">
+          <div><h2 id="deleteTemplateTitle">Delete template?</h2><p id="deleteTemplateDesc">This cannot be undone.</p></div>
+          <button class="dialog-close" id="cancelDeleteTemplate" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="form-actions">
+          <button class="form-action secondary" id="keepTemplate" type="button">Keep</button>
+          <button class="form-action danger" id="confirmDeleteTemplate" type="button">Delete</button>
+        </div>
+      </div>
+    </dialog>
+    <dialog class="custom-dialog" id="deleteCompletedWorkoutDialog" aria-labelledby="deleteCompletedWorkoutTitle">
+      <div class="custom-form">
+        <div class="custom-form-head">
+          <div><h2 id="deleteCompletedWorkoutTitle">Delete workout?</h2><p id="deleteCompletedWorkoutDesc">This permanently deletes this workout from your history.</p></div>
+          <button class="dialog-close" id="cancelDeleteCompletedWorkout" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="form-actions">
+          <button class="form-action secondary" id="keepCompletedWorkout" type="button">Keep</button>
+          <button class="form-action danger" id="confirmDeleteCompletedWorkout" type="button">Delete</button>
+        </div>
+      </div>
+    </dialog>
 
     <dialog class="custom-dialog compact-dialog" id="accountDialog" aria-labelledby="accountDialogTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="accountDialogTitle">Account</h2><p id="accountDialogEmail"></p></div><button class="dialog-close" id="closeAccountDialog" type="button" aria-label="Close">×</button></div><dl class="account-info"><div><dt>Display name</dt><dd id="accountDialogName"></dd></div><div><dt>Plan</dt><dd id="accountDialogPlan"></dd></div><div><dt>Last synced</dt><dd id="accountDialogSync"></dd></div></dl><div class="form-actions"><button class="primary-button" id="accountDialogSyncNow" type="button">Sync now</button><button class="secondary-button" id="accountDialogEditName" type="button">Edit name</button><button class="secondary-button danger-button" id="accountDialogSignOut" type="button">Sign out</button></div></div>
+      <div class="custom-form"><div class="custom-form-head"><div><h2 id="accountDialogTitle">Account</h2><p id="accountDialogEmail"></p></div><button class="dialog-close" id="closeAccountDialog" type="button" aria-label="Close">×</button></div><dl class="account-info"><div><dt>Display name</dt><dd id="accountDialogName"></dd></div><div><dt>Plan</dt><dd id="accountDialogPlan"></dd></div><div><dt>Last synced</dt><dd id="accountDialogSync"></dd></div></dl><div class="form-actions"><button id="accountDialogSyncNow" type="button">Sync now</button><button id="accountDialogEditName" type="button">Edit name</button><button id="accountDialogSignOut" type="button">Sign out</button><button class="danger-text" id="accountDialogDelete" type="button">Delete account</button></div></div>
+    </dialog>
+    <dialog class="custom-dialog compact-dialog" id="deleteAccountDialog" aria-labelledby="deleteAccountTitle">
+      <div class="custom-form"><div class="custom-form-head"><div><h2 id="deleteAccountTitle">Delete account?</h2><p id="deleteAccountDesc">This deletes all your data from this device and the cloud. This cannot be undone.</p></div><button class="dialog-close" id="closeDeleteAccount" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="cancelDeleteAccount" type="button">Keep my account</button><button class="danger-button" id="confirmDeleteAccount" type="button">Delete everything</button></div></div>
     </dialog>
 
     <dialog class="custom-dialog" id="editNameDialog" aria-labelledby="editNameTitle">
@@ -564,6 +654,7 @@
 <script src="assets/js/dashboard-stats.js"></script>
 <script src="assets/js/programs.js"></script>
 <script src="assets/js/custom-exercises.js"></script>
+<script src="assets/js/app-updates.js"></script>
 <script src="assets/js/app-bootstrap.js"></script>
 </body>
 </html>

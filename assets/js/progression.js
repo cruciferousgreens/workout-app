@@ -21,8 +21,15 @@
 
     function progressionForExercise(exerciseId, profile, config=null, hasStoredZone=false) {
       const programConfig=config || workoutState.activeProgram?.progression || progressionSetup;
+      // Progression scheme: 'rpe' is the default double progression; 'linear'
+      // adds the increment every session with no RPE gate (per-program setting,
+      // stamped onto each exercise at program start so repeats stay linear);
+      // 'onerm' prescribes load as a percentage of the estimated 1RM (#54).
+      const scheme=profile?.scheme||programConfig?.scheme||'rpe';
       const logs=getExerciseLogs(exerciseId).sort((a,b)=>b.isoDate.localeCompare(a.isoDate));
-      if(!logs.length)return null;
+      const manual1RM=Number(profile?.manual1RM)||0;
+      // %1RM with a manual 1RM needs no history at all.
+      if(!logs.length&&!(scheme==='onerm'&&manual1RM>0))return null;
       const targetMode=profile?.mode || 'reps';
       const threshold=Number(programConfig.threshold ?? 8);
       // AMRAP has no upper rep bound: a blank max means "as many as possible" from an
@@ -63,8 +70,8 @@
         return top.mode==='reps'&&top.reps>=min&&(profile?.openTop||profile?.amrap||top.reps<=max);
       };
       const zoneLog=logs.find(inStoredZone)||logs.find(inLoggedZone);
-      const latestLog=zoneLog||logs[0],latest=topSetForSession(latestLog); if(!latest)return null;
-      const mode=profile?.mode || latest.mode || 'reps';
+      const latestLog=zoneLog||logs[0], latest=latestLog?topSetForSession(latestLog):null;
+      const mode=profile?.mode || latest?.mode || 'reps';
       // Freestyle (out-of-program) with no explicit range: follow the lifter's
       // most recent zone instead of rebasing into the Settings default zone.
       // A program prescribes its zone; a freestyle session doesn't, so imposing
@@ -79,7 +86,7 @@
       // collapsing it contradicted the program-start suggestion for identical
       // history.
       const followLifter=!!config?.freeform&&!profile?.custom&&!hasStoredZone;
-      if(followLifter&&!profile?.amrap&&!profile?.openTop&&latest.mode===mode){
+      if(latest&&followLifter&&!profile?.amrap&&!profile?.openTop&&latest.mode===mode){
         if(mode==='time'){timeMin=Math.max(1,latest.seconds);timeMax=Math.max(1,latest.seconds);}
         else{min=Math.max(1,latest.reps);max=Math.max(1,latest.reps);}
       }
@@ -92,15 +99,42 @@
       const repsOnly=!!profile?.repsOnly;
       // Progression scheme: 'rpe' is the default double progression; 'linear'
       // adds the increment every session with no RPE gate (per-program setting,
-      // stamped onto each exercise at program start so repeats stay linear).
-      const scheme=profile?.scheme||programConfig?.scheme||'rpe';
-      const previousProfile=latestLog.progression;
+      // stamped onto each exercise at program start so repeats stay linear);
+      // 'onerm' prescribes load as a percentage of the estimated 1RM (#54).
+      const previousProfile=latestLog?.progression;
       const previousMin=normMin(previousProfile),previousMax=normMax(previousProfile);
-      const hasStoredRange=Number.isFinite(Number(previousProfile?.min))&&(!!previousProfile?.amrap||Number.isFinite(Number(previousProfile?.max))),outsideNewRange=latest.reps<min||(!profile?.openTop&&!profile?.amrap&&latest.reps>max);
-      const repRangeChanged=mode==='reps'&&previousProfile?.mode!=='time'&&((hasStoredRange&&(previousMin!==min||previousMax!==max))||(!hasStoredRange&&outsideNewRange));
-      let nextWeight=latest.weight,nextReps=latest.reps,nextSeconds=latest.seconds,kind='hold',reason='Top-set RPE is above the progression trigger.',estimated1RM=0;
-      if(scheme==='linear'){
-        // Linear progression (Justin's call 2026-09-11): the increment applies
+      const hasStoredRange=Number.isFinite(Number(previousProfile?.min))&&(!!previousProfile?.amrap||Number.isFinite(Number(previousProfile?.max))),outsideNewRange=!!latest&&(latest.reps<min||(!profile?.openTop&&!profile?.amrap&&latest.reps>max));
+      const repRangeChanged=!!latest&&mode==='reps'&&previousProfile?.mode!=='time'&&((hasStoredRange&&(previousMin!==min||previousMax!==max))||(!hasStoredRange&&outsideNewRange));
+      let nextWeight=latest?.weight??0,nextReps=latest?.reps??min,nextSeconds=latest?.seconds??timeMin,kind='hold',reason='Top-set RPE is above the progression trigger.',estimated1RM=0;
+      if(scheme==='onerm'&&mode!=='time'){
+        // %1RM prescription (user's call 2026-09-11, #54): the target load
+        // is a fixed percentage of the estimated 1RM — no RPE gate, no rep
+        // ladder. The estimate comes from the same-zone top set (RPE-based
+        // when RPE was logged, Epley fallback); a manual 1RM covers exercises
+        // with no history yet. Time-based exercises fall through to the
+        // standard path — %1RM is a load prescription for rep work.
+        const pct=Number(profile?.percentOf1RM)||75;
+        let basis=0,basisNote='';
+        if(latest&&latest.weight>0){
+          basis=estimate1RM({w:latest.weight,r:latest.reps,rpe:latest.rpe});
+          basisNote=`estimated 1RM of ${displayWeight(Math.round(basis))} ${weightUnit()}`;
+        }else if(manual1RM>0){
+          basis=manual1RM;basisNote=`your entered 1RM of ${displayWeight(manual1RM)} ${weightUnit()}`;
+        }
+        if(basis>0){
+          // user 2026-09-11: snap %1RM loads to 5 lb plates (2.5 kg metric).
+          const rawLoad=basis*(pct/100);
+          nextWeight=isMetric()?Math.round(rawLoad/LB_TO_KG/2.5)*2.5*LB_TO_KG:Math.round(rawLoad/5)*5;
+          nextReps=min;kind='onerm';
+          reason=`${pct}% of ${basisNote}; suggesting ${displayWeight(nextWeight)} ${weightUnit()} at ${min} rep${min===1?'':'s'}.`;
+          estimated1RM=basis;
+        }else return null;
+      }
+      // The standard path needs real history; only %1RM+manual-1RM reaches here
+      // without it, and time-based %1RM has no prescription — no card.
+      else if(!latest)return null;
+      else if(scheme==='linear'){
+        // Linear progression (user's call 2026-09-11): the increment applies
         // every session, even when reps were missed. Reps and seconds carry
         // over from the latest top set; only the load moves.
         if(repsOnly){reason='Linear progression is on, but load progression is off for this exercise.';}
@@ -131,16 +165,27 @@
       const flat=recent.length>=3 && recent.every((row,i)=>i===0 || (row.weight<=recent[i-1].weight && row.performance<=recent[i-1].performance));
       const rising=recent.length>=3 && recent.every((row,i)=>i===0 || row.rpe==null || recent[i-1].rpe==null || row.rpe>=recent[i-1].rpe);
       const stall=!!programConfig.stallDetection && flat && rising;
-      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog.isoDate,sourceWorkout:latestLog.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall,freeform:!!config?.freeform,scheme};
+      /* #79: suppress suggestions that propose no actual change from the latest
+         top set (e.g. "25 lb · 6 reps → 25 lb · 6 reps"). A suggestion that
+         changes nothing is noise, not guidance. */
+      if(latest){
+        const weightSame=Math.abs((nextWeight||0)-(latest.weight||0))<0.001;
+        const noChange=mode==='time'
+          ? weightSame&&nextSeconds===latest.seconds
+          : profile?.amrap ? weightSame : weightSame&&nextReps===latest.reps;
+        if(noChange)return null;
+      }
+      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog?.isoDate,sourceWorkout:latestLog?.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall,freeform:!!config?.freeform,scheme,amrap:!!profile?.amrap};
     }
 
     function suggestionCardMarkup(suggestion,index,interactive=true) {
       const ex=exercises.find(x=>x.id===suggestion.exerciseId);
       const formatTarget=(weight,performance)=>`${weight ? `${displayWeight(weight)} ${weightUnit()} · ` : ''}${performance} ${suggestion.mode==='time'?'sec':'reps'}`;
-      const oldTarget=formatTarget(suggestion.latest.weight,suggestion.mode==='time'?suggestion.latest.seconds:suggestion.latest.reps);
-      const nextTarget=formatTarget(suggestion.nextWeight,suggestion.mode==='time'?suggestion.nextSeconds:suggestion.nextReps);
-      const label=suggestion.applied?'Applied ✓':suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='range'?(suggestion.freeform?'New range':'Week range'):suggestion.kind==='time'?'Time +':'Rep +';
-      // Justin 2026-09-11 (#44): cards stay lean — name, kind, and the target
+      // Manual-1RM %1RM suggestions have no logged top set — show the 1RM basis instead.
+      const oldTarget=suggestion.latest?formatTarget(suggestion.latest.weight,suggestion.mode==='time'?suggestion.latest.seconds:suggestion.latest.reps):`1RM ${displayWeight(suggestion.estimated1RM)} ${weightUnit()}`;
+      const nextTarget=suggestion.amrap&&suggestion.mode!=='time'?`${suggestion.nextWeight?`${displayWeight(suggestion.nextWeight)} ${weightUnit()} · `:''}AMRAP`:formatTarget(suggestion.nextWeight,suggestion.mode==='time'?suggestion.nextSeconds:suggestion.nextReps);
+      const label=suggestion.applied?'Applied ✓':suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='onerm'?'%1RM':suggestion.kind==='range'?(suggestion.freeform?'New range':'Week range'):suggestion.kind==='time'?'Time +':'Rep +';
+      // user 2026-09-11 (#44): cards stay lean — name, kind, and the target
       // change only. The reason/basis sentences were gratuitous.
       return `<${interactive?'button':'div'} class="suggestion-card ${suggestion.applied?'applied':''}" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name">${escapeHtml(ex?.name||'Exercise')}<span>${label}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div></${interactive?'button':'div'}>`;
     }
@@ -184,7 +229,7 @@
       // Suggested targets are hints, not values: they render as true HTML placeholders
       // (ghosted text, empty value, cleared on focus) and are saved only when a set is
       // completed with its field untouched.
-      item.suggestedTarget={w:suggestion.nextWeight?String(suggestion.nextWeight):'',r:suggestion.mode==='time'?'':String(suggestion.nextReps),seconds:suggestion.mode==='time'?String(suggestion.nextSeconds):''};
+      item.suggestedTarget={w:suggestion.nextWeight?String(suggestion.nextWeight):'',r:suggestion.mode==='time'?'':(suggestion.amrap?'':String(suggestion.nextReps)),seconds:suggestion.mode==='time'?String(suggestion.nextSeconds):''};
       suggestion.applied=true;
       if(rerender){renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();}
     }
@@ -192,7 +237,18 @@
     function renderWorkoutProgression() {
       const draft=workoutState.draft, box=$('#workoutProgression'), context=$('#workoutContext');
       const program=workoutState.activeProgram && draft?.programId===workoutState.activeProgram.id?workoutState.activeProgram:null;
-      context.hidden=!program; context.textContent=program?`${program.name} · Week ${programWeek(program)} · ${draft.name||'Workout'}`:'';
+      /* #68: the pill duplicates the workout name field when they match. The pill
+         carries program context; the name field carries the name. Only show the
+         scheduled workout name in the pill when the user renamed this workout,
+         so the pill still says which program slot this is. */
+      let contextText='';
+      if(program){
+        contextText=`${program.name} · Week ${programWeek(program)}`;
+        const scheduled=program.workouts.find(w=>w.uid===draft.programWorkoutUid);
+        const scheduledName=(scheduled?.name||'').trim(), draftName=(draft.name||'').trim();
+        if(scheduledName&&draftName&&scheduledName.toLowerCase()!==draftName.toLowerCase())contextText+=` · ${scheduledName}`;
+      }
+      context.hidden=!program; context.textContent=contextText;
       const suggestions=draft?.progressionSuggestions||[];
       if(!draft?.exercises?.length){box.hidden=true;return;}
       box.hidden=false;

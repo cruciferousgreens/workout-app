@@ -20,7 +20,7 @@
         renderMuscleSelection();
         renderLibrary();
       });
-      /* Custom-exercise filter sits beside ★ Favorites (Justin 2026-09-10). */
+      /* Custom-exercise filter sits beside ★ Favorites (user 2026-09-10). */
       $('#customToggle')?.addEventListener('click', () => {
         state.onlyCustom = !state.onlyCustom;
         renderMuscleSelection();

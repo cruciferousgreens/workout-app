@@ -78,7 +78,7 @@
     function escapeHtml(text) {
       const div = document.createElement('div'); div.textContent = text; return div.innerHTML;
     }
-    /* Time-step preset pills (2026-09-10, Justin picked presets over a stepper;
+    /* Time-step preset pills (2026-09-10, user picked presets over a stepper;
        Custom removed app-wide 2026-09-10, #45).
        Shared by Settings, program setup, and per-exercise rule rows. */
     const TIME_STEP_PRESETS=[5,10,15,30];
@@ -141,10 +141,10 @@
       const titleEl = $('#topBarTitle'); if (!titleEl) return;
       const back = $('#topBarBack'); const gear = $('#topBarSettings');
       if (back) back.hidden = !(view === 'settings' || view === 'detail');
-      /* The gear stays visible on Settings, shown active like an active tab (Justin 2026-09-10). */
+      /* The gear stays visible on Settings, shown active like an active tab (user 2026-09-10). */
       if (gear) gear.classList.toggle('active', view === 'settings');
       if (view === 'detail') {
-        /* #10 (Justin 2026-09-11): no breadcrumb in the header — it shows only
+        /* #10 (user 2026-09-11): no breadcrumb in the header — it shows only
            the parent page ("Exercises" etc.). The exercise name lives in the
            detail body; the top-bar back chevron is the one and only back
            affordance. */
@@ -152,7 +152,7 @@
         const parentKey = { library: 'library', workout: 'workout', program: 'program', dashboard: 'dashboard', stats: 'stats', 'completed-workout': 'workout' }[ret] || 'library';
         titleEl.textContent = TOP_BAR_TITLES[parentKey];
       } else if (view === 'settings') {
-        // Settings is its own page, not a breadcrumb (Justin 2026-09-10).
+        // Settings is its own page, not a breadcrumb (user 2026-09-10).
         titleEl.textContent = 'Settings';
       } else {
         titleEl.textContent = customTitle || TOP_BAR_TITLES[view] || '';

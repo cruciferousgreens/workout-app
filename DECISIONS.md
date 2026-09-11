@@ -2,7 +2,7 @@
 
 Standing decisions for the accounts fork of the workout tracker. Newest first.
 
-## 2026-09-10 — account profile structure (Justin's call)
+## 2026-09-10 — account profile structure (user's call)
 
 - Account settings begin with a data structure: `display_name` (user-editable
   in Settings → Account) and `account_type` (seeds `'free'`) live in Supabase
@@ -10,7 +10,7 @@ Standing decisions for the accounts fork of the workout tracker. Newest first.
   changes. Everything stays free; the type field exists so paid/comped tiers
   can be added later without migrating.
 
-## 2026-09-10 — union merge for collection keys (Justin's call: "merger is great")
+## 2026-09-10 — union merge for collection keys (user's call: "merger is great")
 
 - Sign-in / sync conflict policy, issue #36: when a collection key (completed,
   templates, tags, exerciseTagPresets, archivedPrograms, customExercises,
@@ -21,7 +21,7 @@ Standing decisions for the accounts fork of the workout tracker. Newest first.
   updated_at. Empty-state guards unchanged. A toast notes when a merge happened.
 - Known limit: deletes don't propagate through a union (tombstones = future work).
 
-## 2026-09-10 — rebased onto v0.49 app build (Justin's call)
+## 2026-09-10 — rebased onto v0.49 app build (user's call)
 
 - App code is now the v0.49 production tree; accounts v1 re-applied on top via
   3-way merge (index.html, app-bootstrap.js) + hand-merge (persistence.js).
@@ -50,15 +50,15 @@ Standing decisions for the accounts fork of the workout tracker. Newest first.
 - Known v1 limits: offline delete on one device vs. stale data on another device
   can resurrect (no tombstones); client-clock skew affects last-write-wins
   ordering.
-- Justin still needs to add the site URL under Authentication → URL
+- user still needs to add the site URL under Authentication → URL
   Configuration → Redirect URLs, or magic links won't return to the app.
 
-## 2026-09-10 — initial direction (from research + Justin)
+## 2026-09-10 — initial direction (from research + user)
 
 - **Backend: Supabase** (hosted Postgres + Auth). Free tier covers 10–50 users at $0/mo.
   Runner-up was Firebase (better offline, but NoSQL + lock-in); PocketBase is the
   escape hatch ($5/mo VPS, own ops); D1 rejected (no auth, would need a custom backend).
-- **Auth: passwordless email magic link** (Supabase `signInWithOtp`). Justin's pick —
+- **Auth: passwordless email magic link** (Supabase `signInWithOtp`). user's pick —
   no passwords to manage. Open detail: magic link vs password was the one question;
   magic link won.
 - **Local-first sync.** localStorage stays the read path (the app keeps working offline
@@ -73,7 +73,7 @@ Standing decisions for the accounts fork of the workout tracker. Newest first.
 
 ## Open questions
 
-- Supabase project: Justin creates it (or grants access) and supplies the project URL
+- Supabase project: user creates it (or grants access) and supplies the project URL
   + anon key; the app needs both at runtime.
 - Domain for the accounts version: undecided — no CNAME in this repo until chosen.
 - Multi-device conflict resolution: last-write-wins per record is the starting point;

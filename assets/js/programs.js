@@ -1,14 +1,22 @@
 
 /* ===== module: programs.js ===== */
     /** Manages reusable workouts, active programs, built-in templates, and archived program history. */
-    /* 15+ and AMRAP are open-ended: no max (Justin 2026-09-10). An empty max
+    /* Global: open the new-template dialog (top-level start option + template list button). */
+    function openNewTemplateDialog(){
+      const input=$('#newTemplateInput'), dialog=$('#newTemplateDialog');
+      if(!input||!dialog)return;
+      input.value='';
+      dialog.showModal();
+      requestAnimationFrame(()=>input.focus());
+    }
+    /* 15+ and AMRAP are open-ended: no max (user 2026-09-10). An empty max
        field elsewhere also means open. */
     const REP_PRESETS={strength:{label:'Strength',min:1,max:5},hypertrophy:{label:'Hypertrophy',min:6,max:12},endurance:{label:'Endurance',min:12,max:20},open:{label:'15+',min:15,max:null,openTop:true},amrap:{label:'AMRAP',min:1,max:null,amrap:true}};
     function applyRepPreset(key,target=progressionSetup){
       const preset=REP_PRESETS[key]||REP_PRESETS.hypertrophy;
       target.defaultRange={preset:key,min:preset.min,max:preset.max,openTop:!!preset.openTop,amrap:!!preset.amrap};
       /* Settings pills edit the global defaults; program pills edit the form
-         draft only (Justin 2026-09-10: the program form must never change
+         draft only (user 2026-09-10: the program form must never change
          the defaults — defaults flow INTO the form instead). */
       const isGlobal=target===progressionSetup;
       const minInput=$(isGlobal?'#settingsRepMin':'#programRepMin'), maxInput=$(isGlobal?'#settingsRepMax':'#programRepMax');
@@ -16,12 +24,25 @@
       if(maxInput)maxInput.value=preset.max??'';
       document.querySelectorAll(`${isGlobal?'#settingsRepPresets':'#programRepPresets'} [data-rep-preset]`).forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.repPreset===key)));
     }
-    /* Program setup form scratch state (Justin 2026-09-10): every control in
+    /* Program setup form scratch state (user 2026-09-10): every control in
        the program form reads/writes this draft, never the global
        progressionSetup. Seeding flows the defaults INTO the form (or a
        program's own progression when editing); creating the program
        snapshots the draft. */
     let programDraftProgression=null;
+    let pendingDeleteProgramWorkoutUid=null;
+    /* #71: confirmation dialog for deleting a program workout. */
+    $('#cancelDeleteProgramWorkout')?.addEventListener('click',()=>$('#deleteProgramWorkoutDialog').close());
+    $('#keepProgramWorkout')?.addEventListener('click',()=>$('#deleteProgramWorkoutDialog').close());
+    $('#confirmDeleteProgramWorkout')?.addEventListener('click',()=>{
+      $('#deleteProgramWorkoutDialog').close();
+      const program=workoutState.activeProgram;
+      if(program&&pendingDeleteProgramWorkoutUid){
+        program.workouts=program.workouts.filter(workout=>workout.uid!==pendingDeleteProgramWorkoutUid);
+        schedulePersist();renderProgram();
+      }
+      pendingDeleteProgramWorkoutUid=null;
+    });
     function cloneProgression(src){const base=src||{};return {...base,defaultRange:{...(base.defaultRange||{})},weeklyRanges:[...(base.weeklyRanges||[])] };}
     function programFormProgression(){if(!programDraftProgression)programDraftProgression=cloneProgression(progressionSetup);return programDraftProgression;}
     function syncProgramForm(){
@@ -30,8 +51,10 @@
       const scheme=p.scheme||'rpe';
       document.querySelectorAll('#programSchemePills [data-scheme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.scheme===scheme)));
       // The RPE trigger only applies to RPE-based mode — hide it entirely
-      // under linear progression (Justin 2026-09-11, #54).
-      $('#progressionThreshold').closest('.rule-field').hidden=scheme==='linear';
+      // under linear and %1RM progression (user 2026-09-11, #54).
+      $('#progressionThreshold').closest('.rule-field').hidden=scheme==='linear'||scheme==='onerm';
+      // %1RM prescribes load as a percentage of 1RM, so fixed increments don't apply.
+      $('#progressionIncrementType').closest('.settings-pair').hidden=scheme==='onerm';
       $('#progressionIncrementType').value=p.incrementType||'lb';
       $('#progressionIncrementValue').value=p.incrementValue??5;
       $('#programRepMin').value=range.min??'';
@@ -88,9 +111,54 @@
     }
     function renderWorkoutTemplateList() {
       const host=$('#workoutTemplateList');if(!host)return;
-      host.innerHTML=workoutState.templates.length?`<div class="picker-list">${workoutState.templates.map(t=>`<button class="picker-item start-template" type="button" data-template-id="${escapeHtml(t.id)}"><span><strong>${escapeHtml(t.name)} ${t.builtIn?'<span class="built-in-label">Built-in</span>':''}</strong><span>${t.exercises.length} exercise${t.exercises.length===1?'':'s'}</span></span><span class="picker-state">›</span></button>`).join('')}</div>`:'<div class="dialog-empty"><strong>No templates yet.</strong><br>Build a workout, then choose Save as template.</div>';
+      host.innerHTML=(workoutState.templates.length?`<div class="picker-list">${workoutState.templates.map(t=>`
+        <div class="template-row">
+          <button class="picker-item start-template" type="button" data-template-id="${escapeHtml(t.id)}" aria-label="Start workout from ${escapeHtml(t.name)}"><span><strong>${escapeHtml(t.name)} ${t.builtIn?'<span class="built-in-label">Built-in</span>':''}</strong><span>${t.exercises.length} exercise${t.exercises.length===1?'':'s'}</span></span><span class="picker-state">›</span></button>
+          ${t.builtIn?'':`<div class="template-row-actions"><button class="small-button" type="button" data-edit-template="${escapeHtml(t.id)}">Edit</button><button class="small-button" type="button" data-rename-template="${escapeHtml(t.id)}">Rename</button><button class="template-delete-text" type="button" data-delete-template="${escapeHtml(t.id)}" aria-label="Delete ${escapeHtml(t.name)}">delete template</button></div>`}
+        </div>`).join('')}</div>`:'<div class="dialog-empty"><strong>No templates yet.</strong><br>Build a workout, then choose Save as template.</div>')
+        +`<button class="new-template-button" id="newTemplateButton" type="button">+ New template</button>`;
       host.querySelectorAll('.start-template').forEach(b=>b.addEventListener('click',()=>startWorkoutFromTemplate(b.dataset.templateId)));
+      /* #74: blank template creation — name it, then the builder opens to add exercises. */
+      $('#newTemplateButton')?.addEventListener('click',()=>openNewTemplateDialog());
+      host.querySelectorAll('[data-edit-template]').forEach(b=>b.addEventListener('click',()=>{const t=workoutState.templates.find(x=>x.id===b.dataset.editTemplate);if(t)openTemplateBuilder(t);}));
+      host.querySelectorAll('[data-rename-template]').forEach(b=>b.addEventListener('click',()=>{const t=workoutState.templates.find(x=>x.id===b.dataset.renameTemplate);if(!t)return;pendingRenameTemplateId=t.id;$('#renameTemplateInput').value=t.name;$('#renameTemplateDialog').showModal();requestAnimationFrame(()=>$('#renameTemplateInput').select());}));
+      host.querySelectorAll('[data-delete-template]').forEach(b=>b.addEventListener('click',()=>{
+        const t=workoutState.templates.find(x=>x.id===b.dataset.deleteTemplate);if(!t)return;
+        pendingDeleteTemplateId=t.id;
+        $('#deleteTemplateDesc').textContent=`Delete "${t.name}"? This cannot be undone.`;
+        $('#deleteTemplateDialog').showModal();
+      }));
     }
+    /* #74: rename / delete template dialogs. */
+    let pendingRenameTemplateId=null,pendingDeleteTemplateId=null;
+    $('#cancelRenameTemplate')?.addEventListener('click',()=>$('#renameTemplateDialog').close());
+    $('#renameTemplateInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#saveRenameTemplate').click();}});
+    $('#saveRenameTemplate')?.addEventListener('click',()=>{
+      const name=$('#renameTemplateInput').value.trim();
+      const t=workoutState.templates.find(x=>x.id===pendingRenameTemplateId);
+      if(t&&name){t.name=name;schedulePersist();renderWorkoutTemplateList();showToast(`Renamed to "${name}".`);}
+      pendingRenameTemplateId=null;$('#renameTemplateDialog').close();
+    });
+    /* #74: create a blank template, then open the builder so exercises can be added. */
+    $('#cancelNewTemplate')?.addEventListener('click',()=>$('#newTemplateDialog').close());
+    $('#newTemplateInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#saveNewTemplate').click();}});
+    $('#saveNewTemplate')?.addEventListener('click',()=>{
+      const name=$('#newTemplateInput').value.trim()||'New template';
+      const template={id:uid('template'),name,exercises:[]};
+      workoutState.templates.unshift(template);schedulePersist();renderWorkoutTemplateList();
+      $('#newTemplateDialog').close();showToast(`Created “${name}”. Add exercises below.`);
+      if(typeof openTemplateBuilder==='function')openTemplateBuilder(template);
+    });
+    $('#cancelDeleteTemplate')?.addEventListener('click',()=>$('#deleteTemplateDialog').close());
+    $('#keepTemplate')?.addEventListener('click',()=>$('#deleteTemplateDialog').close());
+    $('#confirmDeleteTemplate')?.addEventListener('click',()=>{
+      $('#deleteTemplateDialog').close();
+      if(pendingDeleteTemplateId){
+        workoutState.templates=workoutState.templates.filter(x=>x.id!==pendingDeleteTemplateId);
+        schedulePersist();renderWorkoutTemplateList();showToast('Template deleted.');
+      }
+      pendingDeleteTemplateId=null;
+    });
     function activateBuiltInProgram(id) {
       if(workoutState.activeProgram)return;
       const source=builtInPrograms.find(program=>program.id===id); if(!source)return;
@@ -195,9 +263,14 @@
       if (!program) { if(!programDraftProgression)seedProgramForm(null); return; }
       const week=programWeek(program), completedThisWeek=workoutState.completed.filter(w=>w.programId===program.id&&programWeekAtDate(program,w.date)===week).length;
       const muscleRows=programMuscles(program),muscleMax=Math.max(1,...muscleRows.map(([,count])=>count));
-      $('#programCover').innerHTML = `<div class="program-cover-head"><div class="program-cover-kicker">ACTIVE PROGRAM · WEEK ${week} OF ${program.length}</div><h2>${escapeHtml(program.name)}</h2>${program.schedule?`<p class="program-cover-meta">${escapeHtml(program.schedule)} · three sessions per week</p>`:''}</div><div class="program-body">${program.notice?`<p class="program-notice">${escapeHtml(program.notice)}</p>`:''}<div class="program-progress"><span>${program.workouts.length} workout${program.workouts.length === 1 ? '' : 's'} in rotation</span><span>${completedThisWeek} completed this week</span></div><div class="week-progress" style="--program-weeks:${program.length}" aria-label="Week ${week} of ${program.length}">${Array.from({length:program.length},(_,i)=>`<span class="week-segment ${i+1<week?'past':i+1===week?'current':''}"></span>`).join('')}</div><div class="program-cover-actions"><button class="secondary-button" id="editProgram" type="button">Edit program</button></div><section class="program-muscles"><h3>Muscles in this program</h3>${muscleRows.length?`<div class="program-muscle-bars">${muscleRows.slice(0,8).map(([muscle,count])=>`<div class="program-muscle-bar"><span>${escapeHtml(titleCase(muscle))}</span><i style="--fill:${Math.max(8,count/muscleMax*100)}%"></i></div>`).join('')}</div>`:'<p class="section-note">Add exercises to a program workout to see its muscle coverage.</p>'}</section><div class="program-progression-summary"><h3>Progression engine</h3><div class="program-progression-meta">${program.progression?.scheme==='linear'?'<span class="tag primary">Linear progression</span>':`<span class="tag primary">Top set ≤ RPE ${program.progression?.threshold??8}</span>`}<span class="tag">${program.progression?.incrementType==='percent'?(program.progression.incrementValue+'%'):(program.progression?.incrementValue??5)+' '+weightUnit()} ${program.progression?.scheme==='linear'?'every session':'default jump'}</span><span class="tag">Auto-applied on start</span><span class="tag">Stall detector ${program.progression?.stallDetection===false?'off':'on'}</span><span class="tag">${escapeHtml(titleCase(program.progression?.defaultRange?.preset||'hypertrophy'))} · ${programRangeLabel(program.progression?.defaultRange)}</span>${program.progression?.undulating?'<span class="tag primary">Varies by week</span>':''}</div></div><div class="workout-toolbar"><h2>Workouts</h2><button class="exercise-info-button plain-glyph" id="addProgramWorkoutBtn" type="button" aria-label="Add workout">+</button></div><div class="program-workouts" id="programWorkouts">${program.workouts.length ? program.workouts.map((workout,index) => {const count=workoutState.completed.filter(w=>w.programId===program.id&&w.programWorkoutUid===workout.uid).length,exerciseCount=workout.template?.exercises?.length||0;return `<div class="swipe-item program-swipe"><button class="swipe-delete-action delete-program-workout" type="button" data-uid="${escapeHtml(workout.uid)}" aria-label="Remove ${escapeHtml(workout.name)}">Delete</button><div class="program-workout swipe-content"><span class="program-workout-index">${index + 1}</span><div><strong>${escapeHtml(workout.name)}</strong><span>${exerciseCount?`${exerciseCount} exercise${exerciseCount===1?'':'s'}${count?` · ${count} completed`:''}`:'Empty shell · add exercises to start'}</span></div><div class="program-row-actions"><button class="setup-program-row" type="button" data-build-program-workout="${escapeHtml(workout.uid)}">${exerciseCount?'Edit':'Add exercises'}</button>${exerciseCount?`<button class="start-program-row" type="button" data-start-program-workout="${escapeHtml(workout.uid)}">Start</button>`:''}</div></div></div>`;}).join('') : '<div class="history-empty">No workouts yet. Tap + to add the first one.</div>'}</div><div class="program-actions"><button class="secondary-button" id="endProgram" type="button">Archive program</button></div><p class="session-note">Workout order is flexible. Week progress begins at your chosen start week, then advances with calendar time.</p></div>`;
+      $('#programCover').innerHTML = `<div class="program-cover-head"><div class="program-cover-kicker">ACTIVE PROGRAM · WEEK ${week} OF ${program.length}</div><h2>${escapeHtml(program.name)}</h2>${program.schedule?`<p class="program-cover-meta">${escapeHtml(program.schedule)} · three sessions per week</p>`:''}</div><div class="program-body">${program.notice?`<p class="program-notice">${escapeHtml(program.notice)}</p>`:''}<div class="program-progress"><span>${program.workouts.length} workout${program.workouts.length === 1 ? '' : 's'} in rotation</span><span>${completedThisWeek} completed this week</span></div><div class="week-progress" style="--program-weeks:${program.length}" aria-label="Week ${week} of ${program.length}">${Array.from({length:program.length},(_,i)=>`<span class="week-segment ${i+1<week?'past':i+1===week?'current':''}"></span>`).join('')}</div><div class="program-cover-actions"><button class="secondary-button" id="editProgram" type="button">Edit program</button></div><section class="program-muscles"><h3>Muscles in this program</h3>${muscleRows.length?`<div class="program-muscle-bars">${muscleRows.slice(0,8).map(([muscle,count])=>`<div class="program-muscle-bar"><span>${escapeHtml(titleCase(muscle))}</span><i style="--fill:${Math.max(8,count/muscleMax*100)}%"></i></div>`).join('')}</div>`:'<p class="section-note">Add exercises to a program workout to see its muscle coverage.</p>'}</section><div class="program-progression-summary"><h3>Progression engine</h3><div class="program-progression-meta">${program.progression?.scheme==='linear'?'<span class="tag primary">Linear progression</span>':program.progression?.scheme==='onerm'?'<span class="tag primary">%1RM-based</span>':`<span class="tag primary">Top set ≤ RPE ${program.progression?.threshold??8}</span>`}${program.progression?.scheme==='onerm'?'':`<span class="tag">${program.progression?.incrementType==='percent'?(program.progression.incrementValue+'%'):(program.progression?.incrementValue??5)+' '+weightUnit()} ${program.progression?.scheme==='linear'?'every session':'default jump'}</span>`}<span class="tag">Auto-applied on start</span><span class="tag">Stall detector ${program.progression?.stallDetection===false?'off':'on'}</span><span class="tag">${escapeHtml(titleCase(program.progression?.defaultRange?.preset||'hypertrophy'))} · ${programRangeLabel(program.progression?.defaultRange)}</span>${program.progression?.undulating?'<span class="tag primary">Varies by week</span>':''}</div></div><div class="workout-toolbar"><h2>Workouts</h2><button class="exercise-info-button plain-glyph" id="addProgramWorkoutBtn" type="button" aria-label="Add workout">+</button></div><div class="program-workouts" id="programWorkouts">${program.workouts.length ? program.workouts.map((workout,index) => {const count=workoutState.completed.filter(w=>w.programId===program.id&&w.programWorkoutUid===workout.uid).length,exerciseCount=workout.template?.exercises?.length||0;return `<div class="swipe-item program-swipe"><button class="swipe-delete-action delete-program-workout" type="button" data-uid="${escapeHtml(workout.uid)}" aria-label="Remove ${escapeHtml(workout.name)}" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/></svg></button><div class="program-workout swipe-content"><span class="program-workout-index">${index + 1}</span><div><strong>${escapeHtml(workout.name)}</strong><span>${exerciseCount?`${exerciseCount} exercise${exerciseCount===1?'':'s'}${count?` · ${count} completed`:''}`:'Empty shell · add exercises to start'}</span></div><div class="program-row-actions"><button class="setup-program-row" type="button" data-build-program-workout="${escapeHtml(workout.uid)}">${exerciseCount?'Edit':'Add exercises'}</button>${exerciseCount?`<button class="start-program-row" type="button" data-start-program-workout="${escapeHtml(workout.uid)}">Start</button>`:''}<button class="delete-program-workout program-row-delete-text" type="button" data-uid="${escapeHtml(workout.uid)}" aria-label="Delete ${escapeHtml(workout.name)}">delete workout</button></div></div></div>`;}).join('') : '<div class="history-empty">No workouts yet. Tap + to add the first one.</div>'}</div><div class="program-actions"><button class="secondary-button" id="endProgram" type="button">Archive program</button></div><p class="session-note">Workout order is flexible. Week progress begins at your chosen start week, then advances with calendar time.</p></div>`;
       $('#editProgram')?.addEventListener('click',editActiveProgram);
-      document.querySelectorAll('.delete-program-workout').forEach(button => button.addEventListener('click', () => {program.workouts=program.workouts.filter(workout=>workout.uid!==button.dataset.uid);schedulePersist();renderProgram();}));
+      document.querySelectorAll('.delete-program-workout').forEach(button => button.addEventListener('click', () => {
+        const workout=program.workouts.find(w=>w.uid===button.dataset.uid);
+        pendingDeleteProgramWorkoutUid=button.dataset.uid;
+        $('#deleteProgramWorkoutDesc').textContent=workout?`Delete "${workout.name}" from your program? This cannot be undone.`:'Delete this workout from your program? This cannot be undone.';
+        $('#deleteProgramWorkoutDialog').showModal();
+      }));
       document.querySelectorAll('[data-start-program-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=program.workouts.find(w=>w.uid===button.dataset.startProgramWorkout);if(workout)startProgramWorkout(program,workout);}));
       document.querySelectorAll('[data-build-program-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=program.workouts.find(w=>w.uid===button.dataset.buildProgramWorkout);if(workout)openProgramWorkoutBuilder(program,workout);}));
       $('#addProgramWorkoutBtn').addEventListener('click', addProgramWorkout);

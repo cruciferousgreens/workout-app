@@ -1,7 +1,29 @@
 
 /* ===== module: app-bootstrap.js ===== */
     /** Connects static controls to feature modules and performs initial rendering. */
-    /** Theme state (Justin 2026-09-10): four themes in two visual columns.
+    /* Native-app feel (2026-09-11): on touch devices (phones/tablets — NOT
+       desktop), lock the viewport scale and hide scrollbars so the app
+       feels native in both the home-screen app and mobile browser tabs.
+       pointer:coarse is the touch-vs-desktop line; done in JS (not the
+       static meta/CSS) so desktop is completely unaffected. */
+    (function(){
+      var touch=false;
+      try{touch=!!(window.matchMedia&&window.matchMedia('(pointer: coarse)').matches);}catch(_){}
+      if(!touch)return;
+      document.documentElement.classList.add('is-touch');
+      /* iOS Home Screen apps cache the system status-bar tint at launch —
+         flag standalone so the theme section can note the relaunch caveat. */
+      var standalone=false;
+      try{standalone=(window.navigator&&window.navigator.standalone===true)||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);}catch(_){}
+      if(standalone)document.documentElement.classList.add('is-standalone');
+      var vp=document.querySelector('meta[name="viewport"]');
+      if(vp)vp.setAttribute('content','width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+      /* Catches older iOS versions that still fire gesture events; the
+         touch-action CSS above carries modern mobile browsers (iOS Safari
+         ignores user-scalable=no, but honors touch-action). */
+      document.addEventListener('gesturestart',function(e){e.preventDefault();},{passive:false});
+    })();
+    /** Theme state (user 2026-09-10): four themes in two visual columns.
         The dark toggle moves between the matching pills: Cruciferous <->
         Asterid, Rosé <-> Matcha — the newly active theme's pill is always
         the one shown selected. Tapping the Cruciferous pill always lands on
@@ -9,7 +31,7 @@
         resets to Cruciferous light. Persisted as workout-theme (dark/light)
         + workout-theme-name (+ legacy workout-theme-light, kept for stored
         prefs). */
-    let themeName='cruciferous', darkMode=false, ctpDark='mocha', lightTheme='cruciferous';
+    let themeName='cruciferous', darkMode=false, ctpDark='mocha', lightTheme='cruciferous', swipeToDeleteSets=true;
     const ROSEPINE='rosepine', DARK_FLAVORS=['macchiato','mocha'], LIGHT_THEMES=['cruciferous','rosepine'];
     function applyTheme(){
       const eff=themeName==='cruciferous'?(darkMode?'macchiato':'light'):themeName;
@@ -24,26 +46,36 @@
     }
     /** Accounts sync: appearance travels as one key so the theme follows the
         account across devices. Validated on the way in; garbage never applies. */
-    function getAppearanceState(){return {themeName:themeName,darkMode:darkMode,ctpDark:ctpDark,lightTheme:lightTheme};}
+    function getAppearanceState(){return {themeName:themeName,darkMode:darkMode,ctpDark:ctpDark,lightTheme:lightTheme,swipeToDeleteSets:swipeToDeleteSets};}
     function setAppearanceState(v){
       if(!v||typeof v!=='object')return;
       if(!['cruciferous','rosepine','macchiato','mocha'].includes(v.themeName))return;
       if(typeof v.darkMode!=='boolean')return;
       if(!DARK_FLAVORS.includes(v.ctpDark)||!LIGHT_THEMES.includes(v.lightTheme))return;
       themeName=v.themeName;darkMode=v.darkMode;ctpDark=v.ctpDark;lightTheme=v.lightTheme;
-      applyTheme();
+      if(typeof v.swipeToDeleteSets==='boolean')swipeToDeleteSets=v.swipeToDeleteSets;
+      applyTheme();applySwipeSets();
     }
+    /** Swipe-to-delete for set rows (user 2026-09-11): a Settings toggle that
+        travels with the appearance sync key. The gesture itself only engages on
+        touch devices — desktop keeps the × button regardless. */
+    function applySwipeSets(){
+      document.documentElement.classList.toggle('swipe-sets',swipeToDeleteSets);
+      const toggle=$('#swipeDeleteSetsToggle');
+      if(toggle){toggle.setAttribute('aria-pressed',String(swipeToDeleteSets));toggle.setAttribute('aria-label',`Swipe to delete sets ${swipeToDeleteSets?'on':'off'}`);}
+    }
+    function swipeDeleteSetsEnabled(){return swipeToDeleteSets&&document.documentElement.classList.contains('is-touch');}
     function setThemeName(name){
       themeName=name;
       if(name===ROSEPINE){darkMode=false;lightTheme=ROSEPINE;}
       /* Cruciferous always means Cruciferous light — tapping the pill must show
-         the default theme, never linger in a dark palette (Justin 2026-09-10).
+         the default theme, never linger in a dark palette (user 2026-09-10).
          The Cruciferous<->Asterid dark relationship lives in the dark toggle. */
       else if(name==='cruciferous'){darkMode=false;lightTheme='cruciferous';}
       else{ /* dark Catppuccin flavor */ darkMode=true;ctpDark=name;}
       applyTheme();
     }
-    /** Highlights the active workout-focus pill from the draft's explicit choice (Justin 2026-09-10). */
+    /** Highlights the active workout-focus pill from the draft's explicit choice (user 2026-09-10). */
     function syncWorkoutFocusPills(){
       const key=workoutState.draft?.focusPreset||null;
       document.querySelectorAll('[data-workout-focus]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.workoutFocus===key)));
@@ -53,7 +85,7 @@
       const unit=$('#programIncrementUnit');
       if(unit) unit.textContent = programFormProgression().incrementType==='percent' ? '%' : weightUnit();
     }
-    /** Light unit suffix inside the increment value field; follows the type (Justin 2026-09-10). */
+    /** Light unit suffix inside the increment value field; follows the type (user 2026-09-10). */
     function syncSettingsIncrementUnit(){
       const unit=$('#settingsIncrementUnit');
       if(unit) unit.textContent = progressionSetup.incrementType==='percent' ? '%' : weightUnit();
@@ -63,16 +95,26 @@
     function syncUnitPills(){
       document.querySelectorAll('#settingsUnitPills [data-units]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.units===(progressionSetup.units||'imperial'))));
     }
+    /* Stats default metric pills (user 2026-09-11): saved under Units,
+       persisted in progressionSetup (synced with the account). */
+    function syncStatsDefaultPills(){
+      const def=progressionSetup.statsDefaultMetric==='sets'?'sets':'volume';
+      document.querySelectorAll('#settingsStatsDefaultPills [data-stats-default]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.statsDefault===def)));
+    }
     /** Mirrors the program form: the RPE trigger only applies to RPE-based mode. */
     function syncSettingsScheme(){
       const scheme=progressionSetup.scheme||'rpe';
       document.querySelectorAll('#settingsSchemePills [data-scheme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.scheme===scheme)));
       const thresholdField=$('#settingsRpeThreshold');
-      if(thresholdField)thresholdField.closest('.rule-field').hidden=scheme==='linear';
+      if(thresholdField)thresholdField.closest('.rule-field').hidden=scheme==='linear'||scheme==='onerm';
+      const incrementField=$('#settingsIncrementType');
+      if(incrementField)incrementField.closest('.settings-pair').hidden=scheme==='onerm';
     }
     function renderSettings(){
       const darkToggle=$('#darkModeToggle');
       if(darkToggle){darkToggle.setAttribute('aria-pressed',String(darkMode));darkToggle.setAttribute('aria-label',`Dark mode ${darkMode?'on':'off'}`);}
+      const swipeToggle=$('#swipeDeleteSetsToggle');
+      if(swipeToggle){swipeToggle.setAttribute('aria-pressed',String(swipeToDeleteSets));swipeToggle.setAttribute('aria-label',`Swipe to delete sets ${swipeToDeleteSets?'on':'off'}`);}
       document.querySelectorAll('#themePills [data-theme-name]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.themeName===themeName)));
       $('#settingsRpeThreshold').value=progressionSetup.threshold;
       $('#settingsIncrementType').value=progressionSetup.incrementType;
@@ -83,6 +125,7 @@
       const activePreset=progressionSetup.defaultRange.preset||'hypertrophy';
       document.querySelectorAll('[data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.repPreset===activePreset)));
       syncUnitPills();
+      syncStatsDefaultPills();
       syncTimeStepPills($('#settingsTimeStepPills'),progressionSetup.timeStep);
       const stall=$('#settingsStallToggle');
       stall.setAttribute('aria-pressed',String(!!progressionSetup.stallDetection));
@@ -99,7 +142,10 @@
     }
     window.addEventListener('load', () => {
       if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-        navigator.serviceWorker.register('sw.js').catch(() => {});
+        /* updateViaCache:'none' (user 2026-09-11): the browser must never
+           serve a cached sw.js when checking for updates — GitHub Pages sends
+           max-age=600 and its headers aren't configurable. */
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
       }
     });
 
@@ -152,24 +198,27 @@
     $('#closeCustomDialog').addEventListener('click', closeCustomDialog);
     $('#cancelCustomExercise').addEventListener('click', closeCustomDialog);
 
-    /* "By weighted volume" <-> "By number of sets" toggle on the stats page (Justin 2026-09-10). */
-    $('#topExercisesMode').addEventListener('click',()=>{
-      state.topExercisesMode=state.topExercisesMode==='sets'?'volume':'sets';
-      schedulePersist();renderStats();
-    });
+    /* #14: the top-exercises metric is now a two-button segmented control;
+       its wiring lives in renderMuscleAnalysis (dashboard-stats.js). */
 
     $('#darkModeToggle').addEventListener('click',()=>{
       darkMode=!darkMode;
-      /* The toggle walks to the matching theme pill (Justin 2026-09-10):
+      /* The toggle walks to the matching theme pill (user 2026-09-10):
          Cruciferous <-> Asterid, Rosé <-> Matcha. */
       if(darkMode){ if(themeName==='cruciferous')themeName='macchiato'; else if(themeName===ROSEPINE)themeName='mocha'; }
       else{ if(themeName==='macchiato')themeName='cruciferous'; else if(themeName==='mocha')themeName=ROSEPINE; }
       applyTheme();
     });
+    $('#swipeDeleteSetsToggle').addEventListener('click',()=>{
+      swipeToDeleteSets=!swipeToDeleteSets;
+      applySwipeSets();
+      /* Flipping the toggle changes the appearance sync key — persist + sync it. */
+      if(typeof schedulePersist==='function')schedulePersist();
+    });
     document.querySelectorAll('#themePills [data-theme-name]').forEach(button=>button.addEventListener('click',()=>{
       const name=button.dataset.themeName;
       /* Tapping the active pill resets to Cruciferous light. Tapping
-         "Cruciferous" always shows Cruciferous light (Justin 2026-09-10) —
+         "Cruciferous" always shows Cruciferous light (user 2026-09-10) —
          the dark side of that column is reached via the dark toggle. */
       if(name===themeName){ themeName='cruciferous';darkMode=false;lightTheme='cruciferous';applyTheme(); return; }
       setThemeName(name);
@@ -177,6 +226,12 @@
     document.querySelectorAll('#settingsUnitPills [data-units]').forEach(button=>button.addEventListener('click',()=>{
       progressionSetup.units=button.dataset.units; syncUnitPills(); syncSettingsIncrementUnit(); syncProgramIncrementUnit(); schedulePersist();
       renderDashboard(); renderStats(); renderWorkoutScreen(); renderWorkoutProgression();
+    }));
+    document.querySelectorAll('#settingsStatsDefaultPills [data-stats-default]').forEach(button=>button.addEventListener('click',()=>{
+      const def=button.dataset.statsDefault; if(progressionSetup.statsDefaultMetric===def)return;
+      progressionSetup.statsDefaultMetric=def; syncStatsDefaultPills(); schedulePersist();
+      /* Apply immediately: both Stats toggles follow the new default. */
+      state.topExercisesMode=def; state.muscleVolumeMode=def; renderStats();
     }));
     $('#settingsRpeThreshold').addEventListener('input',e=>{progressionSetup.threshold=Math.min(10,Math.max(1,Number(e.target.value)||8));schedulePersist();});
     $('#settingsIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;syncSettingsIncrementUnit();schedulePersist();});
@@ -227,17 +282,12 @@
       if(DARK_FLAVORS.includes(themeName))ctpDark=themeName;
       try{const savedLight=localStorage.getItem('workout-theme-light');if(LIGHT_THEMES.includes(savedLight))lightTheme=savedLight;}catch(_){}
     }catch(_){}
-    applyTheme();
+    applyTheme();applySwipeSets();
     $('#closeReplaceDraft').addEventListener('click',()=>{pendingRepeatWorkout=null;$('#replaceDraftDialog').close();});
     $('#keepCurrentDraft').addEventListener('click',()=>{pendingRepeatWorkout=null;$('#replaceDraftDialog').close();});
     $('#confirmReplaceDraft').addEventListener('click',()=>{const workout=pendingRepeatWorkout;pendingRepeatWorkout=null;$('#replaceDraftDialog').close();if(workout)repeatWorkout(workout,true);});
-    /* Single review prompt on finish (2026-09-10, #43): unfilled values and
-       unmarked sets are reviewed together — mark all complete, delete the
-       unfinished sets, or keep editing. */
-    $('#closeReviewSets').addEventListener('click',()=>$('#reviewSetsDialog').close());
-    $('#reviewSetsCancel').addEventListener('click',()=>$('#reviewSetsDialog').close());
-    $('#reviewSetsComplete').addEventListener('click',()=>{$('#reviewSetsDialog').close();const draft=workoutState.draft;if(draft){draft.exercises.forEach(item=>item.sets.forEach(set=>{set.complete=true;}));renderWorkoutExercises();markDraftSaved();}finishWorkout(true);});
-    $('#reviewSetsDelete').addEventListener('click',()=>{$('#reviewSetsDialog').close();const draft=workoutState.draft;if(draft){/* #43: bulk delete removes only fully-empty sets (isEmptySet) and prunes exercises left with no sets — never sets with partial values. */let removed=0,removedEx=0;draft.exercises.forEach(item=>{const before=item.sets.length;item.sets=item.sets.filter(set=>!isEmptySet(set));removed+=before-item.sets.length;});const beforeEx=draft.exercises.length;draft.exercises=draft.exercises.filter(item=>item.sets.length);removedEx=beforeEx-draft.exercises.length;renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();if(removed||removedEx)showToast(`Deleted ${removed} empty set${removed===1?'':'s'}${removedEx?` and ${removedEx} empty exercise${removedEx===1?'':'s'}`:''}.`);}finishWorkout();});
+    /* Review dialog retired 2026-09-11 (user): finish now drops incomplete
+       sets automatically — no dialog needed. */
     $('#dashboardNav').addEventListener('click', () => goTab(showDashboard, 'dashboard'));
     $('#workoutsNav').addEventListener('click', () => {
       // Re-tapping the active Workout tab pops a completed-workout review back to the
@@ -264,7 +314,7 @@
       else history.back();
     });
     /* Program setup form controls edit the form draft, never the global
-       defaults (Justin 2026-09-10). */
+       defaults (user 2026-09-10). */
     $('#progressionThreshold').addEventListener('input',e=>{programFormProgression().threshold=Number(e.target.value)||8;schedulePersist();});
     $('#progressionIncrementType').addEventListener('change',e=>{programFormProgression().incrementType=e.target.value;syncProgramIncrementUnit();schedulePersist();});
     $('#progressionIncrementValue').addEventListener('input',e=>{programFormProgression().incrementValue=Number(e.target.value)||5;schedulePersist();});
@@ -281,6 +331,7 @@
     $('#stallDetectorToggle').addEventListener('click',()=>{const d=programFormProgression();d.stallDetection=!d.stallDetection;$('#stallDetectorToggle').setAttribute('aria-pressed',String(d.stallDetection));$('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${d.stallDetection?'on':'off'}`);schedulePersist();});
     $('#createProgram').addEventListener('click', createProgram);
     $('#startBlankWorkout').addEventListener('click', () => startBlankWorkout());
+    $('#startNewTemplate')?.addEventListener('click', () => { if (typeof openNewTemplateDialog === 'function') openNewTemplateDialog(); });
     $('#repeatLastWorkout').addEventListener('click',()=>repeatWorkout(workoutState.completed.slice().sort((a,b)=>b.date.localeCompare(a.date))[0]));
     $('#addWorkoutExercise').addEventListener('click', () => {
       workoutState.pickerMode='draft';workoutState.programWorkoutTarget=null;
@@ -293,8 +344,8 @@
       $('#exercisePickerDialog').showModal();
       requestAnimationFrame(() => $('#exercisePickerSearch').focus());
     });
-    $('#closeExercisePicker').addEventListener('click', () => {$('#exercisePickerDialog').close();if(workoutState.pickerMode==='program')renderProgram();});
-    $('#doneExercisePicker').addEventListener('click', () => {$('#exercisePickerDialog').close();if(workoutState.pickerMode==='program')renderProgram();});
+    $('#closeExercisePicker').addEventListener('click', () => {$('#exercisePickerDialog').close();if(workoutState.pickerMode==='program')renderProgram();else if(workoutState.pickerMode==='template'){schedulePersist();renderWorkoutTemplateList();}});
+    $('#doneExercisePicker').addEventListener('click', () => {$('#exercisePickerDialog').close();if(workoutState.pickerMode==='program')renderProgram();else if(workoutState.pickerMode==='template'){schedulePersist();renderWorkoutTemplateList();}});
     /* Workout focus (2026-09-10): one tap applies a rep-range preset to every
        reps-tracked exercise in the draft. Explicit choice, so profiles become
        custom (the engine follows the chosen zone instead of last session's).
@@ -327,7 +378,7 @@
     document.querySelectorAll('[data-workout-focus]').forEach(button=>button.addEventListener('click',()=>{
       if(!workoutState.draft)return;
       const key=button.dataset.workoutFocus;
-      /* "No focus" clears the workout-level selection (Justin 2026-09-10);
+      /* "No focus" clears the workout-level selection (user 2026-09-10);
          per-exercise ranges already applied stay as the exercises' own settings. */
       if(!key){workoutState.draft.focusPreset=null;syncWorkoutFocusPills();markDraftSaved();return;}
       const preset=REP_PRESETS[key]; if(!preset)return;
@@ -342,7 +393,7 @@
     $('#focusConfirmApply').addEventListener('click',()=>{$('#focusConfirmDialog').close();if(pendingFocusKey){applyWorkoutFocus(pendingFocusKey);pendingFocusKey=null;}});
     $('#exercisePickerSearch').addEventListener('input', renderPickerList);
     /* Picker filter panel: the Exercises tab's selector interface inside the
-       add-exercise dialog (Justin 2026-09-10). */
+       add-exercise dialog (user 2026-09-10). */
     $('#pickerFilterToggle').addEventListener('click',()=>{
       const panel=$('#pickerFilterPanel'),open=panel.classList.toggle('open');
       $('#pickerFilterToggle').setAttribute('aria-expanded',String(open));
@@ -415,7 +466,7 @@
       else if (id && exercises.some(x => x.id === id)) openExercise(id, false); else showDashboard(false);
     });
 
-    /* Build stamp (Justin 2026-09-11): version + last-updated in Settings → About. */
+    /* Build stamp (user 2026-09-11): version + last-updated in Settings → About. */
     try{
       const info=window.BUILD_INFO;
       if(info){
@@ -425,6 +476,13 @@
       }
     }catch(_){}
     restorePersisted();
+    /* Stats metric default (user 2026-09-11): the Volume|Sets toggles on the
+       Stats page initialize to the saved Units → Stats default on every load. */
+    state.topExercisesMode=state.muscleVolumeMode=(progressionSetup.statsDefaultMetric==='sets'?'sets':'volume');
+    /* Boot guarantee (user 2026-09-11 marathon): the swipe-sets class must
+       reflect the restored setting even if the appearance-key restore above
+       was skipped — otherwise the inline × stays visible on touch. */
+    applySwipeSets();
     updateLiveWorkoutIndicator();
     populateFilters(); renderLibrary(); renderDashboard(); renderStats();
     const initialId = decodeURIComponent(location.hash.slice(1));

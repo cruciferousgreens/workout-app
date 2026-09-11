@@ -164,7 +164,7 @@
          so a later deliberate delete on another device isn't resurrected. */
       syncMeta.keys[key]={updatedAt:remote.updated_at,snapshot:snapshotOf(key),dirty:false,pushedAt:remote.updated_at};
     }
-    /* ===== union merge for collection keys (Justin's call 2026-09-10) ===== */
+    /* ===== union merge for collection keys (user's call 2026-09-10) ===== */
     /** Keys whose values are collections: when both sides hold different items,
         they union by id instead of last-write-wins. */
     const MERGE_KEYS=new Set(['completed','templates','tags','exerciseTagPresets','archivedPrograms','customExercises','favorites']);
@@ -354,15 +354,49 @@
       if(left>0){setAccountStatus('Wait '+fmtCooldown(left)+' before requesting another link.');return;}
       const sb=await getSupabase();
       if(!sb){setAccountStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.');return;}
-      setAccountStatus('Sending sign-in link\u2026');
+      setAccountStatus('Sending code\u2026');
       try{
         const {error}=await sb.auth.signInWithOtp({email:email,options:{emailRedirectTo:location.origin+location.pathname}});
         /* Cooldown starts on any completed attempt — even a rate-limited one —
            so rapid taps can't burn the Supabase email quota. */
         startMagicLinkCooldown();
         if(error){setAccountStatus(error.message);return;}
-        setAccountStatus('Check your email for the sign-in link.');
-      }catch(err){setAccountStatus((err&&err.message)||'Could not send the link.');}
+        /* #75: progressive disclosure — reveal the code step once the email is sent. */
+        const otpStep=$('#otpStep');
+        if(otpStep)otpStep.hidden=false;
+        setAccountStatus('Code sent \u2014 enter it below, or tap the link in the email.');
+      }catch(err){setAccountStatus((err&&err.message)||'Could not send the code.');}
+    }
+    /* ===== 6-digit sign-in code (2026-09-11) =====
+       verifyOtp needs no PKCE code verifier, so it completes wherever the
+       email is read — including the iPhone home-screen app, whose storage
+       is isolated from Safari and which never sees a tapped magic link. */
+    async function verifySignInCode(){
+      const emailInput=$('#accountEmail');
+      const email=(emailInput&&emailInput.value||'').trim();
+      const input=$('#accountOtp');
+      const token=((input&&input.value)||'').trim().replace(/[\s-]+/g,'');
+      if(!email||email.indexOf('@')<0){setAccountStatus('Enter your email address above first.');return;}
+      if(!token){setAccountStatus('Enter the code from the email.');return;}
+      const sb=await getSupabase();
+      if(!sb){setAccountStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.');return;}
+      setAccountStatus('Verifying code\u2026');
+      try{
+        const {error}=await sb.auth.verifyOtp({email:email,token:token,type:'email'});
+        if(error){setAccountStatus(otpErrorText(error));return;}
+        if(input)input.value='';
+        /* onAuthStateChange -> handleAuthChange picks up the session and
+           runs the first sync cycle. */
+        setAccountStatus('');
+      }catch(err){setAccountStatus((err&&err.message)||'Could not verify the code.');}
+    }
+    /* Friendlier wording for the common code failures (#70: cryptic errors). */
+    function otpErrorText(error){
+      const msg=String((error&&error.message)||'');
+      const low=msg.toLowerCase();
+      if(low.indexOf('expired')>=0)return 'That code expired \u2014 request a new link and use the fresh code.';
+      if(low.indexOf('invalid')>=0||low.indexOf('token')>=0)return 'That code didn\u2019t work \u2014 double-check it against the email and try again.';
+      return msg||'Could not verify the code.';
     }
     async function saveDisplayName(){
       const sb=await getSupabase();
@@ -449,12 +483,32 @@
     function wireAccountUI(){
       const send=$('#sendMagicLinkButton');
       if(send)send.addEventListener('click',()=>{sendSignInLink().catch(()=>{});});
+      const verify=$('#verifyOtpButton');
+      if(verify)verify.addEventListener('click',()=>{verifySignInCode().catch(()=>{});});
+      const otp=$('#accountOtp');
+      if(otp)otp.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();verifySignInCode().catch(()=>{});}});
       const row=$('#accountRowButton');
       if(row)row.addEventListener('click',()=>{renderAccount();const d=$('#accountDialog');if(d)d.showModal();});
       const closeDlg=$('#closeAccountDialog');
       if(closeDlg)closeDlg.addEventListener('click',()=>{const d=$('#accountDialog');if(d)d.close();});
       const out=$('#accountDialogSignOut');
       if(out)out.addEventListener('click',()=>{const d=$('#accountDialog');if(d)d.close();signOutAccount().catch(()=>{});});
+      /* #37: delete account — confirmation, then wipe remote + local data and sign out. */
+      const del=$('#accountDialogDelete');
+      if(del)del.addEventListener('click',()=>{const d=$('#accountDialog');if(d)d.close();const cd=$('#deleteAccountDialog');if(cd)cd.showModal();});
+      const closeDel=$('#closeDeleteAccount');
+      if(closeDel)closeDel.addEventListener('click',()=>$('#deleteAccountDialog').close());
+      const cancelDel=$('#cancelDeleteAccount');
+      if(cancelDel)cancelDel.addEventListener('click',()=>$('#deleteAccountDialog').close());
+      const confirmDel=$('#confirmDeleteAccount');
+      if(confirmDel)confirmDel.addEventListener('click',async()=>{
+        $('#deleteAccountDialog').close();
+        await wipeRemoteData();
+        try{localStorage.removeItem('workout-app:v1');}catch(_){}
+        try{localStorage.removeItem('workout-sync:v1');}catch(_){}
+        await signOutAccount();
+        setAccountStatus('Account deleted. All data removed.');
+      });
       const now=$('#accountDialogSyncNow');
       if(now)now.addEventListener('click',()=>{syncNowManual().catch(()=>{});});
       const edit=$('#accountDialogEditName');
@@ -466,7 +520,7 @@
       const saveName=$('#saveNameButton');
       if(saveName)saveName.addEventListener('click',()=>{saveDisplayName().catch(()=>{});});
       /* Resume an in-progress resend cooldown across reloads. */
-      if(magicLinkCooldownRemaining()>0)startMagicLinkCooldown();
+      if(magicLinkCooldownRemaining()>0){startMagicLinkCooldown();/* #75: a code was already sent — keep the OTP step visible. */const s=$('#otpStep');if(s)s.hidden=false;}
     }
     /* ===== magic-link resend cooldown (2 min, survives reload) ===== */
     const MAGIC_LINK_COOLDOWN_MS=120000;
@@ -486,7 +540,7 @@
       const left=magicLinkCooldownRemaining();
       if(left<=0){
         if(magicLinkCooldownTimer){clearInterval(magicLinkCooldownTimer);magicLinkCooldownTimer=null;}
-        if(btn){btn.disabled=false;btn.textContent='Email me a sign-in link';}
+        if(btn){btn.disabled=false;btn.textContent='Email me a code';}
         try{localStorage.removeItem(MAGIC_LINK_COOLDOWN_KEY);}catch(_){}
         return;
       }
@@ -499,7 +553,26 @@
       magicLinkCooldownTimer=setInterval(tickMagicLinkCooldown,1000);
     }
     let authListenerAttached=false;
+    /* #70: surface human-readable magic-link errors. Supabase puts auth
+       failures in the URL hash (#error=...&error_description=...) when
+       detectSessionInUrl can't establish a session. */
+    function checkAuthCallbackError(){
+      const hash=location.hash||'';
+      if(!hash.includes('error='))return false;
+      const params=new URLSearchParams(hash.slice(1));
+      const desc=(params.get('error_description')||'').toLowerCase();
+      const code=(params.get('error')||'').toLowerCase();
+      let msg='That sign-in link didn\u2019t work.';
+      if(desc.includes('expired')||code.includes('expired'))msg='That sign-in link expired. Request a new one below.';
+      else if(desc.includes('already')||desc.includes('used')||code.includes('invalid'))msg='That sign-in link was already used or is invalid. Request a new one below.';
+      else if(!navigator.onLine)msg='No network connection. Reconnect and try the link again, or request a new one.';
+      setAccountStatus(msg);
+      /* Clean the error from the URL so refresh doesn't re-show it. */
+      try{history.replaceState(null,'',location.pathname+location.search);}catch(_){}
+      return true;
+    }
     async function resumeSync(){
+      checkAuthCallbackError();
       const sb=await getSupabase();
       if(!sb){setAccountStatus('Sync unavailable offline \u2014 your data stays on this device.');return;}
       try{

@@ -5,6 +5,7 @@
       const target=workoutState.exerciseTagTarget;
       if(!target)return null;
       if(target.mode==='program')return pickerProgramWorkout()?.template?.exercises.find(item=>item.exerciseId===target.exerciseId)||null;
+      if(target.mode==='template')return pickerTemplate()?.exercises.find(item=>item.exerciseId===target.exerciseId)||null;
       return workoutState.draft?.exercises.find(item=>item.uid===target.exerciseUid)||null;
     }
     function openExerciseTagDialog(target) {
@@ -22,7 +23,7 @@
         const tag=button.dataset.exerciseTag;
         item.exerciseTags=item.exerciseTags.includes(tag)?item.exerciseTags.filter(value=>value!==tag):[...item.exerciseTags,tag];
         renderExerciseTagDialog();
-        if(workoutState.exerciseTagTarget?.mode==='program'){schedulePersist();renderPickerRules();}else{renderWorkoutExercises();markDraftSaved();}
+        if(workoutState.exerciseTagTarget?.mode==='program'||workoutState.exerciseTagTarget?.mode==='template'){schedulePersist();renderPickerRules();}else{renderWorkoutExercises();markDraftSaved();}
       }));
     }
     function addExerciseTag() {
@@ -34,7 +35,7 @@
       if(!item.exerciseTags.includes(selected))item.exerciseTags.push(selected);
       $('#newExerciseTagInput').value='';
       renderExerciseTagDialog();
-      if(workoutState.exerciseTagTarget?.mode==='program'){schedulePersist();renderPickerRules();}else{renderWorkoutExercises();markDraftSaved();}
+      if(workoutState.exerciseTagTarget?.mode==='program'||workoutState.exerciseTagTarget?.mode==='template'){schedulePersist();renderPickerRules();}else{renderWorkoutExercises();markDraftSaved();}
     }
 
     function findDraftSet(exerciseUid, setUid) {
