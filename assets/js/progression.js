@@ -19,7 +19,7 @@
       return Math.round((weight+Number(value))*2)/2;
     }
 
-    function progressionForExercise(exerciseId, profile, config=null) {
+    function progressionForExercise(exerciseId, profile, config=null, hasStoredZone=false) {
       const programConfig=config || workoutState.activeProgram?.progression || progressionSetup;
       const logs=getExerciseLogs(exerciseId).sort((a,b)=>b.isoDate.localeCompare(a.isoDate));
       if(!logs.length)return null;
@@ -33,7 +33,7 @@
       const min0=normMin(profile), max0=normMax(profile);
       let min=min0, max=max0;
       let timeMin=Number(profile?.timeMin ?? 30), timeMax=Number(profile?.timeMax ?? 60);
-      const timeStep=Number(profile?.timeStep ?? 5);
+      const timeStep=Number(profile?.timeStep)||5;
       // Suggest from the most recent log in the SAME rep/time zone as the target.
       // Basing the suggestion on the latest log regardless of zone produced invented
       // loads (e.g. a Friday 4s e1RM interpolated into a Monday 8s target); the
@@ -74,8 +74,11 @@
       // single number — their top set — so the suggestion becomes "same reps,
       // add load when the RPE trigger hits". Explicitly chosen ranges
       // (profile.custom, set in the exercise rule rows), AMRAP, and open-top
-      // keep the existing behavior.
-      const followLifter=!!config?.freeform&&!profile?.custom;
+      // keep the existing behavior. A repeat or template-start whose draft item
+      // carries a stored zone from a real workout also keeps its zone (#48):
+      // collapsing it contradicted the program-start suggestion for identical
+      // history.
+      const followLifter=!!config?.freeform&&!profile?.custom&&!hasStoredZone;
       if(followLifter&&!profile?.amrap&&!profile?.openTop&&latest.mode===mode){
         if(mode==='time'){timeMin=Math.max(1,latest.seconds);timeMax=Math.max(1,latest.seconds);}
         else{min=Math.max(1,latest.reps);max=Math.max(1,latest.reps);}
@@ -87,14 +90,25 @@
       const incrementValueLb=incrementType==='percent'?incrementValue:(isMetric()?incrementValue/LB_TO_KG:incrementValue);
       const incrementLabel=incrementType==='percent'?`${incrementValue}%`:`${incrementValue} ${weightUnit()}`;
       const repsOnly=!!profile?.repsOnly;
+      // Progression scheme: 'rpe' is the default double progression; 'linear'
+      // adds the increment every session with no RPE gate (per-program setting,
+      // stamped onto each exercise at program start so repeats stay linear).
+      const scheme=profile?.scheme||programConfig?.scheme||'rpe';
       const previousProfile=latestLog.progression;
       const previousMin=normMin(previousProfile),previousMax=normMax(previousProfile);
       const hasStoredRange=Number.isFinite(Number(previousProfile?.min))&&(!!previousProfile?.amrap||Number.isFinite(Number(previousProfile?.max))),outsideNewRange=latest.reps<min||(!profile?.openTop&&!profile?.amrap&&latest.reps>max);
       const repRangeChanged=mode==='reps'&&previousProfile?.mode!=='time'&&((hasStoredRange&&(previousMin!==min||previousMax!==max))||(!hasStoredRange&&outsideNewRange));
       let nextWeight=latest.weight,nextReps=latest.reps,nextSeconds=latest.seconds,kind='hold',reason='Top-set RPE is above the progression trigger.',estimated1RM=0;
+      if(scheme==='linear'){
+        // Linear progression (Justin's call 2026-09-11): the increment applies
+        // every session, even when reps were missed. Reps and seconds carry
+        // over from the latest top set; only the load moves.
+        if(repsOnly){reason='Linear progression is on, but load progression is off for this exercise.';}
+        else{nextWeight=roundedIncrement(latest.weight,incrementType,incrementValueLb);kind='load';reason=`Linear progression: add ${incrementLabel} every session.`;}
+      }
       // Freestyle follow-the-lifter skips the e1RM rebase entirely: there is no
       // prescribed zone to rebase into, the lifter's own zone is the target.
-      if(repRangeChanged&&latest.weight>0&&!followLifter){
+      else if(repRangeChanged&&latest.weight>0&&!followLifter){
         estimated1RM=estimate1RM({w:latest.weight,r:latest.reps,rpe:latest.rpe});
         const targetReps=profile?.openTop?min:Math.max(min,max),rawTarget=estimated1RM/(1+targetReps/30);
         nextWeight=Math.max(0,Math.round(rawTarget*10)/10);nextReps=min;kind='range';
@@ -117,7 +131,7 @@
       const flat=recent.length>=3 && recent.every((row,i)=>i===0 || (row.weight<=recent[i-1].weight && row.performance<=recent[i-1].performance));
       const rising=recent.length>=3 && recent.every((row,i)=>i===0 || row.rpe==null || recent[i-1].rpe==null || row.rpe>=recent[i-1].rpe);
       const stall=!!programConfig.stallDetection && flat && rising;
-      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog.isoDate,sourceWorkout:latestLog.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall,freeform:!!config?.freeform};
+      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog.isoDate,sourceWorkout:latestLog.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall,freeform:!!config?.freeform,scheme};
     }
 
     function suggestionCardMarkup(suggestion,index,interactive=true) {
@@ -126,8 +140,9 @@
       const oldTarget=formatTarget(suggestion.latest.weight,suggestion.mode==='time'?suggestion.latest.seconds:suggestion.latest.reps);
       const nextTarget=formatTarget(suggestion.nextWeight,suggestion.mode==='time'?suggestion.nextSeconds:suggestion.nextReps);
       const label=suggestion.applied?'Applied ✓':suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='range'?(suggestion.freeform?'New range':'Week range'):suggestion.kind==='time'?'Time +':'Rep +';
-      const basis=`<div class="suggestion-basis">Based on ${escapeHtml(suggestion.sourceWorkout||'your last workout')} · ${escapeHtml(formatLogDate(suggestion.sourceDate))} · latest top set ${oldTarget}${suggestion.latest.rpe==null?' without RPE':` @ RPE ${suggestion.latest.rpe}`}</div>`;
-      return `<${interactive?'button':'div'} class="suggestion-card ${suggestion.applied?'applied':''}" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name">${escapeHtml(ex?.name||'Exercise')}<span>${label}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div><div class="suggestion-reason">${escapeHtml(suggestion.reason)}</div>${basis}</${interactive?'button':'div'}>`;
+      // Justin 2026-09-11 (#44): cards stay lean — name, kind, and the target
+      // change only. The reason/basis sentences were gratuitous.
+      return `<${interactive?'button':'div'} class="suggestion-card ${suggestion.applied?'applied':''}" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name">${escapeHtml(ex?.name||'Exercise')}<span>${label}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div></${interactive?'button':'div'}>`;
     }
 
     function renderProgressionPreview() {
@@ -153,7 +168,13 @@
 
     function prepareDraftProgression(draft,programConfig) {
       if(!draft)return;
-      draft.progressionSuggestions=draft.exercises.map(item=>progressionForExercise(item.exerciseId,progressionProfileForDraftItem(item),programConfig)).filter(Boolean);
+      draft.progressionSuggestions=draft.exercises.map(item=>{
+        // #48: the draft item carries a prescribed zone when it was copied from
+        // a real workout (repeat) or a zoned template — the freestyle
+        // follow-the-lifter retarget must not collapse it.
+        const p=item.progression,hasStoredZone=!!(p&&(p.min!=null||p.max!=null||p.amrap||p.openTop));
+        return progressionForExercise(item.exerciseId,progressionProfileForDraftItem(item),programConfig,hasStoredZone);
+      }).filter(Boolean);
     }
 
     function applyProgressionSuggestion(draft,suggestion,rerender=true) {
@@ -175,7 +196,7 @@
       const suggestions=draft?.progressionSuggestions||[];
       if(!draft?.exercises?.length){box.hidden=true;return;}
       box.hidden=false;
-      if(!suggestions.length){box.innerHTML=`<div class="progression-banner-head"><div><h3>No progression suggestions yet</h3><p>Suggestions appear for exercises in this workout once you have completed history.</p></div></div>`;return;}
+      if(!suggestions.length){box.hidden=true;return;}
       box.innerHTML=`<div class="progression-banner-head"><div><h3>${draft.autoAppliedProgression?'Progression targets applied':'Suggestions for this workout'}</h3><p>${draft.autoAppliedProgression?'Targets below appear as ghosted hints in each set. Type to override — completing a set untouched saves the hinted value.':'Only exercises below with completed history appear. Tap a card to apply its target to every set.'}</p></div></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
       document.querySelectorAll('[data-real-suggestion]').forEach(button=>button.addEventListener('click',()=>applyProgressionSuggestion(draft,suggestions[Number(button.dataset.realSuggestion)])));
     }

@@ -24,6 +24,9 @@ function collectPersistable(){
 }
 function persistNow(){
   try{localStorage.setItem(PERSIST_KEY,JSON.stringify(collectPersistable()));}catch(_){}
+  /* Accounts sync hook: flag changed keys for the debounced background push (sync.js).
+     Guarded so the local-only path never breaks if sync.js is absent. */
+  if(typeof markSyncDirty==='function'){try{markSyncDirty();}catch(_){}}
 }
 function schedulePersist(){
   clearTimeout(persistTimer);
@@ -52,32 +55,71 @@ function restorePersisted(){
   let data=null;
   try{data=JSON.parse(raw);}catch(_){return;}
   if(!data||data.version!==1||typeof data!=='object')return;
-  if(Array.isArray(data.completed))workoutState.completed=data.completed;
-  /* Templates: built-ins are always present; restore only merges in the user's own saved templates. */
-  if(Array.isArray(data.templates)){
-    const savedUser=data.templates.filter(t=>t&&!t.builtIn);
-    const ids=new Set(savedUser.map(t=>t.id));
-    workoutState.templates=[...savedUser,...cloneWorkoutTemplates().filter(t=>!ids.has(t.id))];
-  }
-  /* Tags: merge saved customs onto the defaults (defaults first, deduped) — never a wholesale replace. */
-  if(Array.isArray(data.tags))workoutState.tags=mergeTagLists(DEFAULT_SET_TAGS,data.tags);
-  if(Array.isArray(data.exerciseTagPresets))workoutState.exerciseTagPresets=mergeTagLists(DEFAULT_EXERCISE_TAG_PRESETS,data.exerciseTagPresets);
-  if(data.activeProgram&&typeof data.activeProgram==='object')workoutState.activeProgram=data.activeProgram;
-  if(Array.isArray(data.archivedPrograms))workoutState.archivedPrograms=data.archivedPrograms;
+  SYNCABLE_KEYS.forEach(key=>{if(key in data)setSyncableValue(key,data[key]);});
   if(data.draft&&typeof data.draft==='object'&&data.draft!==null)workoutState.draft=data.draft;
-  if(Array.isArray(data.customExercises))state.customExercises=data.customExercises;
-  if(Array.isArray(data.favorites))state.favorites=new Set(data.favorites.filter(x=>typeof x==='string'));
-  if(data.progressionSetup&&typeof data.progressionSetup==='object'){
-    const incoming=data.progressionSetup;
-    Object.assign(progressionSetup,incoming);
-    if(incoming.defaultRange&&typeof incoming.defaultRange==='object')progressionSetup.defaultRange={...progressionSetup.defaultRange,...incoming.defaultRange};
-    if(Array.isArray(incoming.weeklyRanges))progressionSetup.weeklyRanges=incoming.weeklyRanges;
-  }
-  if(typeof data.dashboardPeriod==='string')state.dashboardPeriod=data.dashboardPeriod;
-  if(typeof data.statsPeriod==='string')state.statsPeriod=data.statsPeriod;
-  if(data.topExercisesMode==='volume'||data.topExercisesMode==='sets')state.topExercisesMode=data.topExercisesMode;
   if(typeof data.showBlindspots==='boolean')state.showBlindspots=data.showBlindspots;
   mergeCustomExercises();
+}
+/* ===== accounts sync support ===== */
+/** Keys mirrored to the Supabase user_data table. The live draft is deliberately
+    excluded: it is ephemeral, device-local, in-progress state (see sync.js).
+    showBlindspots stays local-only (now unused — blindspots are always visible).
+    Appearance (theme) travels as one key so it follows the account; the
+    standalone workout-theme* localStorage keys remain the local read path. */
+const SYNCABLE_KEYS=['completed','templates','tags','exerciseTagPresets','activeProgram','archivedPrograms','customExercises','favorites','progressionSetup','dashboardPeriod','statsPeriod','topExercisesMode','appearance'];
+/** Read one syncable key from live in-memory state. */
+function getSyncableValue(key){
+  switch(key){
+    case 'completed':return workoutState.completed;
+    case 'templates':return workoutState.templates;
+    case 'tags':return workoutState.tags;
+    case 'exerciseTagPresets':return workoutState.exerciseTagPresets;
+    case 'activeProgram':return workoutState.activeProgram;
+    case 'archivedPrograms':return workoutState.archivedPrograms;
+    case 'customExercises':return state.customExercises;
+    case 'favorites':return state.favorites instanceof Set?[...state.favorites]:[];
+    case 'progressionSetup':return progressionSetup;
+    case 'dashboardPeriod':return state.dashboardPeriod;
+    case 'statsPeriod':return state.statsPeriod;
+    case 'topExercisesMode':return state.topExercisesMode;
+    case 'appearance':return (typeof getAppearanceState==='function')?getAppearanceState():undefined;
+    default:return undefined;
+  }
+}
+/** Apply one syncable key to live in-memory state, using the same merge guards
+    as restorePersisted. Callers re-run mergeCustomExercises() afterwards when
+    the customExercises key was applied. */
+function setSyncableValue(key,value){
+  switch(key){
+    case 'completed':if(Array.isArray(value))workoutState.completed=value;break;
+    case 'templates':
+      /* Templates: built-ins are always present; only the user's own saved
+         templates merge in. */
+      if(Array.isArray(value)){
+        const savedUser=value.filter(t=>t&&!t.builtIn);
+        const ids=new Set(savedUser.map(t=>t.id));
+        workoutState.templates=[...savedUser,...cloneWorkoutTemplates().filter(t=>!ids.has(t.id))];
+      }
+      break;
+    case 'tags':if(Array.isArray(value))workoutState.tags=mergeTagLists(DEFAULT_SET_TAGS,value);break;
+    case 'exerciseTagPresets':if(Array.isArray(value))workoutState.exerciseTagPresets=mergeTagLists(DEFAULT_EXERCISE_TAG_PRESETS,value);break;
+    case 'activeProgram':if(value&&typeof value==='object')workoutState.activeProgram=value;break;
+    case 'archivedPrograms':if(Array.isArray(value))workoutState.archivedPrograms=value;break;
+    case 'customExercises':if(Array.isArray(value))state.customExercises=value;break;
+    case 'favorites':if(Array.isArray(value))state.favorites=new Set(value.filter(x=>typeof x==='string'));break;
+    case 'progressionSetup':
+      if(value&&typeof value==='object'){
+        const incoming=value;
+        Object.assign(progressionSetup,incoming);
+        if(incoming.defaultRange&&typeof incoming.defaultRange==='object')progressionSetup.defaultRange={...progressionSetup.defaultRange,...incoming.defaultRange};
+        if(Array.isArray(incoming.weeklyRanges))progressionSetup.weeklyRanges=incoming.weeklyRanges;
+      }
+      break;
+    case 'dashboardPeriod':if(typeof value==='string')state.dashboardPeriod=value;break;
+    case 'statsPeriod':if(typeof value==='string')state.statsPeriod=value;break;
+    case 'topExercisesMode':if(value==='volume'||value==='sets')state.topExercisesMode=value;break;
+    case 'appearance':if(value&&typeof value==='object'&&typeof setAppearanceState==='function')setAppearanceState(value);break;
+  }
 }
 function exportWorkoutData(){
   return JSON.stringify(collectPersistable(),null,2);

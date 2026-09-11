@@ -2,6 +2,62 @@
 
 Newest first. Dates are release dates (America/New_York).
 
+## 2026-09-10 — UX fix batch
+
+- Settings gear: re-tapping the active gear scrolls to the top instead of
+  stacking history, so Back returns in one tap (#27).
+- Hover colors: green actions never hover red, destructive hovers stay red —
+  including suggestion cards, the exercise picker, and period options (#44);
+  fixes the iOS stuck-hover red tint on the sign-in button (#26).
+- Calendar week arrows recentered (#39).
+- Exercise cards: Add Set is full-width and centered, "+ Add notes" is now
+  "Add notes", and Exercise Options uses a rotating chevron (#42).
+- Finishing a workout shows one combined review for unfilled and unmarked
+  sets instead of two stacked prompts (#43).
+- Program "Progression rules" card now matches Settings → Progression
+  defaults (notched labels, info button, unit suffix) (#45).
+- Settings → Data is the last section, with a changelog link at the page
+  bottom (#40, #33).
+- Delete all data uses a confirmation dialog instead of the two-tap arm (#38).
+- "Sync now" and "Sign out" hide under an Account actions disclosure (#37).
+- Account settings: editable display name plus account type (Free for now),
+  stored in the sign-in profile so they sync across devices (#30).
+
+## 2026-09-10 — Union merge on sync conflicts
+
+- When your cloud data and a device hold different items (e.g. workouts logged
+  on two devices while offline), sync now **combines** them instead of picking a
+  winner — nothing is silently lost. A short toast confirms when a merge happens.
+  (Issue #36; per-item edits and settings still follow last-write-wins.)
+
+## 2026-09-10 — Accounts rebased onto v0.49 app
+
+- App code is now the v0.49 production build (inline ledger set rows, name/focus/date workout header with No focus, always-visible blindspots, centered "This week.", tap-shift fixes, exercise-detail fixes, About card).
+- Accounts v1 (magic-link + local-first sync) re-applied on top; `favorites` sync is now Set-aware; `topExercisesMode` joins the synced keys.
+
+## 2026-09-10 — Accounts v1: magic-link sign-in + local-first sync
+
+- **New module `assets/js/sync.js`.** Supabase client loads lazily from a CDN in
+  a try/catch — offline or blocked, the app works exactly as before.
+- **Settings → Account.** Email magic-link sign-in, sign out, "Sync now", and
+  last-sync status. All status is inline text, no popups.
+- **Local-first sync.** localStorage stays the read path; when signed in and
+  online, changed data pushes in the background (debounced) and newer remote
+  data pulls on sign-in, app start, reconnect, or manual sync. Existing local
+  data uploads on first sign-in. The live workout draft is never synced.
+- **Conflict policy:** last-write-wins per record, with guards so empty state
+  never wipes real data. "Delete all data" also deletes your cloud rows.
+- Needs one dashboard step: add the site URL under Authentication → URL
+  Configuration → Redirect URLs so magic links return to the app.
+
+## 2026-09-10 — Accounts fork seeded
+
+- **New repo: `cruciferousgreens/workout-app-accounts`.** Seeded from `workout-app`
+  production (`6e12066`, SW `20260910-1949`) — identical app, no behavior changes yet.
+- **No custom domain yet** (no CNAME); the accounts version gets its own domain later.
+- Architecture direction is recorded in `DECISIONS.md`: Supabase + magic-link auth,
+  local-first sync, bug fixes cherry-picked back to `workout-app`.
+
 ## 2026-09-10 — Exercise detail fixes
 
 - **Similar exercises are compact tappable rows now.** The chunky cards are gone — similar exercises render as clean rows (name, primary muscle · equipment, chevron), consistent with the rest of the app.

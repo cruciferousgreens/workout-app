@@ -1,7 +1,6 @@
 
 /* ===== module: app-bootstrap.js ===== */
     /** Connects static controls to feature modules and performs initial rendering. */
-    let deleteArmed=false;
     /** Theme state (Justin 2026-09-10): four themes in two visual columns.
         The dark toggle moves between the matching pills: Cruciferous <->
         Asterid, Rosé <-> Matcha — the newly active theme's pill is always
@@ -20,6 +19,19 @@
       document.querySelectorAll('#themePills [data-theme-name]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.themeName===themeName)));
       const color=getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();document.querySelector('meta[name="theme-color"]').setAttribute('content',color);document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').setAttribute('content',darkMode?'black-translucent':'default');
       try{localStorage.setItem('workout-theme',darkMode?'dark':'light');localStorage.setItem('workout-theme-name',themeName);localStorage.setItem('workout-theme-light',lightTheme);}catch(_){}
+      /* Theme changes are account settings too: flag the appearance sync key. */
+      if(typeof schedulePersist==='function')schedulePersist();
+    }
+    /** Accounts sync: appearance travels as one key so the theme follows the
+        account across devices. Validated on the way in; garbage never applies. */
+    function getAppearanceState(){return {themeName:themeName,darkMode:darkMode,ctpDark:ctpDark,lightTheme:lightTheme};}
+    function setAppearanceState(v){
+      if(!v||typeof v!=='object')return;
+      if(!['cruciferous','rosepine','macchiato','mocha'].includes(v.themeName))return;
+      if(typeof v.darkMode!=='boolean')return;
+      if(!DARK_FLAVORS.includes(v.ctpDark)||!LIGHT_THEMES.includes(v.lightTheme))return;
+      themeName=v.themeName;darkMode=v.darkMode;ctpDark=v.ctpDark;lightTheme=v.lightTheme;
+      applyTheme();
     }
     function setThemeName(name){
       themeName=name;
@@ -36,6 +48,11 @@
       const key=workoutState.draft?.focusPreset||null;
       document.querySelectorAll('[data-workout-focus]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.workoutFocus===key)));
     }
+    /** Light unit suffix inside the program increment value field; follows the program form's type. */
+    function syncProgramIncrementUnit(){
+      const unit=$('#programIncrementUnit');
+      if(unit) unit.textContent = programFormProgression().incrementType==='percent' ? '%' : weightUnit();
+    }
     /** Light unit suffix inside the increment value field; follows the type (Justin 2026-09-10). */
     function syncSettingsIncrementUnit(){
       const unit=$('#settingsIncrementUnit');
@@ -45,6 +62,13 @@
     }
     function syncUnitPills(){
       document.querySelectorAll('#settingsUnitPills [data-units]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.units===(progressionSetup.units||'imperial'))));
+    }
+    /** Mirrors the program form: the RPE trigger only applies to RPE-based mode. */
+    function syncSettingsScheme(){
+      const scheme=progressionSetup.scheme||'rpe';
+      document.querySelectorAll('#settingsSchemePills [data-scheme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.scheme===scheme)));
+      const thresholdField=$('#settingsRpeThreshold');
+      if(thresholdField)thresholdField.closest('.rule-field').hidden=scheme==='linear';
     }
     function renderSettings(){
       const darkToggle=$('#darkModeToggle');
@@ -63,8 +87,11 @@
       const stall=$('#settingsStallToggle');
       stall.setAttribute('aria-pressed',String(!!progressionSetup.stallDetection));
       stall.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);
+      syncSettingsScheme();
+      const und=$('#settingsUndulatingToggle');
+      und.setAttribute('aria-pressed',String(!!progressionSetup.undulating));
+      und.setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);
       const del=$('#deleteAllDataButton');
-      del.classList.remove('armed');del.textContent='Delete all data';deleteArmed=false;
       const hasSamples=hasSampleData();
       const addBtn=$('#addSampleDataButton'),clearBtn=$('#clearSampleDataButton');
       if(addBtn){addBtn.disabled=hasSamples;addBtn.textContent=hasSamples?'Sample data added':'Add sample data';addBtn.title=hasSamples?'Sample workouts are already in your history':'Add 8 labeled sample workouts across the last ~3 weeks';}
@@ -148,7 +175,7 @@
       setThemeName(name);
     }));
     document.querySelectorAll('#settingsUnitPills [data-units]').forEach(button=>button.addEventListener('click',()=>{
-      progressionSetup.units=button.dataset.units; syncUnitPills(); syncSettingsIncrementUnit(); schedulePersist();
+      progressionSetup.units=button.dataset.units; syncUnitPills(); syncSettingsIncrementUnit(); syncProgramIncrementUnit(); schedulePersist();
       renderDashboard(); renderStats(); renderWorkoutScreen(); renderWorkoutProgression();
     }));
     $('#settingsRpeThreshold').addEventListener('input',e=>{progressionSetup.threshold=Math.min(10,Math.max(1,Number(e.target.value)||8));schedulePersist();});
@@ -160,22 +187,37 @@
     wireTimeStepPills($('#settingsTimeStepPills'),()=>progressionSetup.timeStep,v=>{progressionSetup.timeStep=v;syncAllTimeStepPills();schedulePersist();});
     wireTimeStepPills($('#programTimeStepPills'),()=>programFormProgression().timeStep,v=>{programFormProgression().timeStep=v;syncAllTimeStepPills();schedulePersist();});
     $('#settingsStallToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;const toggle=$('#settingsStallToggle');toggle.setAttribute('aria-pressed',String(progressionSetup.stallDetection));toggle.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);schedulePersist();});
+    document.querySelectorAll('#settingsSchemePills [data-scheme]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.scheme=button.dataset.scheme;syncSettingsScheme();schedulePersist();}));
+    $('#settingsUndulatingToggle').addEventListener('click',()=>{progressionSetup.undulating=!progressionSetup.undulating;const toggle=$('#settingsUndulatingToggle');toggle.setAttribute('aria-pressed',String(!!progressionSetup.undulating));toggle.setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);schedulePersist();});
     $('#progressionInfoButton').addEventListener('click',()=>$('#progressionInfoDialog').showModal());
+    $('#programProgressionInfoButton').addEventListener('click',()=>$('#progressionInfoDialog').showModal());
     $('#closeProgressionInfo').addEventListener('click',()=>$('#progressionInfoDialog').close());
     $('#doneProgressionInfo').addEventListener('click',()=>$('#progressionInfoDialog').close());
     $('#exportDataButton').addEventListener('click',()=>{downloadWorkoutBackup();showToast('Backup downloaded.');});
     $('#addSampleDataButton').addEventListener('click',()=>{addSampleData();});
     $('#clearSampleDataButton').addEventListener('click',()=>{clearSampleData();});
-    $('#deleteAllDataButton').addEventListener('click',()=>{
-      const button=$('#deleteAllDataButton');
-      if(!deleteArmed){deleteArmed=true;button.classList.add('armed');button.textContent='Tap again to confirm — erases everything';return;}
+    $('#deleteAllDataButton').addEventListener('click',()=>{$('#deleteAllDialog').showModal();});
+    $('#cancelDeleteAll').addEventListener('click',()=>$('#deleteAllDialog').close());
+    $('#keepDeleteAll').addEventListener('click',()=>$('#deleteAllDialog').close());
+    $('#confirmDeleteAll').addEventListener('click',()=>{
+      $('#deleteAllDialog').close();
       try{localStorage.removeItem(PERSIST_KEY);}catch(_){}
       workoutState.completed=[];workoutState.templates=[];workoutState.tags=[];workoutState.exerciseTagPresets=[];workoutState.draft=null;workoutState.activeProgram=null;workoutState.archivedPrograms=[];
       state.customExercises=[];exercises=exercises.filter(ex=>!ex.custom);
       /* Favorites are user data too: clear them in memory so the pagehide
        * persist-on-reload below can't resurrect them. */
-      state.favorites.clear();
-      location.reload();
+      if(state.favorites&&typeof state.favorites.clear==='function')state.favorites.clear();
+      /* Accounts: the emptied state must win over remote data — flag it dirty
+         now (so a later pull can't resurrect it) and best-effort wipe the
+         remote rows before reloading. Signed-out behavior is unchanged. */
+      if(typeof markSyncDirty==='function'){try{markSyncDirty();}catch(_){}}
+      const doReloadAfterDelete=()=>location.reload();
+      if(typeof wipeRemoteData==='function'){
+        let settled=false;
+        const finish=()=>{if(!settled){settled=true;doReloadAfterDelete();}};
+        setTimeout(finish,3000);
+        try{wipeRemoteData().then(finish,finish);}catch(_){finish();}
+      }else doReloadAfterDelete();
     });
     try{
       darkMode=(localStorage.getItem('workout-theme')||'light')==='dark';
@@ -189,18 +231,13 @@
     $('#closeReplaceDraft').addEventListener('click',()=>{pendingRepeatWorkout=null;$('#replaceDraftDialog').close();});
     $('#keepCurrentDraft').addEventListener('click',()=>{pendingRepeatWorkout=null;$('#replaceDraftDialog').close();});
     $('#confirmReplaceDraft').addEventListener('click',()=>{const workout=pendingRepeatWorkout;pendingRepeatWorkout=null;$('#replaceDraftDialog').close();if(workout)repeatWorkout(workout,true);});
-    /* Unfinished sets on finish (Justin 2026-09-10): complete them all, delete
-       them (dropping exercises left with no sets), or keep editing. */
-    $('#closeUnfinishedSets').addEventListener('click',()=>$('#unfinishedSetsDialog').close());
-    $('#unfinishedSetsCancel').addEventListener('click',()=>$('#unfinishedSetsDialog').close());
-    $('#unfinishedSetsComplete').addEventListener('click',()=>{$('#unfinishedSetsDialog').close();const draft=workoutState.draft;if(draft){draft.exercises.forEach(item=>item.sets.forEach(set=>{set.complete=true;}));renderWorkoutExercises();markDraftSaved();}finishWorkout();});
-    $('#unfinishedSetsDelete').addEventListener('click',()=>{$('#unfinishedSetsDialog').close();const draft=workoutState.draft;if(draft){let removed=0;draft.exercises.forEach(item=>{const before=item.sets.length;item.sets=item.sets.filter(set=>set.complete);removed+=before-item.sets.length;});draft.exercises=draft.exercises.filter(item=>item.sets.length);renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();if(removed)showToast(`Deleted ${removed} unfinished set${removed===1?'':'s'}.`);}finishWorkout();});
-    /* Unfilled-sets dialog (Justin 2026-09-10): finish anyway, delete the
-       unfilled sets, or back out. */
-    $('#closeInvalidSets').addEventListener('click',()=>$('#invalidSetsDialog').close());
-    $('#invalidSetsCancel').addEventListener('click',()=>$('#invalidSetsDialog').close());
-    $('#invalidSetsFinish').addEventListener('click',()=>{$('#invalidSetsDialog').close();finishWorkout(true);});
-    $('#invalidSetsDelete').addEventListener('click',()=>{$('#invalidSetsDialog').close();const draft=workoutState.draft;if(draft){let removed=0;draft.exercises.forEach(item=>{const before=item.sets.length;item.sets=item.sets.filter(set=>!isInvalidSet(item,set));removed+=before-item.sets.length;});draft.exercises=draft.exercises.filter(item=>item.sets.length);renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();if(removed)showToast(`Deleted ${removed} unfilled set${removed===1?'':'s'}.`);}finishWorkout();});
+    /* Single review prompt on finish (2026-09-10, #43): unfilled values and
+       unmarked sets are reviewed together — mark all complete, delete the
+       unfinished sets, or keep editing. */
+    $('#closeReviewSets').addEventListener('click',()=>$('#reviewSetsDialog').close());
+    $('#reviewSetsCancel').addEventListener('click',()=>$('#reviewSetsDialog').close());
+    $('#reviewSetsComplete').addEventListener('click',()=>{$('#reviewSetsDialog').close();const draft=workoutState.draft;if(draft){draft.exercises.forEach(item=>item.sets.forEach(set=>{set.complete=true;}));renderWorkoutExercises();markDraftSaved();}finishWorkout(true);});
+    $('#reviewSetsDelete').addEventListener('click',()=>{$('#reviewSetsDialog').close();const draft=workoutState.draft;if(draft){/* #43: bulk delete removes only fully-empty sets (isEmptySet) and prunes exercises left with no sets — never sets with partial values. */let removed=0,removedEx=0;draft.exercises.forEach(item=>{const before=item.sets.length;item.sets=item.sets.filter(set=>!isEmptySet(set));removed+=before-item.sets.length;});const beforeEx=draft.exercises.length;draft.exercises=draft.exercises.filter(item=>item.sets.length);removedEx=beforeEx-draft.exercises.length;renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();if(removed||removedEx)showToast(`Deleted ${removed} empty set${removed===1?'':'s'}${removedEx?` and ${removedEx} empty exercise${removedEx===1?'':'s'}`:''}.`);}finishWorkout();});
     $('#dashboardNav').addEventListener('click', () => goTab(showDashboard, 'dashboard'));
     $('#workoutsNav').addEventListener('click', () => {
       // Re-tapping the active Workout tab pops a completed-workout review back to the
@@ -208,12 +245,18 @@
       if (state.activeView === 'workout' && !workoutState.draft && !$('#workoutComplete').hidden) {
         $('#workoutComplete').hidden = true; renderWorkoutScreen(); window.scrollTo({top:0}); return;
       }
-      if (state.activeView === 'workout') { state.scroll.workout = 0; window.scrollTo({top:0}); return; }
+      if (state.activeView === 'workout') { state.scroll[scrollKeyFor('workout')] = 0; window.scrollTo({top:0}); return; }
       goTab(showWorkouts, 'workout');
     });
     $('#programNav').addEventListener('click', () => goTab(showProgram, 'program'));
     $('#statsNav').addEventListener('click', () => goTab(showStats, 'stats'));
-    $('#topBarSettings').addEventListener('click', () => goTab(showSettings, 'settings'));
+    /* The gear stays visible (active) on Settings — re-tapping it must not push
+       a duplicate history entry, or the first Back tap just re-shows Settings
+       (#27). Like the bottom tabs, re-tap scrolls to top instead. */
+    $('#topBarSettings').addEventListener('click', () => {
+      if (state.activeView === 'settings') { window.scrollTo({top:0, behavior:'auto'}); return; }
+      goTab(showSettings, 'settings');
+    });
     $('#detailFavToggle')?.addEventListener('click', () => toggleFavorite(state.selected));
     $('#topBarBack').addEventListener('click', () => {
       if (state.activeView === 'detail') backFromExerciseDetail();
@@ -223,15 +266,17 @@
     /* Program setup form controls edit the form draft, never the global
        defaults (Justin 2026-09-10). */
     $('#progressionThreshold').addEventListener('input',e=>{programFormProgression().threshold=Number(e.target.value)||8;schedulePersist();});
-    $('#progressionIncrementType').addEventListener('change',e=>{programFormProgression().incrementType=e.target.value;schedulePersist();});
+    $('#progressionIncrementType').addEventListener('change',e=>{programFormProgression().incrementType=e.target.value;syncProgramIncrementUnit();schedulePersist();});
     $('#progressionIncrementValue').addEventListener('input',e=>{programFormProgression().incrementValue=Number(e.target.value)||5;schedulePersist();});
     $('#programRepMin').addEventListener('input',e=>{const d=programFormProgression();d.defaultRange.min=Math.max(1,Number(e.target.value)||1);d.defaultRange.preset='custom';document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
     $('#programRepMax').addEventListener('input',e=>{const d=programFormProgression(),v=e.target.value.trim();d.defaultRange.max=v===''?null:Math.max(d.defaultRange.min,Number(v)||d.defaultRange.min);d.defaultRange.preset='custom';document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
     document.querySelectorAll('#settingsRepPresets [data-rep-preset]').forEach(button=>button.addEventListener('click',()=>{applyRepPreset(button.dataset.repPreset);schedulePersist();}));
     document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.addEventListener('click',()=>{applyRepPreset(button.dataset.repPreset,programFormProgression());schedulePersist();}));
+    document.querySelectorAll('#programSchemePills [data-scheme]').forEach(button=>button.addEventListener('click',()=>{programFormProgression().scheme=button.dataset.scheme;syncProgramForm();schedulePersist();}));
     $('#undulatingToggle').addEventListener('click',()=>{const d=programFormProgression();d.undulating=!d.undulating;$('#undulatingToggle').setAttribute('aria-pressed',String(d.undulating));$('#undulatingToggle').setAttribute('aria-label',`Vary rep ranges by week ${d.undulating?'on':'off'}`);renderWeekRanges(d);schedulePersist();});
     $('#programLength').addEventListener('input',()=>renderWeekRanges());
-    $('#manageProgramOverrides').addEventListener('click',()=>{if(workoutState.activeProgram){$('#programSetup').hidden=true;document.querySelector('#programWorkouts')?.scrollIntoView({behavior:'smooth'});}else{$('#programError').textContent='Create the program first, then edit overrides inside each workout.';}});
+    /* Per-exercise progression overrides are edited inside each program
+       workout directly — no separate management screen (#45). */
     document.querySelectorAll('[data-treatment]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.treatment=button.dataset.treatment;document.querySelectorAll('[data-treatment]').forEach(row=>row.setAttribute('aria-pressed',String(row===button)));schedulePersist();}));
     $('#stallDetectorToggle').addEventListener('click',()=>{const d=programFormProgression();d.stallDetection=!d.stallDetection;$('#stallDetectorToggle').setAttribute('aria-pressed',String(d.stallDetection));$('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${d.stallDetection?'on':'off'}`);schedulePersist();});
     $('#createProgram').addEventListener('click', createProgram);
@@ -243,6 +288,7 @@
       $('#exercisePickerTitle').nextElementSibling.textContent='Choose one or more movements for this workout.';
       $('#exercisePickerSearch').value = '';
       preparePickerFilters();
+      resetPickerSession();
       renderExercisePicker();
       $('#exercisePickerDialog').showModal();
       requestAnimationFrame(() => $('#exercisePickerSearch').focus());
@@ -251,7 +297,33 @@
     $('#doneExercisePicker').addEventListener('click', () => {$('#exercisePickerDialog').close();if(workoutState.pickerMode==='program')renderProgram();});
     /* Workout focus (2026-09-10): one tap applies a rep-range preset to every
        reps-tracked exercise in the draft. Explicit choice, so profiles become
-       custom (the engine follows the chosen zone instead of last session's). */
+       custom (the engine follows the chosen zone instead of last session's).
+       #53: when the tap would wipe per-exercise ranges the user set themselves,
+       confirm first — a silent one-tap clobber of a careful setup was the bug.
+       Taps that change nothing already in place apply without a prompt. */
+    function focusPresetName(preset){
+      return (preset.amrap||preset.openTop) ? preset.label : `${preset.label} · ${preset.min}–${preset.max}`;
+    }
+    function focusPresetClobbers(preset){
+      return (workoutState.draft?.exercises||[]).filter(item=>{
+        const ex=exercises.find(row=>row.id===item.exerciseId);
+        if(exerciseTracking(item,ex)==='time')return false;
+        const p=item.progression||{};
+        return p.custom&&(p.min!==preset.min||p.max!==preset.max||!!p.openTop!==!!preset.openTop||!!p.amrap!==!!preset.amrap);
+      });
+    }
+    function applyWorkoutFocus(key){
+      const preset=REP_PRESETS[key]; if(!preset||!workoutState.draft)return;
+      workoutState.draft.focusPreset=key;
+      workoutState.draft.exercises.forEach(item=>{
+        const ex=exercises.find(row=>row.id===item.exerciseId);
+        if(exerciseTracking(item,ex)==='time')return;
+        item.progression={...(item.progression||{}),preset:key,min:preset.min,max:preset.max,openTop:!!preset.openTop,amrap:!!preset.amrap,custom:true};
+      });
+      prepareDraftProgression(workoutState.draft,freeformProgressionConfig());
+      renderWorkoutExercises(); renderWorkoutProgression(); syncWorkoutFocusPills(); markDraftSaved();
+    }
+    let pendingFocusKey=null;
     document.querySelectorAll('[data-workout-focus]').forEach(button=>button.addEventListener('click',()=>{
       if(!workoutState.draft)return;
       const key=button.dataset.workoutFocus;
@@ -259,15 +331,15 @@
          per-exercise ranges already applied stay as the exercises' own settings. */
       if(!key){workoutState.draft.focusPreset=null;syncWorkoutFocusPills();markDraftSaved();return;}
       const preset=REP_PRESETS[key]; if(!preset)return;
-      workoutState.draft.focusPreset=key;
-      workoutState.draft.exercises.forEach(item=>{
-        const ex=exercises.find(row=>row.id===item.exerciseId);
-        if(exerciseTracking(item,ex)==='time')return;
-        item.progression={...(item.progression||{}),preset:button.dataset.workoutFocus,min:preset.min,max:preset.max,openTop:!!preset.openTop,amrap:!!preset.amrap,custom:true};
-      });
-      prepareDraftProgression(workoutState.draft,freeformProgressionConfig());
-      renderWorkoutExercises(); renderWorkoutProgression(); syncWorkoutFocusPills(); markDraftSaved();
+      const clobbered=focusPresetClobbers(preset);
+      if(!clobbered.length){applyWorkoutFocus(key);return;}
+      pendingFocusKey=key;
+      $('#focusConfirmCopy').textContent=`This replaces the rep ranges you set on ${clobbered.length} exercise${clobbered.length===1?'':'s'} with ${focusPresetName(preset)}. Timed exercises are untouched.`;
+      $('#focusConfirmDialog').showModal();
     }));
+    $('#closeFocusConfirm').addEventListener('click',()=>$('#focusConfirmDialog').close());
+    $('#focusConfirmCancel').addEventListener('click',()=>$('#focusConfirmDialog').close());
+    $('#focusConfirmApply').addEventListener('click',()=>{$('#focusConfirmDialog').close();if(pendingFocusKey){applyWorkoutFocus(pendingFocusKey);pendingFocusKey=null;}});
     $('#exercisePickerSearch').addEventListener('input', renderPickerList);
     /* Picker filter panel: the Exercises tab's selector interface inside the
        add-exercise dialog (Justin 2026-09-10). */
@@ -314,8 +386,6 @@
     $('#closeDiscardDraft').addEventListener('click', () => $('#discardDraftDialog').close());
     $('#keepDraftButton').addEventListener('click', () => $('#discardDraftDialog').close());
     $('#confirmDiscardDraft').addEventListener('click', () => { $('#discardDraftDialog').close(); doDiscardDraft(); });
-    /* The click event must not leak into finishWorkout(skipInvalid) (Justin
-       2026-09-10: the event object is truthy and was skipping the check). */
     $('#finishWorkout').addEventListener('click', () => finishWorkout());
 
     $('#searchInput').addEventListener('input', e => {
@@ -345,6 +415,15 @@
       else if (id && exercises.some(x => x.id === id)) openExercise(id, false); else showDashboard(false);
     });
 
+    /* Build stamp (Justin 2026-09-11): version + last-updated in Settings → About. */
+    try{
+      const info=window.BUILD_INFO;
+      if(info){
+        $('#appVersionLine').textContent=`Cruciferous Greens Workout · v${info.appVersion}`;
+        const built=new Date(info.builtAt);
+        $('#buildUpdatedLine').textContent='Last updated: '+(isNaN(built)?info.build:built.toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}));
+      }
+    }catch(_){}
     restorePersisted();
     updateLiveWorkoutIndicator();
     populateFilters(); renderLibrary(); renderDashboard(); renderStats();

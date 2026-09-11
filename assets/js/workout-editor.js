@@ -17,8 +17,8 @@
       const set=latest.sets.slice().sort((a,b)=>estimate1RM(b)-estimate1RM(a))[0];
       const timed=latest.tracking==='time'||set.seconds!=null;
       const load=Number(set.w)>0?`${displayWeight(set.w)} ${weightUnit()}${timed?' · ':' × '}`:'';
-      const performance=timed?`${set.seconds} sec`:`${set.r} reps`;
-      return `Last: ${load}${performance}${set.rpe==null?'':` @ RPE ${set.rpe}`} · ${formatLogDate(latest.isoDate)}`;
+      const performance=timed?(set.seconds!=null?`${set.seconds} sec`:''):(set.r!=null?`${set.r} reps`:'');
+      return `Last: ${load}${performance||'—'}${set.rpe==null?'':` @ RPE ${set.rpe}`} · ${formatLogDate(latest.isoDate)}`;
     }
     /* Rep/time-range placeholder for set inputs (2026-09-10): the placeholder
        shows the target range ("6–12", "6+", "AMRAP", "30–60 sec") while the
@@ -98,9 +98,21 @@
       const ready=(program.workouts||[]).filter(workout=>workout.template?.exercises?.length);
       const next=suggestedProgramWorkout(program),week=programWeek(program),range=programRangeForWeek(program,week);
       if(!next){host.innerHTML=`<div class="program-next-wrap"><div class="program-next-main"><span><span class="program-next-kicker">ACTIVE PROGRAM · ${escapeHtml(program.name)}</span><strong>Set up your first workout</strong><small>Week ${week} · ${escapeHtml(programRangeLabel(range))}</small></span><span class="program-next-arrow" aria-hidden="true">›</span></div></div>`;host.querySelector('.program-next-main').addEventListener('click',()=>showProgram());return;}
-      host.innerHTML=`<div class="program-next-wrap"><button class="program-next-main" id="startSuggestedProgramWorkout" type="button"><span><span class="program-next-kicker">CONTINUE PROGRAM · ${escapeHtml(program.name)}</span><strong>Continue program · ${escapeHtml(next.name)}</strong><small>Week ${week} · ${next.template.exercises.length} exercise${next.template.exercises.length===1?'':'s'} · ${escapeHtml(programRangeLabel(range))}</small></span><span class="program-next-arrow" aria-hidden="true">›</span></button>${ready.length>1?`<details class="program-next-flexibility"><summary>Choose a different program workout</summary><div class="program-next-alternatives">${ready.filter(workout=>workout.uid!==next.uid).map(workout=>`<button type="button" data-start-program-alternative="${escapeHtml(workout.uid)}">${escapeHtml(workout.name)}</button>`).join('')}</div></details>`:'<p class="program-next-flexibility section-note">Suggested, not required. Blank and template starts remain available below.</p>'}</div>`;
+      host.innerHTML=`<div class="program-next-wrap"><button class="program-next-main" id="startSuggestedProgramWorkout" type="button"><span><span class="program-next-kicker">CONTINUE PROGRAM · ${escapeHtml(program.name)}</span><strong>Continue program · ${escapeHtml(next.name)}</strong><small>Week ${week} · ${next.template.exercises.length} exercise${next.template.exercises.length===1?'':'s'} · ${escapeHtml(programWorkoutRangeLabel(program,next,week))}</small></span><span class="program-next-arrow" aria-hidden="true">›</span></button>${ready.length>1?`<details class="program-next-flexibility"><summary>Choose a different program workout</summary><div class="program-next-alternatives">${ready.filter(workout=>workout.uid!==next.uid).map(workout=>`<button type="button" data-start-program-alternative="${escapeHtml(workout.uid)}">${escapeHtml(workout.name)}</button>`).join('')}</div></details>`:''}</div>`;
       $('#startSuggestedProgramWorkout').addEventListener('click',()=>startProgramWorkout(program,next));
       document.querySelectorAll('[data-start-program-alternative]').forEach(button=>button.addEventListener('click',()=>{const workout=ready.find(row=>row.uid===button.dataset.startProgramAlternative);if(workout)startProgramWorkout(program,workout);}));
+    }
+    /* #66: records a workout sub-screen transition. A new sub-screen is a
+       genuinely new screen: its remembered scroll resets and the viewport
+       moves to the top synchronously, before the browser can paint partway
+       down. Re-renders within the same sub-screen return false and never
+       touch the scroll. */
+    function noteWorkoutSubScreen(sub) {
+      if (state.workoutSubScreen === sub) return false;
+      state.workoutSubScreen = sub;
+      state.scroll['workout:' + sub] = 0;
+      window.scrollTo({top: 0, behavior: 'auto'});
+      return true;
     }
     function renderWorkoutScreen() {
       const hasDraft = !!workoutState.draft;
@@ -108,6 +120,7 @@
       // workout under review wins over the start screen, otherwise the start screen shows.
       if (hasDraft) $('#workoutComplete').hidden = true;
       const viewingComplete = !hasDraft && !$('#workoutComplete').hidden;
+      noteWorkoutSubScreen(hasDraft ? 'editor' : (viewingComplete ? 'complete' : 'start'));
       $('#workoutStart').hidden = hasDraft || viewingComplete;
       $('#workoutEditor').hidden = !hasDraft;
       const lede = $('#workoutLede');
@@ -198,12 +211,14 @@
         return `<div class="swipe-item exercise-swipe" data-exercise-wrapper="${escapeHtml(item.uid)}">
           <button class="swipe-delete-action remove-workout-exercise" type="button" data-uid="${escapeHtml(item.uid)}" aria-label="Remove ${escapeHtml(ex.name)}">Delete</button>
           <details class="exercise-accordion workout-exercise swipe-content" data-workout-exercise="${escapeHtml(item.uid)}" ${item.cardOpen===false?'':'open'}>
-            <summary class="exercise-accordion-head"><span class="exercise-accordion-title"><strong>${escapeHtml(ex.name)}</strong>${cardSummary?`<small>${escapeHtml(cardSummary)}</small>`:''}</span><span class="exercise-accordion-actions"><button class="exercise-info-button" type="button" data-exercise-info="${escapeHtml(item.exerciseId)}" aria-label="About ${escapeHtml(ex.name)}">i</button><span class="exercise-accordion-chevron" aria-hidden="true">›</span></span></summary>
+            <!-- #12 corner-icon rule (Justin 2026-09-11): the info button lives in the card's top-right corner, matching the library star. REVERT: delete this button and restore it inside .exercise-accordion-actions above. -->
+            <button class="exercise-info-button corner-icon" type="button" data-exercise-info="${escapeHtml(item.exerciseId)}" aria-label="About ${escapeHtml(ex.name)}">i</button>
+            <summary class="exercise-accordion-head"><span class="exercise-accordion-title"><strong>${escapeHtml(ex.name)}</strong>${cardSummary?`<small>${escapeHtml(cardSummary)}</small>`:''}</span><span class="exercise-accordion-actions"><span class="exercise-accordion-chevron" aria-hidden="true">›</span></span></summary>
             <div class="exercise-accordion-body">
             ${grouped ? `<div class="superset-band">Superset ${draft.exercises.filter((row, index) => row.supersetId && draft.exercises.findIndex(first => first.supersetId === row.supersetId) === index).findIndex(row => row.supersetId === item.supersetId) + 1}</div>` : ''}
             <details class="advanced-options" ${item.optionsOpen?'open':''}><summary>Exercise options</summary><div class="advanced-options-body"><div class="exercise-tools"><div class="tracking-segment" role="group" aria-label="Track reps or seconds"><button type="button" data-tracking-mode="reps" data-tracking-uid="${escapeHtml(item.uid)}" aria-pressed="${tracking==='time'?'false':'true'}">Reps</button><button type="button" data-tracking-mode="seconds" data-tracking-uid="${escapeHtml(item.uid)}" aria-pressed="${tracking==='time'?'true':'false'}">Seconds</button></div>${draft.exercises.length > 1 ? `<button class="superset-button ${grouped ? 'active' : ''}" type="button" data-superset-uid="${escapeHtml(item.uid)}">${grouped ? 'Edit superset' : 'Create superset'}</button>` : ''}</div><div class="exercise-tag-row">${(item.exerciseTags||[]).map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}<button class="exercise-tag-button" type="button" data-draft-exercise-tags="${escapeHtml(item.uid)}">${item.exerciseTags?.length?'Edit exercise tags':'+ Exercise tags'}</button></div><div class="options-apply-row"><button class="copy-first-set" type="button" data-copy-first-set="${escapeHtml(item.uid)}" ${item.sets.length<2?'disabled':''}>Apply set 1 to all</button><span class="inline-feedback" data-copy-feedback="${escapeHtml(item.uid)}" aria-live="polite"></span></div></div></details>
             ${lastSummary?`<p class="last-session-line"><strong>${escapeHtml(lastSummary)}</strong></p>`:''}
-            <div class="log-labels"><span>SET</span><span>${isBodyweight ? `ADDED ${weightUnit().toUpperCase()}` : `WEIGHT (${weightUnit().toUpperCase()})`}</span><span>${tracking === 'time' ? 'SECONDS' : 'REPS'}</span><span>RPE</span><span>ACTIONS</span></div>
+            <div class="log-labels"><span>SET</span><span>${isBodyweight ? 'ADDED' : 'WEIGHT'}</span><span>${tracking === 'time' ? 'SECONDS' : 'REPS'}</span><span>RPE</span><span></span></div>
             <div class="log-sets">${item.sets.map((set,index) => `
               <div class="log-set ${set.complete ? 'is-complete' : ''}" data-set-uid="${escapeHtml(set.uid)}">
                 <button class="log-set-number ${set.tags.length ? 'has-tags' : ''}" type="button" data-tag-exercise-uid="${escapeHtml(item.uid)}" data-tag-set-uid="${escapeHtml(set.uid)}" aria-label="Choose tags for set ${index + 1}" aria-haspopup="dialog">${index + 1}</button>
@@ -217,7 +232,7 @@
                 <div class="selected-set-tags" aria-label="Selected tags">${set.tags.map(tag => `<span class="set-tag-chip">${escapeHtml(tag)}</span>`).join('')}</div>
               </div>`).join('')}</div>
             <div class="set-utility-row"><button class="add-set" type="button" data-uid="${escapeHtml(item.uid)}">+ Add set</button></div>
-            <div class="exercise-note">${item.noteOpen || item.note ? `<textarea id="note-${escapeHtml(item.uid)}" data-exercise-note="${escapeHtml(item.uid)}" aria-label="Exercise notes" placeholder="Cues, setup, pain, or anything to remember">${escapeHtml(item.note || '')}</textarea>` : `<button class="add-note-toggle" type="button" data-add-note="${escapeHtml(item.uid)}">+ Add notes</button>`}</div>
+            <div class="exercise-note">${item.noteOpen || item.note ? `<textarea id="note-${escapeHtml(item.uid)}" data-exercise-note="${escapeHtml(item.uid)}" aria-label="Exercise notes" placeholder="Cues, setup, pain, or anything to remember">${escapeHtml(item.note || '')}</textarea>` : `<button class="add-note-toggle" type="button" data-add-note="${escapeHtml(item.uid)}">Add notes</button>`}</div>
             <button class="remove-workout-exercise text-danger-button remove-exercise-bottom" type="button" data-uid="${escapeHtml(item.uid)}" aria-label="Remove ${escapeHtml(ex.name)} from this workout">Remove exercise</button>
             </div>
           </details></div>`;

@@ -217,13 +217,15 @@
     }
     /* Muscle blindspots: library muscles with zero weighted volume in the
        period, always visible as dashed pills (Justin 2026-09-10 — no toggle).
-       Shared by the Stats muscle map and the Home At-a-glance card. */
+       #13 (Justin 2026-09-11): sectioned out — a horizontal divider, then a
+       "Blind spots" label, then the pills. Shared by the Stats muscle map
+       and the Home At-a-glance card. */
     function renderBlindspots(volumes,wrapSelector){
       const wrap=$(wrapSelector||'#blindspotWrap');if(!wrap)return;
       const allMuscles=[...new Set(exercises.flatMap(ex=>[...(ex.primary||[]),...(ex.secondary||[])].map(m=>String(m).toLowerCase())))].sort();
       const missing=allMuscles.filter(m=>!volumes[m]);
       if(!missing.length){wrap.innerHTML='';return;}
-      wrap.innerHTML=`<div class="tag-row blindspot-list">${missing.map(m=>`<span class="tag blindspot-tag">${escapeHtml(titleCase(m))}</span>`).join('')}</div>`;
+      wrap.innerHTML=`<div class="blindspot-section"><hr class="blindspot-rule"><p class="blindspot-label">Blind spots</p><div class="tag-row blindspot-list">${missing.map(m=>`<span class="tag blindspot-tag">${escapeHtml(titleCase(m))}</span>`).join('')}</div></div>`;
     }
     function renderStats() {
       const labels={today:'Today',week:'Week',month:'Month',year:'Year',all:'All time'};

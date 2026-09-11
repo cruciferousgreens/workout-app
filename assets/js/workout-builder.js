@@ -14,6 +14,11 @@
       return muscleMatch&&favMatch&&customMatch&&(!pickerFilters.equipment||x.equipment===pickerFilters.equipment);
     }
     function pickerFilterActive(){return pickerFilters.muscles.size>0||!!pickerFilters.equipment||pickerFilters.onlyFavorites||pickerFilters.onlyCustom;}
+    /* Exercises added during this picker opening: the rules section at the
+       top only shows these, never exercises already in the workout (Justin
+       2026-09-11). Reset every time the dialog opens. */
+    let pickerSessionAdded=new Set();
+    function resetPickerSession(){pickerSessionAdded=new Set();}
     function populatePickerFilters(){
       const muscles=[...new Set(exercises.flatMap(x=>[...(x.primary||[]),...(x.secondary||[])]))].sort();
       const equipment=[...new Set(exercises.map(x=>x.equipment).filter(Boolean))].sort();
@@ -40,7 +45,7 @@
       workoutState.pickerMode='program';workoutState.programWorkoutTarget=workout.uid;
       $('#exercisePickerTitle').textContent=`Build ${workout.name}`;
       $('#exercisePickerTitle').nextElementSibling.textContent='Add exercises from the library, or start from one of your saved templates.';
-      $('#exercisePickerSearch').value='';preparePickerFilters();renderExercisePicker();$('#exercisePickerDialog').showModal();
+      $('#exercisePickerSearch').value='';preparePickerFilters();resetPickerSession();renderExercisePicker();$('#exercisePickerDialog').showModal();
       requestAnimationFrame(()=>$('#exercisePickerSearch').focus());
     }
     function pickerCollection(){const programMode=workoutState.pickerMode==='program';return programMode?(pickerProgramWorkout()?.template?.exercises||[]):(workoutState.draft?.exercises||[]);}
@@ -54,16 +59,27 @@
       const collection=pickerCollection();
       const templateBox=$('#pickerTemplateOptions');
       templateBox.hidden=false;
+      // Bug fix (Justin 2026-09-11): changing a rule control (e.g. the load
+      // progression type dropdown) re-renders these rows, which collapsed
+      // every open accordion. Remember which cards are open and restore them.
+      const openAccordions=new Set();
+      templateBox.querySelectorAll('details.exercise-rule-accordion[open]').forEach(openDetails=>{
+        openAccordions.add(openDetails.dataset.ruleUid||openDetails.dataset.programRuleId);
+      });
       const templateButtons=programMode&&workoutState.templates.length?`<strong>START FROM A TEMPLATE</strong><div class="picker-template-buttons">${workoutState.templates.map(template=>`<button class="picker-template-button" type="button" data-use-program-template="${escapeHtml(template.id)}">${escapeHtml(template.name)}</button>`).join('')}</div>`:'';
       const ruleRangeSummary=(profile,time,setCount)=>`${setCount} set${setCount===1?'':'s'} · `+(time?`${profile.timeMin}–${profile.timeMax} sec`:(profile.amrap?(profile.min>1?`AMRAP from ${profile.min} reps`:'AMRAP'):(profile.openTop||profile.max==null)?`${profile.min}+ reps`:`${profile.min??''}–${profile.max??''} reps`));
-      const ruleRows=collection.length?`<div class="exercise-rules-list">${collection.map(item=>{
+      /* Top rules show only exercises added during this picker opening, never
+         exercises that were already in the workout (Justin 2026-09-11). */
+      const sessionItems=collection.filter(item=>pickerSessionAdded.has(item.exerciseId));
+      const ruleRows=sessionItems.length?`<div class="exercise-rules-list">${sessionItems.map(item=>{
         const ex=exercises.find(row=>row.id===item.exerciseId);
         const defaults=(programMode?workoutState.activeProgram?.progression:progressionSetup)||progressionSetup;
         const range=defaults.defaultRange||progressionSetup.defaultRange;
         const profile=item.progression||{mode:item.tracking||ex?.tracking||'reps',min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:defaults.timeStep||5,incrementType:defaults.incrementType,incrementValue:defaults.incrementValue,repsOnly:false};
         const time=profile.mode==='time', setCount=Math.max(1,item.sets?.length||1), incrementType=profile.incrementType||progressionSetup.incrementType||'lb';
         const rangeSummary=ruleRangeSummary(profile,time,setCount);
-        return `<details class="exercise-rule-accordion" data-program-rule-id="${escapeHtml(item.exerciseId)}" data-rule-uid="${escapeHtml(item.uid||'')}">
+        const accordionOpen=openAccordions.has(item.uid||item.exerciseId);
+        return `<details class="exercise-rule-accordion" ${accordionOpen?'open':''} data-program-rule-id="${escapeHtml(item.exerciseId)}" data-rule-uid="${escapeHtml(item.uid||'')}">
           <summary class="exercise-rule-accordion-head"><span class="exercise-rule-accordion-title"><strong>${escapeHtml(ex?.name||'Exercise')}</strong><small>${escapeHtml(rangeSummary)}</small></span><span class="rule-head-actions"><button class="rule-remove" type="button" data-remove-rule aria-label="Remove ${escapeHtml(ex?.name||'exercise')} from this workout">×</button><span class="exercise-accordion-chevron" aria-hidden="true">›</span></span></summary>
           <div class="exercise-rule-accordion-body"><div class="exercise-rule-row">
           <div class="exercise-rule-head"><label class="rule-field set-count-field"><span>Sets</span><input type="number" inputmode="numeric" min="1" max="20" step="1" value="${setCount}" data-program-rule="setCount" aria-label="Number of sets for ${escapeHtml(ex?.name||'exercise')}"></label></div>
@@ -80,7 +96,7 @@
         </details>`;
       }).join('')}</div>`:'<span class="field-help">Choose exercises below, then set the number of sets, rep or time range, and load progression.</span>';
       templateBox.innerHTML=templateButtons+ruleRows;
-      document.querySelectorAll('[data-use-program-template]').forEach(button=>button.addEventListener('click',()=>{const template=workoutState.templates.find(row=>row.id===button.dataset.useProgramTemplate);if(!template||!programWorkout)return;programWorkout.template={name:programWorkout.name,exercises:cloneTemplateExercises(template.exercises)};renderPickerRules();}));
+      document.querySelectorAll('[data-use-program-template]').forEach(button=>button.addEventListener('click',()=>{const template=workoutState.templates.find(row=>row.id===button.dataset.useProgramTemplate);if(!template||!programWorkout)return;programWorkout.template={name:programWorkout.name,exercises:cloneTemplateExercises(template.exercises)};programWorkout.template.exercises.forEach(item=>pickerSessionAdded.add(item.exerciseId));renderPickerRules();}));
       document.querySelectorAll('[data-program-rule-id]').forEach(row=>{
         const getItem=()=>programMode?programWorkout?.template?.exercises.find(entry=>entry.exerciseId===row.dataset.programRuleId):(workoutState.draft?.exercises.find(entry=>entry.uid===row.dataset.ruleUid)||workoutState.draft?.exercises.find(entry=>entry.exerciseId===row.dataset.programRuleId));
         /* × on a chosen exercise removes it outright, so an accidental tap in
@@ -88,6 +104,7 @@
         row.querySelector('[data-remove-rule]')?.addEventListener('click',event=>{
           event.preventDefault();event.stopPropagation();
           const item=getItem();if(!item)return;
+          pickerSessionAdded.delete(item.exerciseId);
           if(programMode){if(programWorkout?.template)programWorkout.template.exercises=programWorkout.template.exercises.filter(entry=>entry.exerciseId!==item.exerciseId);}
           else{workoutState.draft.exercises=workoutState.draft.exercises.filter(entry=>entry.uid!==item.uid);prepareDraftProgression(workoutState.draft,freeformProgressionConfig());renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();}
           renderPickerRules();renderPickerList();
@@ -184,13 +201,13 @@
           if(!programWorkout.template)programWorkout.template={name:programWorkout.name,exercises:[]};
           const existing=programWorkout.template.exercises.find(item=>item.exerciseId===button.dataset.id);
           nowChosen=!existing;
-          if(existing)programWorkout.template.exercises=programWorkout.template.exercises.filter(item=>item.exerciseId!==button.dataset.id);
-          else { const ex=exercises.find(row=>row.id===button.dataset.id),program=workoutState.activeProgram,range=programRangeForWeek(program,programWeek(program)); programWorkout.template.exercises.push({exerciseId:button.dataset.id,tracking:ex?.tracking||'reps',note:'',exerciseTags:[],supersetId:null,progression:{mode:ex?.tracking||'reps',min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:program?.progression?.timeStep||5,incrementType:program?.progression?.incrementType||'lb',incrementValue:program?.progression?.incrementValue||5,repsOnly:false},sets:Array.from({length:3},()=>({w:'',r:range.amrap?'':String(range.min),seconds:'',rpe:'',tags:[],complete:false}))}); }
+          if(existing){programWorkout.template.exercises=programWorkout.template.exercises.filter(item=>item.exerciseId!==button.dataset.id);pickerSessionAdded.delete(button.dataset.id);}
+          else{const ex=exercises.find(row=>row.id===button.dataset.id),program=workoutState.activeProgram,range=programRangeForWeek(program,programWeek(program));programWorkout.template.exercises.push({exerciseId:button.dataset.id,tracking:ex?.tracking||'reps',note:'',exerciseTags:[],supersetId:null,progression:{mode:ex?.tracking||'reps',min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:program?.progression?.timeStep||5,incrementType:program?.progression?.incrementType||'lb',incrementValue:program?.progression?.incrementValue||5,repsOnly:false},sets:Array.from({length:3},()=>({w:'',r:range.amrap?'':String(range.min),seconds:'',rpe:'',tags:[],complete:false}))});pickerSessionAdded.add(button.dataset.id);}
         }else{
-          const existing = workoutState.draft.exercises.find(item => item.exerciseId === button.dataset.id);
+          const existing=workoutState.draft.exercises.find(item=>item.exerciseId===button.dataset.id);
           nowChosen=!existing;
-          if (existing) workoutState.draft.exercises = workoutState.draft.exercises.filter(item => item.exerciseId !== button.dataset.id);
-          else { const ex=exercises.find(row=>row.id===button.dataset.id),range=progressionSetup.defaultRange; workoutState.draft.exercises.push({uid:uid('exercise'), exerciseId:button.dataset.id, tracking:ex?.tracking||'reps', sets:Array.from({length:3},()=>newSet()), note:'', exerciseTags:[], supersetId:null, progression:{mode:ex?.tracking||'reps',min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:progressionSetup.timeStep||5,incrementType:progressionSetup.incrementType,incrementValue:progressionSetup.incrementValue,repsOnly:false,custom:false}}); }
+          if(existing){workoutState.draft.exercises=workoutState.draft.exercises.filter(item=>item.exerciseId!==button.dataset.id);pickerSessionAdded.delete(button.dataset.id);}
+          else{const ex=exercises.find(row=>row.id===button.dataset.id),range=progressionSetup.defaultRange;workoutState.draft.exercises.push({uid:uid('exercise'),exerciseId:button.dataset.id,tracking:ex?.tracking||'reps',sets:Array.from({length:3},()=>newSet()),note:'',exerciseTags:[],supersetId:null,progression:{mode:ex?.tracking||'reps',min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:progressionSetup.timeStep||5,incrementType:progressionSetup.incrementType,incrementValue:progressionSetup.incrementValue,repsOnly:false,custom:false}});pickerSessionAdded.add(button.dataset.id);}
           prepareDraftProgression(workoutState.draft, workoutState.activeProgram?.id===workoutState.draft.programId?workoutState.activeProgram.progression:freeformProgressionConfig());
           renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();
         }

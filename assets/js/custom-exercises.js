@@ -1,6 +1,6 @@
 
 /* ===== module: custom-exercises.js ===== */
-    /** Creates, edits, and deletes session-scoped custom exercises with pill controls. */
+    /** Creates, edits, and deletes custom exercises (persisted to the library, synced across devices) with pill controls. */
     function customOptions() {
       return {
         muscles:[...new Set(exercises.flatMap(x => [...x.primary, ...x.secondary]))].filter(Boolean).sort(),

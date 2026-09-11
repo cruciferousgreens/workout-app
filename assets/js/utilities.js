@@ -78,26 +78,19 @@
     function escapeHtml(text) {
       const div = document.createElement('div'); div.textContent = text; return div.innerHTML;
     }
-    /* Time-step preset pills (2026-09-10, Justin picked presets over a stepper).
+    /* Time-step preset pills (2026-09-10, Justin picked presets over a stepper;
+       Custom removed app-wide 2026-09-10, #45).
        Shared by Settings, program setup, and per-exercise rule rows. */
     const TIME_STEP_PRESETS=[5,10,15,30];
     function timeStepPillsHTML(){
-      return TIME_STEP_PRESETS.map(n=>`<button type="button" data-step="${n}" aria-pressed="false">${n}s</button>`).join('')
-        + `<button type="button" data-step="custom" aria-pressed="false">Custom</button>`
-        + `<input type="number" inputmode="numeric" min="1" step="1" class="step-custom" data-step-custom aria-label="Custom time step in seconds" hidden>`;
+      return TIME_STEP_PRESETS.map(n=>`<button type="button" data-step="${n}" aria-pressed="false">${n}s</button>`).join('');
     }
     function syncTimeStepPills(root,value){
       if(!root)return;
-      const n=Math.max(1,Number(value)||5), isPreset=TIME_STEP_PRESETS.includes(n);
-      const customBtn=root.querySelector('[data-step="custom"]'), custom=root.querySelector('[data-step-custom]');
+      const n=Number(value);
       root.querySelectorAll('[data-step]').forEach(btn=>{
-        const key=btn.dataset.step;
-        btn.setAttribute('aria-pressed',String(key==='custom'?!isPreset:Number(key)===n));
+        btn.setAttribute('aria-pressed',String(Number(btn.dataset.step)===n));
       });
-      /* Custom edits inline in its own pill (Justin 2026-09-10): the input
-         takes the Custom button's place instead of appearing below. */
-      if(customBtn)customBtn.hidden=!isPreset;
-      if(custom){custom.hidden=isPreset;if(!isPreset&&document.activeElement!==custom)custom.value=n;}
     }
     function wireTimeStepPills(root,get,set){
       if(!root)return;
@@ -106,23 +99,26 @@
       root.addEventListener('click',e=>{
         const btn=e.target.closest('[data-step]');
         if(!btn||!root.contains(btn))return;
-        if(btn.dataset.step==='custom'){
-          const custom=root.querySelector('[data-step-custom]');
-          root.querySelectorAll('[data-step]').forEach(b=>b.setAttribute('aria-pressed',String(b===btn)));
-          if(custom){btn.hidden=true;custom.hidden=false;custom.value=get();custom.focus();custom.select();}
-          return;
-        }
         set(Number(btn.dataset.step));
         syncTimeStepPills(root,get());
       });
-      const custom=root.querySelector('[data-step-custom]');
-      const commitCustom=()=>{const n=Math.max(1,Number(custom.value)||5);set(n);syncTimeStepPills(root,get());};
-      custom.addEventListener('change',commitCustom);
-      custom.addEventListener('blur',()=>{if(!custom.hidden)commitCustom();});
-      custom.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();custom.blur();}});
     }
-    function rememberScroll() { state.scroll[state.activeView] = window.scrollY; }
-    function restoreScroll(view) { requestAnimationFrame(() => window.scrollTo({top:state.scroll[view] || 0, behavior:'auto'})); }
+    /* Per-screen scroll memory (#66, 2026-09-11): the Workout tab hosts three
+       distinct screens — the start screen, the live editor, and the completed
+       review — which must not share one scroll slot. A position saved
+       mid-workout would otherwise restore partway down the start screen (and
+       vice versa). Each tab remembers its own scroll across tab switches;
+       genuinely new screens begin at the top. Scrolls apply synchronously in
+       the same task as the render, so the browser never paints at the wrong
+       position first (no visible jump). */
+    function workoutScrollKey() {
+      if (workoutState.draft) return 'workout:editor';
+      const complete = document.querySelector('#workoutComplete');
+      return (complete && !complete.hidden) ? 'workout:complete' : 'workout:start';
+    }
+    function scrollKeyFor(view) { return view === 'workout' ? workoutScrollKey() : view; }
+    function rememberScroll() { state.scroll[scrollKeyFor(state.activeView)] = window.scrollY; }
+    function restoreScroll(view) { window.scrollTo({top: state.scroll[scrollKeyFor(view)] || 0, behavior:'auto'}); }
     function setActiveNav(view) {
       [['dashboard',$('#dashboardNav')],['library',$('#libraryNav')],['workout',$('#workoutsNav')],['program',$('#programNav')],['stats',$('#statsNav')]].forEach(([key,button]) => {
         const active = key === view;
@@ -141,23 +137,6 @@
       else if (key === 'stats') showStats();
       else showDashboard();
     }
-    /** Breadcrumb title on sub-pages, e.g. "Exercises / Air Bike". The parent is
-     *  static context text, not a second back control: the top-bar back chevron
-     *  is the one and only back affordance. */
-    function setCrumbTitle(titleEl, parentLabel, currentLabel, goParent) {
-      titleEl.textContent = '';
-      const parent = document.createElement(goParent ? 'button' : 'span');
-      parent.className = 'crumb-parent'; parent.textContent = parentLabel;
-      if (goParent) {
-        parent.type = 'button';
-        parent.setAttribute('aria-label', `Back to ${parentLabel}`);
-        parent.addEventListener('click', goParent);
-      }
-      const sep = document.createElement('span');
-      sep.className = 'crumb-sep'; sep.setAttribute('aria-hidden', 'true'); sep.textContent = '/';
-      const here = document.createElement('span'); here.className = 'crumb-here'; here.textContent = currentLabel;
-      titleEl.append(parent, sep, here);
-    }
     function updateTopBar(view, customTitle) {
       const titleEl = $('#topBarTitle'); if (!titleEl) return;
       const back = $('#topBarBack'); const gear = $('#topBarSettings');
@@ -165,9 +144,13 @@
       /* The gear stays visible on Settings, shown active like an active tab (Justin 2026-09-10). */
       if (gear) gear.classList.toggle('active', view === 'settings');
       if (view === 'detail') {
+        /* #10 (Justin 2026-09-11): no breadcrumb in the header — it shows only
+           the parent page ("Exercises" etc.). The exercise name lives in the
+           detail body; the top-bar back chevron is the one and only back
+           affordance. */
         const ret = state.exerciseDetailReturn && state.exerciseDetailReturn.view;
         const parentKey = { library: 'library', workout: 'workout', program: 'program', dashboard: 'dashboard', stats: 'stats', 'completed-workout': 'workout' }[ret] || 'library';
-        setCrumbTitle(titleEl, TOP_BAR_TITLES[parentKey], customTitle || '');
+        titleEl.textContent = TOP_BAR_TITLES[parentKey];
       } else if (view === 'settings') {
         // Settings is its own page, not a breadcrumb (Justin 2026-09-10).
         titleEl.textContent = 'Settings';

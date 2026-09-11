@@ -318,6 +318,7 @@
     .form-action { min-height: 42px; padding: 0 15px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 700; }
     .form-action.secondary { border: 1px solid var(--line); background: var(--surface); }
     .form-action.primary { border: 0; background: var(--accent); color: var(--surface-raised); }
+    .form-action.danger { border: 0; background: var(--danger); color: #fff; }
     .custom-tools { display: flex; gap: 8px; margin-top: 18px; }
     .custom-tool { min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 700; }
     .custom-tool.danger { color: var(--danger); border-color: var(--rose); }
@@ -396,7 +397,7 @@
     .start-actions, .workout-actions { display: flex; flex-wrap: wrap; gap: 9px; }
     .primary-button, .secondary-button { min-height: 44px; padding: 0 15px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 750; }
     .primary-button { border: 0; background: var(--accent); color: var(--surface-raised); }
-    .primary-button.danger-button { background: var(--danger); color: #fff; }
+    .primary-button.danger-button { border-color: var(--danger); background: var(--danger); color: #fff; }
     .secondary-button.danger-button { border-color: var(--rose); color: var(--rose); }
     .secondary-button { border: 1px solid var(--line); background: var(--surface); }
     .primary-button:hover { background: var(--accent-hover); }
@@ -425,6 +426,13 @@
     .exercise-accordion-title small { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
     .exercise-accordion-chevron { flex: none; color: var(--muted); font-size: 20px; line-height: 1; transition: transform .18s ease; }
     .exercise-accordion-actions { flex: none; display: flex; align-items: center; gap: 10px; }
+    /* #12 corner-icon rule (Justin 2026-09-11): every card icon lives in the
+       top-right corner — the workout card's info button matches the library
+       star's top:8px right:8px. REVERT: delete this block and restore the info
+       button inside .exercise-accordion-actions in workout-editor.js. */
+    .exercise-accordion.workout-exercise { position: relative; }
+    .exercise-accordion.workout-exercise > .corner-icon { position: absolute; top: 8px; right: 8px; z-index: 2; }
+    .exercise-accordion.workout-exercise .exercise-accordion-head { padding-right: 54px; }
     .exercise-info-button { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 15px; font-weight: 700; font-style: italic; font-family: var(--font-sans); line-height: 1; cursor: pointer; }
     .exercise-info-button:active { transform: scale(.94); }
     .exercise-accordion[open] .exercise-accordion-chevron { transform: rotate(90deg); }
@@ -441,6 +449,7 @@
     .swipe-hint { color: var(--muted); font-size: 11px; white-space: nowrap; }
     .log-labels, .log-set { display: grid; grid-template-columns: 44px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 93px; gap: 6px; align-items: start; }
     .log-labels { margin-bottom: 6px; color: var(--muted); font-size: 10px; font-weight: 750; }
+    .log-labels span { text-align: center; white-space: nowrap; }
     .log-set { padding: 12px 0; border: 0; background: transparent; }
     .log-set + .log-set { border-top: 1px solid var(--line); }
     .log-set-number { width: 44px; min-height: 44px; padding: 0; display: grid; place-items: center; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -507,9 +516,12 @@
     .program-form { display: grid; grid-template-columns: minmax(0,1fr) 150px; gap: 14px; margin-top: 22px; }
     .program-form .wide { grid-column: 1 / -1; }
     .program-cover { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
-    .program-cover-head { padding: clamp(24px, 5vw, 46px); background: var(--pine); color: var(--surface-raised); }
-    .program-cover-kicker { margin-bottom: 10px; color: var(--gold-soft); font-size: 12px; font-weight: 800; }
-    .program-cover-meta { margin: 0; color: var(--pine-soft); line-height: 1.5; }
+    /* Program cover header mirrors the Workout tab's "Start training" hero
+       (Justin 2026-09-11): cream surface, green kicker, ink title. */
+    .program-cover-head { padding: clamp(16px,4vw,26px); background: var(--surface); }
+    .program-cover-head h2 { margin-bottom: 0; font-size: clamp(28px,5vw,44px); }
+    .program-cover-kicker { margin-bottom: 10px; color: var(--accent); font-size: 11px; font-weight: 850; }
+    .program-cover-meta { margin: 0; color: var(--muted); line-height: 1.5; }
     .program-body { padding: clamp(20px, 4vw, 34px); }
     .program-progress { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 18px; color: var(--muted); font-size: 12px; }
     .program-workouts { display: grid; gap: 8px; margin: 12px 0 18px; }
@@ -517,8 +529,6 @@
     .program-workout-index { width: 28px; height: 28px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; color: var(--muted); font-size: 11px; font-weight: 800; }
     .program-workout strong { display: block; font-size: 14px; }
     .program-workout span { color: var(--muted); font-size: 11px; }
-    .program-add { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
-    .program-add input { min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none; }
     .program-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
     .session-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; }
     /* ===== 11. Bottom nav & top bar ===== */
@@ -536,17 +546,9 @@
     #topBarSettings { grid-column: 3; z-index: 1; }
     /* Active state when the Settings page is open: same treatment as an active tab. */
     #topBarSettings.active { background: var(--accent-soft); color: var(--accent); }
-    /* Breadcrumb title on sub-pages ("Exercises / Air Bike"): the parent is static
-       context text; the top-bar back chevron is the only back control. */
-    .top-bar-title:has(.crumb-parent) { align-items: baseline; }
-    .crumb-parent { flex: none; font: inherit; color: var(--muted); white-space: nowrap; }
-    .crumb-sep { flex: none; margin: 0 7px; color: var(--muted); opacity: .55; }
-    .crumb-here { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .top-bar-btn { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; color: var(--ink); cursor: pointer; }
     .top-bar-btn svg { width: 22px; height: 22px; stroke-width: 2.5; /* match tab icon weight (Justin 2026-09-10) */ }
     .top-bar-btn[hidden] { display: none; }
-    /* The top bar owns back/title on the exercise detail; hide the in-screen duplicate. */
-    .has-top-bar .detail .detail-title { display: none; }
     .nav-item { min-height: 50px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer; font-size: 10px; font-weight: 700; line-height: 1.25; }
     .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
     .nav-item.has-live-draft { position: relative; }
@@ -599,7 +601,7 @@
       .workout-meta .date-field { grid-column: auto; grid-row: auto; }
       .workout-toolbar { align-items: flex-end; }
       .workout-exercise { padding: 15px 12px; }
-      .log-labels { display: none; }
+      .log-labels { display: grid; }
       .log-set { grid-template-columns: 44px repeat(3, minmax(0, 1fr)) 93px; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
       .log-set-number { grid-row: 1; grid-column: 1; }
       .log-set .weight-entry { grid-row: 1; grid-column: 2; }
@@ -616,8 +618,6 @@
       .swipe-hint { display: none; }
       .program-form { grid-template-columns: 1fr; }
       .program-form .wide { grid-column: auto; }
-      .program-add { grid-template-columns: 1fr; }
-      .program-add button { width: 100%; }
       .picker-footer { bottom: -20px; margin: 14px -16px -20px; padding-left: 16px; padding-right: 16px; }
       .picker-footer button { width: 100%; }
     }
@@ -632,7 +632,7 @@
     /* ===== 12. Dashboard & stats ===== */
     .dashboard-view, .stats-view { display: none; }
     .dashboard-view.active, .stats-view.active { display: block; }
-    .week-strip { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 7px; margin: 0 0 22px; touch-action: pan-y; }
+    .week-strip { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 7px; margin: 0 0 8px; touch-action: pan-y; }
     .day-chip { min-width: 0; padding: 8px 2px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); text-align: center; }
     .day-chip span, .day-chip strong { display: block; }
     .day-chip span { color: var(--muted); font-size: 10px; font-weight: 750; text-transform: uppercase; }
@@ -730,7 +730,10 @@
     #dashboardStats .stats-panel strong { font-size: 24px; }
     #dashboardStats .stats-panel span { font-size: 11px; }
     .muscle-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-    .calendar-summary { min-height: 19px; margin: 0 2px 10px; color: var(--muted); font-size: 12px; text-align: center; }
+    /* #19: the summary ("This week." / "Go to this week." / selected-date line)
+       lives in the toolbar, right under the week label between the arrows.
+       min-height keeps the toolbar from shifting when the line swaps. */
+    .calendar-summary { min-height: 19px; margin: 3px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
     .link-button { padding: 0; border: 0; background: none; color: var(--accent); cursor: pointer; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
     /* ===== 13. Charts ===== */
     .chart-card { margin-top: 12px; }
@@ -785,7 +788,11 @@
     .blindspot-toggle { display: inline-block; margin-top: 10px; background: none; border: 0; padding: 2px 0; color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; }
     .dash-blindspots:empty { display: none; }
     .blindspot-toggle:active { opacity: .6; }
-    .blindspot-list { margin-top: 8px; }
+    /* Blind-spots section (#13): a horizontal divider, then the label, then the pills. */
+    .blindspot-section { margin-top: 14px; }
+    .blindspot-rule { border: 0; border-top: 1px solid var(--line); margin: 0 0 10px; }
+    .blindspot-label { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    .blindspot-list { margin-top: 0; }
     .tag.blindspot-tag { background: transparent; border: 1px dashed var(--line); color: var(--muted); font-weight: 600; }
     .exercise-map-legend span { display: inline-flex; align-items: center; gap: 6px; }
     .heatmap-list { display: grid; gap: 7px; }
@@ -853,13 +860,17 @@
     /* Inline unit suffix, e.g. "sec" on the time-step field, "lb"/"%" on increment. */
     .rule-field .unit { position: absolute; right: 12px; top: 0; bottom: 0; display: inline-flex; align-items: center; font-style: normal; font-size: 12px; color: var(--muted); pointer-events: none; }
     .rule-field:has(.unit) input, .rule-field:has(.unit) select { padding-right: 44px; }
+    /* Account row → modal (2026-09-10, #37): the signed-in card shows one
+       tappable row; details and actions live in the account dialog. */
+    .account-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 6px 0; border: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
+    .account-info { margin: 0 0 4px; display: grid; gap: 10px; }
+    .account-info > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .account-info dt { color: var(--muted); font-size: 13px; }
+    .account-info dd { margin: 0; font-size: 14px; font-weight: 700; text-align: right; }
     /* Time-step preset pills (2026-09-10, Justin's pick). */
     .step-pills { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 2px 2px; }
     .step-pills [data-step] { min-height: 36px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
     .step-pills [data-step][aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-    /* Custom time-step edits inline in its own pill (Justin 2026-09-10). 16px font
-       stops iOS Safari auto-zoom on focus. */
-    .step-pills .step-custom { width: 88px; flex: 0 0 auto; height: 36px; border: 1px solid var(--accent); border-radius: 999px; background: var(--accent-soft); color: var(--accent); text-align: center; font-size: 16px; font-weight: 700; outline: none; }
     /* Weight-unit pills share the step-pill look, including the selected state. */
     .step-pills [data-units] { min-height: 36px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
     .step-pills [data-units][aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
@@ -886,7 +897,6 @@
     .filter-panel { --notch-bg: var(--surface); }
     /* Surfaces the notched fields sit on: match the cutout behind each label. */
     .program-setup, .dashboard-card, .custom-dialog { --notch-bg: var(--surface); }
-    .progression-setup { --notch-bg: var(--surface-raised); }
     @container (max-width: 700px) {
       .exercise-rule-controls { grid-template-columns: 1fr 1fr 1fr; }
       .load-progression { grid-column: 1 / -1; }
@@ -899,11 +909,6 @@
       .reps-only-toggle { grid-column: 1 / -1; }
     }
 
-    .progression-setup { margin: 20px 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
-    .progression-setup h3 { margin: 0 0 5px; font-size: 16px; }
-    .progression-setup > p { margin: 0 0 16px; color: var(--muted); font-size: 12px; line-height: 1.45; }
-    .progression-fields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
-    .progression-choice { grid-column: 1 / -1; }
     .choice-pills { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 8px; }
     .choice-pill { min-height: 58px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; text-align: left; }
     .choice-pill strong, .choice-pill span { display: block; }
@@ -937,7 +942,6 @@
     .suggestion-name span { flex: none; padding: 4px 11px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: none; white-space: nowrap; }
     .suggestion-change { display: flex; align-items: baseline; gap: 10px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
     .suggestion-change strong { color: var(--ink); font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
-    .suggestion-reason { margin-top: 8px; color: var(--muted); font-size: 12px; line-height: 1.45; }
     .autofill-row { display: grid; grid-template-columns: minmax(0,1fr) 62px 56px; gap: 6px; align-items: center; }
     .autofill-row + .autofill-row { margin-top: 8px; }
     .autofill-row label { min-width: 0; font-size: 11px; font-weight: 750; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -955,12 +959,8 @@
     .program-progression-meta { display: flex; flex-wrap: wrap; gap: 6px; }
     @container (max-width: 700px) {
       .comparison-grid { grid-template-columns: 1fr; }
-      .progression-fields { grid-template-columns: 1fr 1fr; }
-      .progression-choice, .switch-row { grid-column: 1 / -1; }
     }
     @container (max-width: 420px) {
-      .progression-fields { grid-template-columns: 1fr; }
-      .progression-choice, .switch-row { grid-column: auto; }
       .choice-pills { grid-template-columns: 1fr; }
       .progression-preview { padding: 16px 12px; }
       .progression-preview-head { flex-direction: column; }
@@ -972,7 +972,7 @@
     .calendar-toolbar strong, .calendar-toolbar span { display: block; }
     .calendar-toolbar strong { font-size: 13px; }
     .calendar-toolbar span { margin-top: 2px; color: var(--muted); font-size: 10px; }
-    .calendar-page { width: 40px; height: 40px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 25px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+    .calendar-page { width: 40px; height: 40px; padding: 0 0 4px; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 25px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
     /* Optical centering (Justin 2026-09-10): ‹ › glyphs carry uneven side
        bearings, so the visible chevron sits off-center without a nudge. */
     #previousWeek { transform: translateX(-2px); }
@@ -1025,9 +1025,8 @@
       .program-workout { grid-template-columns: 30px minmax(0,1fr); }
       .program-row-actions { grid-column: 2; justify-content: flex-start; }
     }
-    .add-set { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; margin: 12px 0 0 42px; padding: 0 13px; border: 1px solid var(--foam); border-radius: var(--radius-sm); background: var(--pine-soft); color: var(--accent); }
+    .add-set { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 38px; margin: 12px 0 0; padding: 0 13px; border: 1px solid var(--foam); border-radius: var(--radius-sm); background: var(--pine-soft); color: var(--accent); }
     /* (set-count-badge retired 2026-09-10: the accordion summary already carries the set count) */
-    .suggestion-basis { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.5; }
     .muscle-analysis-grid { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(250px,.85fr); gap: 12px; margin-top: 12px; }
     .analysis-panel { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
     .analysis-panel h2 { margin: 0 0 4px; font-size: 17px; }
@@ -1108,8 +1107,8 @@
     .built-in-label { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
     .sample-label { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--gold-soft); color: var(--gold); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
     .advanced-options summary::-webkit-details-marker { display: none; }
-    .advanced-options summary::after { content: '+'; color: var(--accent); font-size: 18px; font-weight: 500; }
-    .advanced-options[open] > summary::after, .program-rules[open] > summary::after { content: '−'; }
+    .advanced-options summary::after { content: '›'; color: var(--muted); font-size: 18px; font-weight: 500; line-height: 1; transition: transform .18s ease; }
+    .advanced-options[open] > summary::after { transform: rotate(90deg); }
     .advanced-options { margin-top: 10px; border-top: 1px solid var(--line); }
     .advanced-options summary { display: flex; align-items: center; justify-content: space-between; min-height: 40px; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 800; }
     .workout-focus-open .field-help { margin: 8px 0 0; }
@@ -1130,15 +1129,24 @@
     .rep-preset { min-height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 11px; font-weight: 750; }
     .rep-preset[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .range-fields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
-    .program-rules { margin: 20px 0; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
-    .program-rules > .program-rules-title { margin: 0; padding: 18px 0 6px; font-size: 15px; font-weight: 800; }
-    .program-rules .progression-setup { margin: 0; padding: 0 0 18px; border: 0; background: transparent; }
+    /* Flat progression section inside program setup (2026-09-10, #45): no
+       nested card — same visual language as Settings → Progression defaults,
+       separated by a top rule. */
+    .program-progression { margin: 24px 0 0; padding: 22px 0 0; border-top: 1px solid var(--line); }
+    .program-progression .settings-head { margin-bottom: 16px; }
+    .program-progression .settings-title-row .program-progression-title { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+    .program-progression .settings-grid { grid-template-columns: 1fr; gap: 16px; margin-bottom: 6px; }
+    .program-progression .switch-row { margin-top: 12px; padding: 18px 0 2px; border-top: 1px solid var(--line); }
     .undulating-panel { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
-    .week-range-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 10px; }
-    .week-range-row { display: grid; grid-template-columns: 64px minmax(0,1fr); gap: 8px; align-items: center; }
-    .week-range-row strong { font-size: 11px; }
-    .week-range-row select { min-height: 38px; margin: 0; font-size: 11px; }
+    .week-range-list { display: grid; gap: 12px; margin-top: 10px; }
+    .week-range-row strong { display: block; margin-bottom: 6px; font-size: 11px; }
+    .week-range-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .week-range-pills .rep-preset { min-height: 32px; padding: 0 10px; font-size: 10px; }
     .program-cover-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    /* Compact Edit program button (Justin 2026-09-11): small pill, not a big CTA. */
+    .program-cover-actions .secondary-button { min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; }
+    /* Program Workouts + button matches the workout screen's add-exercises paradigm. */
+    #addProgramWorkoutBtn { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .program-muscles { margin-top: 18px; }
     .program-muscles h3 { margin: 0 0 8px; font-size: 13px; }
     .program-muscle-bars { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
@@ -1153,9 +1161,6 @@
       .workout-start-options, .program-muscle-bars { grid-template-columns: 1fr; }
       .week-range-list { grid-template-columns: 1fr; }
       .range-fields { grid-template-columns: 1fr 1fr; }
-      /* Time step (the time-based analogue of the rep/weight progression settings)
-         spans the full row on phones so its pills lay out in one line like Settings. */
-      .range-fields .field:last-child { grid-column: 1 / -1; }
     }
 
     /* ===== refined theme overrides ===== */
@@ -1169,7 +1174,7 @@
     h1 { letter-spacing: -.045em; }
     h2, h3 { letter-spacing: -.025em; }
     .filter-group label, .filter-label, .field > label, fieldset.field > legend,
-    .stat-label, .log-labels, .picker-section-label, .program-cover-kicker,
+    .stat-label, .log-labels, .picker-section-label,
     .treatment-label, .load-control-title, .rule-field > span {
       color: var(--muted);
       font-size: 10px;
@@ -1214,8 +1219,16 @@
     }
     .secondary-button:hover, .small-button:hover, .filter-button:hover,
     .back:hover, .setup-program-row:hover, .copy-first-set:hover, .add-set:hover {
-      border-color: var(--rose);
-      background: var(--rose-soft);
+      /* Neutral hover stays neutral — never flashes red (#44). iOS Safari keeps
+         :hover stuck after a tap, so a red hover reads as a broken state (#26). */
+      filter: brightness(.96);
+    }
+    /* Destructive hovers stay in the red family — never flip to accent green (#44). */
+    .primary-button.danger-button:hover, .form-action.danger:hover { background: var(--danger); filter: brightness(.85); }
+    .secondary-button.danger-button:hover, .small-button.danger:hover {
+      border-color: var(--danger);
+      background: var(--danger-soft);
+      filter: none;
     }
     .search, select, .field input, .field textarea, .program-add input,
     .picker-search, .tag-editor input, .log-input, .exercise-note textarea,
@@ -1286,7 +1299,7 @@
     .complete-set { border-color: var(--line-strong); }
     .selected-set-tags { padding-inline: 0; }
     .advanced-options { border-color: var(--line); border-radius: var(--radius-sm); background: var(--surface-2); }
-    .advanced-options summary, .program-rules > summary { color: var(--ink-strong); }
+    .advanced-options summary { color: var(--ink-strong); }
     .suggestion-card, button.suggestion-card {
       min-height: 62px;
       border-color: var(--line);
@@ -1294,14 +1307,10 @@
       background: var(--surface-raised);
       box-shadow: var(--shadow-soft);
     }
-    button.suggestion-card:hover, button.suggestion-card.applied { border-color: var(--rose); background: var(--rose-soft); }
-    .suggestion-card.applied .suggestion-change strong::after { color: var(--danger); }
-    .progression-banner, .progression-setup, .program-rules,
-    .stall-card, .picker-template-options { border-color: var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+    button.suggestion-card:hover, button.suggestion-card.applied { border-color: var(--accent); background: var(--accent-soft); }
+    .suggestion-card.applied .suggestion-change strong::after { color: var(--accent); }
+    .progression-banner, .stall-card, .picker-template-options { border-color: var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
     .program-cover { border-color: var(--line-strong); }
-    .program-cover-head { background: var(--pine); color: var(--on-accent); }
-    .program-cover-head h2 { color: var(--on-accent); }
-    .program-cover-kicker, .program-cover-meta { color: var(--gold-soft); }
     .program-body { background: var(--surface); }
     .week-segment { background: var(--surface-2); }
     .week-segment.past { background: var(--foam); }
@@ -1316,7 +1325,7 @@
     .custom-dialog::backdrop { background: var(--backdrop); }
     .dialog-close { border-color: var(--line); background: var(--surface-2); color: var(--muted); }
     .picker-item { border-color: var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); }
-    .picker-item:hover, .picker-item[aria-pressed="true"] { border-color: var(--rose); background: var(--rose-soft); }
+    .picker-item:hover, .picker-item[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
     .picker-footer { border-color: var(--line); background: var(--surface); }
     .bottom-nav {
       border-top-color: var(--line-strong);
@@ -1332,7 +1341,7 @@
     .day-chip.has-workout strong::after { background: var(--accent); }
     .mini-stat, .workout-detail-metric { border-radius: var(--radius-md); background: var(--surface-2); }
     .period-menu { border-color: var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); box-shadow: var(--shadow); }
-    .period-option:hover, .period-option[aria-checked="true"] { background: var(--rose-soft); color: var(--ink-strong); }
+    .period-option:hover, .period-option[aria-checked="true"] { background: var(--accent-soft); color: var(--accent); }
     @container (max-width: 640px) {
       .dashboard-card, .stats-panel, .workout-exercise, .completed-card,
       .program-template-card, .analysis-panel { padding: 16px; }
@@ -1383,8 +1392,8 @@
     /* ===== 16. Settings ===== */
     .settings-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-bottom: 8px; }
     .settings-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    #accountSignedOut .settings-actions { margin-top: 14px; }
     .small-button.danger { border-color: var(--rose); color: var(--rose); }
-    .small-button.armed { border-color: var(--rose); background: var(--rose-soft); color: var(--ink-strong); }
     .attribution-list { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
     .attribution-list a { color: var(--accent); }
     @container (max-width: 520px) { .settings-grid { grid-template-columns: 1fr; } }
@@ -1394,6 +1403,14 @@
     .settings-head { display: block; margin-bottom: 20px; }
     .settings-head h2 { margin: 0 0 6px; font-size: 19px; letter-spacing: -.02em; }
     .settings-head .section-note { font-size: 13px; line-height: 1.55; max-width: 46ch; }
+    /* Compact account card (Justin 2026-09-11): email directly under the
+       heading, no description, no chevron, tight padding. */
+    #settingsView .account-card { padding: 14px 16px; }
+    #settingsView .account-card .settings-head { margin-bottom: 2px; }
+    #settingsView .account-card .settings-head h2 { margin: 0; }
+    #settingsView .account-card .account-row { min-height: 0; padding: 2px 0; justify-content: flex-start; }
+    #settingsView .account-card #accountRowEmail { font-size: 14px; color: var(--muted); }
+    #settingsView .account-card #accountStatus:empty { display: none; }
     /* Title row: heading with an inline info button (progression explainer). */
     .settings-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
     .settings-title-row h2 { margin: 0; }
@@ -1470,15 +1487,13 @@
        (Justin 2026-09-10): accent pill matching primary-button colors. */
     .start-new-workout-pill { min-height: 40px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--accent); color: var(--surface-raised); font-size: 14px; font-weight: 750; cursor: pointer; }
     .start-new-workout-pill:hover { background: var(--accent-hover); }
-    .program-cover-head { position: relative; padding-right: 150px; }
-    .program-cover-edit { position: absolute; right: 20px; top: 20px; min-height: 40px; padding: 0 14px; border: 1px solid var(--gold-soft); border-radius: 999px; background: var(--surface-raised); color: var(--ink-strong); cursor: pointer; font-weight: 800; }
     @container (max-width: 520px) {
       .shell { padding: var(--top-bar-clearance) 14px calc(205px + env(safe-area-inset-bottom)); }
       .workout-start-options { grid-template-columns: 1fr; }
       .workout-toolbar { align-items: flex-start; }
       .workout-toolbar-actions { width: 100%; justify-content: stretch; }
       .workout-toolbar-actions button { flex: 1 1 140px; }
-      .log-labels { display: none; }
+      .log-labels { display: grid; }
       .progression-banner-head { flex-wrap: wrap; }
       .real-data-label { font-size: 8px; }
       .calendar-toolbar { gap: 12px; }
@@ -1497,8 +1512,6 @@
       .plate-fields { grid-template-columns: 1fr; }
       .body-map-grid { gap: 4px; }
       .focus-key { grid-template-columns: 78px minmax(0,1fr) 38px; }
-      .program-cover-head { padding-right: 20px; padding-top: 76px; }
-      .program-cover-edit { top: 20px; left: 20px; right: auto; }
     }
   
     /* ===== Desktop mode (laptop testing, Justin 2026-09-10) =====

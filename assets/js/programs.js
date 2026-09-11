@@ -27,6 +27,11 @@
     function syncProgramForm(){
       const p=programFormProgression(), range=p.defaultRange||{};
       $('#progressionThreshold').value=p.threshold??8;
+      const scheme=p.scheme||'rpe';
+      document.querySelectorAll('#programSchemePills [data-scheme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.scheme===scheme)));
+      // The RPE trigger only applies to RPE-based mode — hide it entirely
+      // under linear progression (Justin 2026-09-11, #54).
+      $('#progressionThreshold').closest('.rule-field').hidden=scheme==='linear';
       $('#progressionIncrementType').value=p.incrementType||'lb';
       $('#progressionIncrementValue').value=p.incrementValue??5;
       $('#programRepMin').value=range.min??'';
@@ -37,6 +42,7 @@
       $('#undulatingToggle').setAttribute('aria-label',`Vary rep ranges by week ${p.undulating?'on':'off'}`);
       $('#stallDetectorToggle').setAttribute('aria-pressed',String(p.stallDetection!==false));
       $('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${p.stallDetection!==false?'on':'off'}`);
+      syncProgramIncrementUnit();
       renderWeekRanges(p);
     }
     function seedProgramForm(fromProgram){
@@ -50,8 +56,8 @@
       panel.hidden=!target.undulating;if(panel.hidden)return;
       while(target.weeklyRanges.length<length)target.weeklyRanges.push(target.weeklyRanges.length%3===0?'strength':target.weeklyRanges.length%3===1?'hypertrophy':'endurance');
       target.weeklyRanges=target.weeklyRanges.slice(0,length);
-      list.innerHTML=target.weeklyRanges.map((preset,index)=>`<label class="week-range-row"><strong>Week ${index+1}</strong><select data-week-range="${index}">${Object.entries(REP_PRESETS).map(([key,value])=>`<option value="${key}" ${key===preset?'selected':''}>${value.label} · ${value.amrap?'AMRAP':value.openTop?'15+':`${value.min}–${value.max}`}</option>`).join('')}</select></label>`).join('');
-      document.querySelectorAll('[data-week-range]').forEach(select=>select.addEventListener('change',()=>{target.weeklyRanges[Number(select.dataset.weekRange)]=select.value;schedulePersist();}));
+      list.innerHTML=target.weeklyRanges.map((preset,index)=>`<div class="week-range-row"><strong>Week ${index+1}</strong><div class="week-range-pills" role="group" aria-label="Week ${index+1} rep range">${Object.entries(REP_PRESETS).map(([key,value])=>{const short=value.amrap?'AMRAP':value.openTop?'15+':`${value.min}–${value.max}`;return `<button type="button" class="rep-preset" data-week-pill="${index}" data-preset="${key}" aria-pressed="${key===preset}">${short}</button>`;}).join('')}</div></div>`).join('');
+      document.querySelectorAll('[data-week-pill]').forEach(button=>button.addEventListener('click',()=>{const index=Number(button.dataset.weekPill);target.weeklyRanges[index]=button.dataset.preset;document.querySelectorAll(`[data-week-pill="${index}"]`).forEach(other=>other.setAttribute('aria-pressed',String(other===button)));schedulePersist();}));
     }
     function programRangeForWeek(program,week){const progression=program?.progression||progressionSetup;if(!progression.undulating)return progression.defaultRange||progressionSetup.defaultRange;const key=progression.weeklyRanges?.[Math.max(0,week-1)]||progression.defaultRange?.preset||'hypertrophy';const preset=REP_PRESETS[key]||REP_PRESETS.hypertrophy;return {preset:key,min:preset.min,max:preset.max,openTop:!!preset.openTop,amrap:!!preset.amrap};}
     function programMuscles(program){const counts={};(program.workouts||[]).forEach(workout=>(workout.template?.exercises||[]).forEach(item=>{const ex=exercises.find(row=>row.id===item.exerciseId);[...(ex?.primary||[]),...(ex?.secondary||[])].forEach(m=>counts[m]=(counts[m]||0)+1);}));return Object.entries(counts).sort((a,b)=>b[1]-a[1]);}
@@ -105,7 +111,27 @@
     function programRangeLabel(range) {
       if(range?.amrap)return `AMRAP from ${range.min||1} reps`;
       if(range?.openTop||range?.max==null)return `${range.min||15}+ reps`;
+      if(range?.min&&range.min===range.max)return `${range.min} reps`;
       return `${range?.min||1}–${range?.max||range?.min||1} reps`;
+    }
+    /* #49: the Workout tab's continue-program card must read as the workout's
+       own prescription, not the program default. Exercises without their own
+       range inherit the program default for the week, so those label as the
+       default; mixed prescriptions label honestly as mixed. */
+    function programWorkoutRangeLabel(program,workout,week){
+      const fallback=programRangeForWeek(program,week);
+      const labels=[...new Set((workout?.template?.exercises||[]).map(x=>{
+        const p=x.progression||{}, time=(x.tracking||p.mode)==='time';
+        if(time){
+          if(p.timeMin==null&&p.timeMax==null)return programRangeLabel(fallback);
+          const min=p.timeMin,max=p.timeMax;
+          return min&&max&&min!==max?`${min}–${max} sec`:`${min||max} sec`;
+        }
+        const hasOwn=p.min!=null||p.max!=null||p.openTop||p.amrap;
+        return programRangeLabel(hasOwn?p:fallback);
+      }).filter(Boolean))];
+      if(!labels.length)return programRangeLabel(fallback);
+      return labels.length===1?labels[0]:'Mixed ranges';
     }
     function suggestedProgramWorkout(program) {
       const ready=(program?.workouts||[]).filter(workout=>workout.template?.exercises?.length);
@@ -138,7 +164,8 @@
           max:base.max??inheritedRange.max,
           openTop:base.openTop??(hasExerciseRange?false:!!inheritedRange.openTop),
           amrap:base.amrap??(hasExerciseRange?false:!!inheritedRange.amrap),
-          ...base
+          ...base,
+          scheme:program.progression?.scheme||'rpe'
         };
         return{uid:uid('exercise'),exerciseId:x.exerciseId,tracking:x.tracking||progression.mode||'reps',note:x.note||'',noteOpen:!!x.note,exerciseTags:[...(x.exerciseTags||[])],supersetId:x.supersetId||null,progression,sets:(x.sets?.length?x.sets:[{w:'',r:'',seconds:'',rpe:'',tags:[]}]).map(set=>({uid:uid('set'),w:'',r:(x.tracking||progression.mode||'reps')==='time'?'':String(progression.min||''),seconds:set.seconds??'',rpe:set.rpe??'',tags:[...(set.tags||[])],complete:false}))};
       })};
@@ -161,29 +188,26 @@
     }
     function renderProgram() {
       const program = workoutState.activeProgram;
-      $('#programSetup').hidden = !!program;
-      $('#programCover').hidden = !program;
+      const editing=$('#createProgram').dataset.editing==='true'&&!!program;
+      $('#programSetup').hidden = !!program && !editing;
+      $('#programCover').hidden = !program || editing;
       renderArchivedPrograms();
       if (!program) { if(!programDraftProgression)seedProgramForm(null); return; }
       const week=programWeek(program), completedThisWeek=workoutState.completed.filter(w=>w.programId===program.id&&programWeekAtDate(program,w.date)===week).length;
       const muscleRows=programMuscles(program),muscleMax=Math.max(1,...muscleRows.map(([,count])=>count));
-      $('#programCover').innerHTML = `<div class="program-cover-head"><div class="program-cover-kicker">ACTIVE PROGRAM · WEEK ${week} OF ${program.length}</div><h2>${escapeHtml(program.name)}</h2><p class="program-cover-meta">${escapeHtml(program.focus || 'No focus note added.')}${program.schedule?`<br>${escapeHtml(program.schedule)} · three sessions per week`:''}</p><button class="program-cover-edit" id="editProgramTop" type="button">Edit program</button></div><div class="program-body">${program.notice?`<p class="program-notice">${escapeHtml(program.notice)}</p>`:''}<div class="program-progress"><span>${program.workouts.length} workout${program.workouts.length === 1 ? '' : 's'} in rotation</span><span>${completedThisWeek} completed this week</span></div><div class="week-progress" style="--program-weeks:${program.length}" aria-label="Week ${week} of ${program.length}">${Array.from({length:program.length},(_,i)=>`<span class="week-segment ${i+1<week?'past':i+1===week?'current':''}"></span>`).join('')}</div><div class="program-cover-actions"><button class="secondary-button" id="editProgram" type="button">Edit program</button></div><section class="program-muscles"><h3>Muscles in this program</h3>${muscleRows.length?`<div class="program-muscle-bars">${muscleRows.slice(0,8).map(([muscle,count])=>`<div class="program-muscle-bar"><span>${escapeHtml(titleCase(muscle))}</span><i style="--fill:${Math.max(8,count/muscleMax*100)}%"></i></div>`).join('')}</div>`:'<p class="section-note">Add exercises to a program workout to see its muscle coverage.</p>'}</section><div class="program-progression-summary"><h3>Progression engine</h3><div class="program-progression-meta"><span class="tag primary">Top set ≤ RPE ${program.progression?.threshold??8}</span><span class="tag">${program.progression?.incrementType==='percent'?(program.progression.incrementValue+'%'):(program.progression?.incrementValue??5)+' '+weightUnit()} default jump</span><span class="tag">Auto-applied on start</span><span class="tag">Stall detector ${program.progression?.stallDetection===false?'off':'on'}</span><span class="tag">${escapeHtml(titleCase(program.progression?.defaultRange?.preset||'hypertrophy'))} · ${programRangeLabel(program.progression?.defaultRange)}</span>${program.progression?.undulating?'<span class="tag primary">Varies by week</span>':''}</div></div><div class="section-head"><h2>Workouts</h2><p class="section-note">Choose any workout, in any order</p></div><div class="program-workouts" id="programWorkouts">${program.workouts.length ? program.workouts.map((workout,index) => {const count=workoutState.completed.filter(w=>w.programId===program.id&&w.programWorkoutUid===workout.uid).length,exerciseCount=workout.template?.exercises?.length||0;return `<div class="swipe-item program-swipe"><button class="swipe-delete-action delete-program-workout" type="button" data-uid="${escapeHtml(workout.uid)}" aria-label="Remove ${escapeHtml(workout.name)}">Delete</button><div class="program-workout swipe-content"><span class="program-workout-index">${index + 1}</span><div><strong>${escapeHtml(workout.name)}</strong><span>${exerciseCount?`${exerciseCount} exercise${exerciseCount===1?'':'s'}${count?` · ${count} completed`:''}`:'Empty shell · add exercises to start'}</span></div><div class="program-row-actions"><button class="setup-program-row" type="button" data-build-program-workout="${escapeHtml(workout.uid)}">${exerciseCount?'Edit':'Add exercises'}</button>${exerciseCount?`<button class="start-program-row" type="button" data-start-program-workout="${escapeHtml(workout.uid)}">Start</button>`:''}</div></div></div>`;}).join('') : '<div class="history-empty">No workouts yet. Add the first one below.</div>'}</div><div class="program-add"><label class="sr-only" for="newProgramWorkout">Workout name</label><input id="newProgramWorkout" type="text" autocomplete="off" placeholder="Add a workout name"><button class="secondary-button" id="addProgramWorkout" type="button">Add workout</button></div><div class="program-actions"><button class="secondary-button" id="endProgram" type="button">Archive program</button></div><p class="session-note">Workout order is flexible. Week progress begins at your chosen start week, then advances with calendar time.</p></div>`;
+      $('#programCover').innerHTML = `<div class="program-cover-head"><div class="program-cover-kicker">ACTIVE PROGRAM · WEEK ${week} OF ${program.length}</div><h2>${escapeHtml(program.name)}</h2>${program.schedule?`<p class="program-cover-meta">${escapeHtml(program.schedule)} · three sessions per week</p>`:''}</div><div class="program-body">${program.notice?`<p class="program-notice">${escapeHtml(program.notice)}</p>`:''}<div class="program-progress"><span>${program.workouts.length} workout${program.workouts.length === 1 ? '' : 's'} in rotation</span><span>${completedThisWeek} completed this week</span></div><div class="week-progress" style="--program-weeks:${program.length}" aria-label="Week ${week} of ${program.length}">${Array.from({length:program.length},(_,i)=>`<span class="week-segment ${i+1<week?'past':i+1===week?'current':''}"></span>`).join('')}</div><div class="program-cover-actions"><button class="secondary-button" id="editProgram" type="button">Edit program</button></div><section class="program-muscles"><h3>Muscles in this program</h3>${muscleRows.length?`<div class="program-muscle-bars">${muscleRows.slice(0,8).map(([muscle,count])=>`<div class="program-muscle-bar"><span>${escapeHtml(titleCase(muscle))}</span><i style="--fill:${Math.max(8,count/muscleMax*100)}%"></i></div>`).join('')}</div>`:'<p class="section-note">Add exercises to a program workout to see its muscle coverage.</p>'}</section><div class="program-progression-summary"><h3>Progression engine</h3><div class="program-progression-meta">${program.progression?.scheme==='linear'?'<span class="tag primary">Linear progression</span>':`<span class="tag primary">Top set ≤ RPE ${program.progression?.threshold??8}</span>`}<span class="tag">${program.progression?.incrementType==='percent'?(program.progression.incrementValue+'%'):(program.progression?.incrementValue??5)+' '+weightUnit()} ${program.progression?.scheme==='linear'?'every session':'default jump'}</span><span class="tag">Auto-applied on start</span><span class="tag">Stall detector ${program.progression?.stallDetection===false?'off':'on'}</span><span class="tag">${escapeHtml(titleCase(program.progression?.defaultRange?.preset||'hypertrophy'))} · ${programRangeLabel(program.progression?.defaultRange)}</span>${program.progression?.undulating?'<span class="tag primary">Varies by week</span>':''}</div></div><div class="workout-toolbar"><h2>Workouts</h2><button class="exercise-info-button plain-glyph" id="addProgramWorkoutBtn" type="button" aria-label="Add workout">+</button></div><div class="program-workouts" id="programWorkouts">${program.workouts.length ? program.workouts.map((workout,index) => {const count=workoutState.completed.filter(w=>w.programId===program.id&&w.programWorkoutUid===workout.uid).length,exerciseCount=workout.template?.exercises?.length||0;return `<div class="swipe-item program-swipe"><button class="swipe-delete-action delete-program-workout" type="button" data-uid="${escapeHtml(workout.uid)}" aria-label="Remove ${escapeHtml(workout.name)}">Delete</button><div class="program-workout swipe-content"><span class="program-workout-index">${index + 1}</span><div><strong>${escapeHtml(workout.name)}</strong><span>${exerciseCount?`${exerciseCount} exercise${exerciseCount===1?'':'s'}${count?` · ${count} completed`:''}`:'Empty shell · add exercises to start'}</span></div><div class="program-row-actions"><button class="setup-program-row" type="button" data-build-program-workout="${escapeHtml(workout.uid)}">${exerciseCount?'Edit':'Add exercises'}</button>${exerciseCount?`<button class="start-program-row" type="button" data-start-program-workout="${escapeHtml(workout.uid)}">Start</button>`:''}</div></div></div>`;}).join('') : '<div class="history-empty">No workouts yet. Tap + to add the first one.</div>'}</div><div class="program-actions"><button class="secondary-button" id="endProgram" type="button">Archive program</button></div><p class="session-note">Workout order is flexible. Week progress begins at your chosen start week, then advances with calendar time.</p></div>`;
       $('#editProgram')?.addEventListener('click',editActiveProgram);
-      $('#editProgramTop')?.addEventListener('click',editActiveProgram);
       document.querySelectorAll('.delete-program-workout').forEach(button => button.addEventListener('click', () => {program.workouts=program.workouts.filter(workout=>workout.uid!==button.dataset.uid);schedulePersist();renderProgram();}));
       document.querySelectorAll('[data-start-program-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=program.workouts.find(w=>w.uid===button.dataset.startProgramWorkout);if(workout)startProgramWorkout(program,workout);}));
       document.querySelectorAll('[data-build-program-workout]').forEach(button=>button.addEventListener('click',()=>{const workout=program.workouts.find(w=>w.uid===button.dataset.buildProgramWorkout);if(workout)openProgramWorkoutBuilder(program,workout);}));
-      $('#addProgramWorkout').addEventListener('click', addProgramWorkout);
-      $('#newProgramWorkout').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); addProgramWorkout(); } });
+      $('#addProgramWorkoutBtn').addEventListener('click', addProgramWorkout);
       $('#endProgram').addEventListener('click', () => {program.archivedAt=localIsoDate();workoutState.archivedPrograms.unshift(program);workoutState.activeProgram=null;programDraftProgression=null;$('#programName').value='';$('#programStartWeek').value='1';$('#programFocus').value='';schedulePersist();renderProgram();renderDashboard();});
       attachSwipeDelete($('#programWorkouts'));
     }
 
     function addProgramWorkout() {
-      const input = $('#newProgramWorkout');
-      const name = input.value.trim();
-      if (!name || !workoutState.activeProgram) return;
-      const shell={uid:uid('program-workout'), name};
+      if (!workoutState.activeProgram) return;
+      const shell={uid:uid('program-workout'), name:`Workout ${workoutState.activeProgram.workouts.length+1}`};
       workoutState.activeProgram.workouts.push(shell);
       schedulePersist(); renderProgram();
       requestAnimationFrame(() => openProgramWorkoutBuilder(workoutState.activeProgram,shell));
@@ -208,7 +232,7 @@
       const program=workoutState.activeProgram;if(!program)return;
       $('#programName').value=program.name;$('#programLength').value=program.length;$('#programStartWeek').max=String(program.length);$('#programStartWeek').value=String(Math.max(1,Math.min(program.length,Number(program.startWeek)||1)));$('#programFocus').value=program.focus||'';
       seedProgramForm(program);
-      $('#programSetup').hidden=false;$('#createProgram').dataset.editing='true';$('#createProgram').textContent='Save program changes';$('#programSetup').scrollIntoView({behavior:'smooth',block:'start'});
+      $('#createProgram').dataset.editing='true';$('#createProgram').textContent='Save program changes';$('#programSetup').hidden=false;$('#programCover').hidden=true;$('#programSetup').scrollIntoView({behavior:'smooth',block:'start'});
     }
 
     
