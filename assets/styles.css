@@ -237,6 +237,7 @@
     .reorder-arrow:not(:disabled):active { background: var(--surface-raised); }
     .is-touch::-webkit-scrollbar, .is-touch body::-webkit-scrollbar { display: none; }
     .is-touch body { scrollbar-width: none; }
+    html, body { overflow-x: hidden; }
     body { margin: 0; min-height: 100vh; font-family: var(--font-sans); background: var(--bg); scroll-padding-bottom: var(--bottom-nav-clearance); }
     button, input, textarea, select { font: inherit; }
     button { color: inherit; }
@@ -257,7 +258,7 @@
     .topline { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
     .topline.actions-only { justify-content: flex-end; }
     .top-actions { display: flex; align-items: center; gap: 12px; }
-    .add-exercise { min-height: 42px; padding: 0 14px; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: var(--surface-raised); font-weight: 750; cursor: pointer; white-space: nowrap; }
+    .add-exercise { min-height: 44px; padding: 0 14px; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: var(--surface-raised); font-weight: 750; cursor: pointer; white-space: nowrap; }
     .add-exercise:hover { background: var(--accent-hover); }
     /* ===== 4. Typography ===== */
     h1, h2, h3, p { margin-top: 0; }
@@ -270,7 +271,7 @@
     .search-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
     .search { width: 100%; height: 52px; padding: 0 44px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--ink); outline: none; transition: border-color .16s, box-shadow .16s; }
     .search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
-    .clear-search { position: absolute; right: 9px; top: 8px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; display: none; }
+    .clear-search { position: absolute; right: 5px; top: 4px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; display: none; }
     .clear-search.visible { display: grid; place-items: center; }
     .filter-button { min-width: 116px; height: 52px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
     .filter-button[aria-expanded="true"] { border-color: var(--accent); background: var(--accent-soft); }
@@ -281,7 +282,7 @@
     .filter-clear { padding: 2px 0; border: 0; background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; }
     .filter-clear[hidden] { display: none; }
     .muscle-options { display: flex; flex-wrap: wrap; gap: 7px; }
-    .muscle-option { min-height: 34px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; text-transform: capitalize; }
+    .muscle-option { min-height: 44px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; text-transform: capitalize; }
     .muscle-option[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     select { width: 100%; min-height: 42px; margin-top: 8px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background-color: var(--surface); color: var(--ink); font: inherit; }
     /* Every dropdown gets the theme-aware chevron (#9): never a white-on-white native arrow. */
@@ -302,7 +303,7 @@
     .exercise-card-main:focus-visible { outline: none; }
     .exercise-card h2 { margin: 0 0 20px; font-size: 18px; line-height: 1.18; letter-spacing: -.02em; }
     /* Favorite star: hollow muted by default, filled accent when favorited. */
-    .fav-toggle { display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+    .fav-toggle { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
     .fav-toggle svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
     .fav-toggle:hover { background: var(--surface-2); }
     .fav-toggle[aria-pressed="true"] { color: var(--accent); }
@@ -321,7 +322,7 @@
     .custom-form-head { display: flex; align-items: start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
     .custom-form-head h2 { margin: 0 0 5px; font: 700 24px/1.15 var(--font-sans); letter-spacing: -.02em; }
     .custom-form-head p { margin: 0; color: var(--muted); font-size: 13px; }
-    .dialog-close { flex: 0 0 auto; width: 38px; height: 38px; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--muted); cursor: pointer; font-size: 22px; line-height: 1; }
+    .dialog-close { flex: 0 0 auto; width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--muted); cursor: pointer; font-size: 22px; line-height: 1; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
     .field { display: grid; gap: 7px; }
     .field.wide { grid-column: 1 / -1; }
@@ -334,17 +335,17 @@
     fieldset.field { min-width: 0; margin: 0; padding: 0; border: 0; }
     fieldset.field legend { padding: 0; color: var(--muted); font-size: 12px; font-weight: 700; }
     .form-pill-options { display: flex; flex-wrap: wrap; gap: 7px; }
-    .form-pill { min-height: 36px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; text-transform: capitalize; }
+    .form-pill { min-height: 44px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; text-transform: capitalize; }
     .form-pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .form-pill:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
     .form-error { min-height: 18px; margin: 12px 0 0; color: var(--danger); font-size: 12px; }
     .form-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 5px; }
-    .form-action { min-height: 42px; padding: 0 15px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 700; }
+    .form-action { min-height: 44px; padding: 0 15px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 700; }
     .form-action.secondary { border: 1px solid var(--line); background: var(--surface); }
     .form-action.primary { border: 0; background: var(--accent); color: var(--surface-raised); }
     .form-action.danger { border: 0; background: var(--danger); color: #fff; }
     .custom-tools { display: flex; gap: 8px; margin-top: 18px; }
-    .custom-tool { min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 700; }
+    .custom-tool { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 700; }
     .custom-tool.danger { color: var(--danger); border-color: var(--rose); }
     .custom-delete-row { margin-top: 26px; }
     .custom-delete-row:empty { display: none; }
@@ -377,7 +378,7 @@
     /* #14: compact segmented toggles (top-exercises metric, muscle-map mode).
        Fixed button widths so tapping never shifts the surrounding layout. */
     .mini-segmented { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
-    .mini-segmented button { min-width: 62px; min-height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 750; cursor: pointer; }
+    .mini-segmented button { min-width: 62px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 750; cursor: pointer; }
     .mini-segmented button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
     /* #4: upcoming program workout shown when a future calendar date is tapped. */
     .upcoming-kicker { margin: 0 0 4px; font-size: 11px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
@@ -423,6 +424,8 @@
     .workout-start p { max-width: 520px; margin-bottom: 24px; color: var(--muted); line-height: 1.5; }
     .start-actions, .workout-actions { display: flex; flex-wrap: wrap; gap: 9px; }
     .primary-button, .secondary-button { min-height: 44px; padding: 0 15px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 750; }
+    /* #112: bottom "Add exercise" button — full width like "Add set", with top spacing. */
+    .add-exercise-bottom { display: flex; align-items: center; justify-content: center; width: 100%; margin: 18px 0 0; }
     .primary-button { border: 0; background: var(--accent); color: var(--surface-raised); }
     .primary-button.danger-button { border-color: var(--danger); background: var(--danger); color: #fff; }
     .secondary-button.danger-button { border-color: var(--rose); color: var(--rose); }
@@ -435,15 +438,21 @@
     .draft-status { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
     .draft-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
     .workout-exercises { display: grid; gap: 14px; }
-    .swipe-item { position: relative; overflow: hidden; border-radius: var(--radius-md); background: transparent; }
-    .swipe-content { position: relative; z-index: 1; transform: translateX(0); transition: transform .18s ease; touch-action: pan-y; will-change: transform; }
+    .swipe-item { position: relative; overflow: hidden; border-radius: var(--radius-md); background: var(--surface); }
+    .swipe-content { position: relative; z-index: 1; transform: translateX(0); transition: transform .18s ease; touch-action: pan-y; }
+    /* #107: width overlap removed — testing if will-change was the artifact source. */
     .swipe-item.is-open .swipe-content { transform: translateX(-72px); }
     /* Delete rail: only the trailing 72px is red (user 2026-09-11) — the row
        slides left over it, iOS-Mail style. Icon-only, no text.
        #84 (user 2026-09-11): the red is harmonized with the accent — danger
        muted 18% toward the accent so it doesn't clash with cruciferous green.
        Plain var(--danger) stays as the fallback for pre-color-mix browsers. */
-    .swipe-delete-action { position: absolute; top: 0; bottom: 0; right: 0; width: 72px; border: 0; border-radius: 0; background: var(--danger); background: color-mix(in srgb, var(--danger) 82%, var(--accent)); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .swipe-delete-action { position: absolute; top: 0; bottom: 0; right: 0; width: 72px; border: 0; border-radius: 0 10px 10px 0; background: var(--surface); -webkit-appearance: none; appearance: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    /* #107: closed rail matches the row surface — even if iOS WebKit blends at
+       the rounded clip edge, it blends surface-with-surface (invisible).
+       Red appears only while actively dragging (.is-swiping) or open. */
+    .swipe-item.is-open .swipe-delete-action,
+    .swipe-item.is-swiping .swipe-delete-action { background: var(--danger); background: color-mix(in srgb, var(--danger) 82%, var(--accent)); }
     .swipe-delete-action svg { width: 26px; height: 26px; display: block; }
     .standalone-only { display: none; }
     .is-standalone .standalone-only { display: block; }
@@ -470,7 +479,8 @@
     .exercise-accordion.workout-exercise { position: relative; }
     .exercise-accordion.workout-exercise > .corner-icon { position: absolute; top: 8px; right: 8px; z-index: 2; }
     .exercise-accordion.workout-exercise .exercise-accordion-head { padding-right: 54px; }
-    .exercise-info-button { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 15px; font-weight: 700; font-style: italic; font-family: var(--font-sans); line-height: 1; cursor: pointer; }
+    .exercise-info-button { position: relative; flex: none; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 15px; font-weight: 700; font-style: italic; font-family: var(--font-sans); line-height: 1; cursor: pointer; }
+    .exercise-info-button::before { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
     .exercise-info-button:active { transform: scale(.94); }
     .exercise-accordion[open] .exercise-accordion-chevron { transform: rotate(90deg); }
     .exercise-accordion-body { padding: 2px 18px 18px; }
@@ -512,7 +522,8 @@
        muted, and visually subordinate to the checkbox; warms to a soft red
        only on hover/focus. Desktop keeps it; touch with swipe-to-delete on
        hides it (see the .is-touch.swipe-sets rule below). */
-    .delete-set-inline { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); opacity: .5; cursor: pointer; display: grid; place-items: center; transition: opacity .15s ease, background-color .15s ease, color .15s ease; }
+    .delete-set-inline { position: relative; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); opacity: .5; cursor: pointer; display: grid; place-items: center; transition: opacity .15s ease, background-color .15s ease, color .15s ease; }
+    .delete-set-inline::before { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
     .delete-set-inline svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; display: block; }
     .delete-set-inline:hover, .delete-set-inline:focus-visible { opacity: 1; background: var(--rose-soft); color: var(--danger); outline: none; }
     /* Swipe-to-delete replaces the × on touch devices when the Settings toggle
@@ -553,7 +564,8 @@
     .tag-editor input { min-width: 0; height: 42px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none; }
     .tag-list { display: flex; flex-wrap: wrap; gap: 7px; }
     .tag-list-item { display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px 4px 9px; border-radius: 999px; background: var(--surface-2); font-size: 11px; }
-    .tag-list-item button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--line); color: var(--muted); cursor: pointer; }
+    .tag-list-item button { position: relative; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--line); color: var(--muted); cursor: pointer; }
+    .tag-list-item button::before { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
     .completed-card { max-width: 760px; padding: clamp(22px, 5vw, 38px); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); scroll-margin-bottom: var(--bottom-nav-clearance); }
     .completed-set-cell .perf-sub { display: block; color: var(--muted); font-size: 11px; font-weight: 600; margin-top: 1px; }
     .completed-card h2 { margin-bottom: 6px; font: 800 clamp(26px, 5vw, 34px)/1.08 var(--font-sans); letter-spacing: -.025em; }
@@ -629,7 +641,7 @@
       .topline { align-items: start; }
       .top-actions { flex-direction: column-reverse; align-items: flex-end; gap: 8px; }
       .source-link { margin-top: 0; font-size: 11px; }
-      .add-exercise { min-height: 40px; padding: 0 11px; font-size: 13px; }
+      .add-exercise { min-height: 44px; padding: 0 11px; font-size: 13px; }
       .custom-form { padding: 20px 16px; }
       .form-grid { grid-template-columns: 1fr; }
       .field.wide { grid-column: auto; }
@@ -638,7 +650,7 @@
       .filter-button span { display: none; }
       .filter-panel { grid-template-columns: 1fr; }
       .muscle-options { gap: 6px; }
-      .muscle-option { min-height: 36px; }
+      .muscle-option { min-height: 44px; }
       .exercise-grid { grid-template-columns: 1fr; gap: 8px; }
       .exercise-card-main { min-height: 128px; padding: 16px; padding-right: 50px; }
       .exercise-card h2 { margin-bottom: 15px; }
@@ -721,17 +733,18 @@
     .swipe-delete-action { width: 72px; background: var(--danger); background: color-mix(in srgb, var(--danger) 82%, var(--accent)); }
     .swipe-item.is-open .swipe-content { transform: translateX(-72px); }
     .exercise-tools { display: flex; align-items: center; gap: 6px; }
-    .drag-handle, .superset-button { min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); cursor: grab; font-size: 11px; font-weight: 750; touch-action: none; }
+    .drag-handle, .superset-button { min-height: 44px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); cursor: grab; font-size: 12px; font-weight: 750; touch-action: none; }
     .drag-handle { font-size: 18px; letter-spacing: -3px; }
     .superset-button { cursor: pointer; }
     .superset-button.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .superset-band { margin: -5px 0 8px; color: var(--accent); font-size: 10px; font-weight: 800; text-transform: uppercase; }
     .exercise-note { margin-top: 14px; }
-    .add-note-toggle { padding: 6px 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 750; }
+    .add-note-toggle { display: inline-flex; align-items: center; min-height: 44px; padding: 6px 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 750; }
     .exercise-note textarea { width: 100%; min-height: 62px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); resize: vertical; outline: none; }
     .exercise-note textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
-    .small-button { min-height: 38px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 750; }
+    .small-button { min-height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 750; }
     .status-note { min-height: 18px; margin: 8px 0 0; color: var(--accent); font-size: 12px; }
+    .status-note.is-error { color: var(--danger); }
     .bottom-nav { grid-template-columns: repeat(5, 1fr); }
     @container (max-width: 700px) {
       .dashboard-grid { grid-template-columns: 1fr; }
@@ -760,10 +773,10 @@
     .dashboard-card-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
     .dashboard-card-head h2 { margin: 0; }
     .period-wrap { position: relative; }
-    .period-trigger { min-height: 30px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 750; }
+    .period-trigger { min-height: 44px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 750; }
     .period-trigger:hover, .period-trigger[aria-expanded="true"] { border-color: var(--line); background: var(--surface-2); color: var(--ink); }
     .period-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 8; width: 126px; padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); box-shadow: var(--shadow); }
-    .period-option { width: 100%; min-height: 36px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; text-align: left; cursor: pointer; font-size: 12px; }
+    .period-option { width: 100%; min-height: 44px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; text-align: left; cursor: pointer; font-size: 12px; }
     /* Sticky-:hover fix (user 2026-09-11): on touch devices iOS keeps :hover
        applied after a tap, so a hover style that matches the selected style
        leaves cards looking "stuck" selected. :hover only applies where hover
@@ -819,7 +832,7 @@
     .exercise-visual-copy strong { display: block; margin-bottom: 7px; font-size: 15px; }
     .exercise-visual-copy p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
     .program-workout { grid-template-columns: 34px minmax(0,1fr) auto; }
-    .start-program-row { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--accent); cursor: pointer; font-size: 11px; font-weight: 750; }
+    .start-program-row { min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--accent); cursor: pointer; font-size: 12px; font-weight: 750; }
     .week-progress { display: grid; grid-template-columns: repeat(var(--program-weeks, 8), minmax(0,1fr)); gap: 4px; margin: 12px 0 20px; }
     .week-segment { height: 6px; border-radius: 999px; background: var(--surface-2); }
     .week-segment.past, .week-segment.current { background: var(--accent); }
@@ -842,7 +855,7 @@
     .day-chip strong { margin-top: 5px; font-size: 18px; }
     .day-chip em { display: block; min-height: 11px; margin-top: 4px; font-size: 8px; font-style: normal; font-weight: 850; text-transform: uppercase; }
     .period-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
-    .period-tab { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 750; }
+    .period-tab { min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 750; }
     .period-tab[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .heatmap-shell { display: grid; grid-template-columns: minmax(180px,.78fr) minmax(220px,1.22fr); gap: 20px; align-items: center; margin-top: 14px; }
     /* Sasha anatomical body map (restored 2026-09-10). The SVG holds front+back
@@ -906,14 +919,14 @@
     .exercise-rule-controls { display: grid; grid-template-columns: 96px 72px 72px minmax(190px,1fr); gap: 8px; align-items: end; }
     .rule-field { display: grid; gap: 4px; }
     .rule-field span, .load-control-title { color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
-    .rule-field input, .rule-field select { width: 100%; min-height: 38px; height: 38px; margin: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background-color: var(--surface); font-size: 12px; }
+    .rule-field input, .rule-field select { width: 100%; min-height: 44px; height: 44px; margin: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background-color: var(--surface); font-size: 16px; }
     .load-progression { display: grid; gap: 5px; }
     .load-progression-row { display: grid; grid-template-columns: minmax(0,1fr) 76px auto; gap: 6px; align-items: center; }
     .lp-value { position: relative; display: block; min-width: 0; }
     .lp-value .unit { position: absolute; right: 8px; top: 0; bottom: 0; display: inline-flex; align-items: center; font-style: normal; font-size: 11px; color: var(--muted); pointer-events: none; }
     .lp-value input { padding-right: 28px; }
-    .load-progression select, .load-progression input { width: 100%; min-width: 0; height: 38px; margin: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background-color: var(--surface); font-size: 12px; }
-    .reps-only-toggle { min-height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .load-progression select, .load-progression input { width: 100%; min-width: 0; height: 44px; margin: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background-color: var(--surface); font-size: 16px; }
+    .reps-only-toggle { min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 800; white-space: nowrap; }
     .reps-only-toggle[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .exercise-rule-controls .rule-amrap-hint { grid-column: 1 / -1; }
     .load-progression.is-disabled select, .load-progression.is-disabled input { opacity: .45; pointer-events: none; }
@@ -937,19 +950,19 @@
     .account-info dd { margin: 0; font-size: 14px; font-weight: 700; text-align: right; }
     /* Time-step preset pills (2026-09-10, user's pick). */
     .step-pills { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 2px 2px; }
-    .step-pills [data-step] { min-height: 36px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
+    .step-pills [data-step] { min-height: 44px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
     .step-pills [data-step][aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     /* Weight-unit pills share the step-pill look, including the selected state. */
-    .step-pills [data-units] { min-height: 36px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
+    .step-pills [data-units] { min-height: 44px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
     .step-pills [data-units][aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     /* Stats default metric pills (user 2026-09-11): same treatment as the unit pills. */
-    .step-pills [data-stats-default] { min-height: 36px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
+    .step-pills [data-stats-default] { min-height: 44px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
     .step-pills [data-stats-default][aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .stats-default-label { margin: 14px 0 0; }
     /* Theme picker (Settings > Appearance, under the Dark mode toggle). */
     .theme-picker { margin-top: 14px; }
     .theme-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 2px 2px; }
-    .theme-pills [data-theme-name] { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 6px 14px 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
+    .theme-pills [data-theme-name] { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 6px 14px 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 700; cursor: pointer; }
     .theme-pills [data-theme-name] i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); }
     .theme-pills [data-theme-name][aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     /* Theme families (user 2026-09-10): two columns — Cruciferous/Asterid and
@@ -992,6 +1005,7 @@
     .switch-copy strong { font-size: 12px; }
     .switch-copy span { margin-top: 3px; color: var(--muted); font-size: 10px; line-height: 1.4; }
     .switch { position: relative; flex: 0 0 auto; width: 46px; height: 28px; padding: 0; border: 0; border-radius: 999px; background: var(--switch-track); cursor: pointer; }
+    .switch::before { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
     .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--surface-raised); box-shadow: 0 1px 3px var(--backdrop); transition: transform .16s ease; }
     .switch[aria-pressed="true"] { background: var(--accent); }
     .switch[aria-pressed="true"]::after { transform: translateX(18px); }
@@ -1017,7 +1031,7 @@
     .autofill-row { display: grid; grid-template-columns: minmax(0,1fr) 62px 56px; gap: 6px; align-items: center; }
     .autofill-row + .autofill-row { margin-top: 8px; }
     .autofill-row label { min-width: 0; font-size: 11px; font-weight: 750; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .autofill-row input { min-width: 0; width: 100%; height: 36px; padding: 0 7px; border: 1px solid var(--foam); border-radius: 7px; background: var(--pine-soft); text-align: center; }
+    .autofill-row input { min-width: 0; width: 100%; height: 44px; padding: 0 7px; border: 1px solid var(--foam); border-radius: 7px; background: var(--pine-soft); text-align: center; font-size: 16px; }
     .progression-footnote { margin: 14px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
     .progression-banner { margin: 0 0 16px; padding: 14px; border: 1px solid var(--foam); border-radius: var(--radius-md); background: var(--pine-soft); }
     .progression-banner-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
@@ -1025,7 +1039,6 @@
     .progression-banner p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
     .real-data-label { color: var(--accent); font-size: 9px; font-weight: 850; text-transform: uppercase; }
     .workout-context { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; padding: 6px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 750; }
-    .stall-card { margin-top: 10px; padding: 10px; border-radius: 9px; background: var(--gold-soft); color: var(--warning); font-size: 10px; line-height: 1.45; }
     .program-progression-summary { margin: 18px 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
     .program-progression-summary h3 { margin: 0 0 8px; font-size: 14px; }
     .program-progression-meta { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1044,7 +1057,8 @@
     .calendar-toolbar strong, .calendar-toolbar span { display: block; }
     .calendar-toolbar strong { font-size: 13px; }
     .calendar-toolbar span { margin-top: 2px; color: var(--muted); font-size: 10px; }
-    .calendar-page { width: 40px; height: 40px; padding: 0 0 4px; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 25px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+    .calendar-page { position: relative; width: 40px; height: 40px; padding: 0 0 4px; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 25px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+    .calendar-page::before { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
     /* Optical centering (user 2026-09-10): ‹ › glyphs carry uneven side
        bearings, so the visible chevron sits off-center without a nudge. */
     #previousWeek { transform: translateX(-2px); }
@@ -1079,7 +1093,7 @@
     .picker-template-options { margin: 0 0 12px; padding: 12px; border-radius: var(--radius-sm); background: var(--surface-2); }
     .picker-template-options strong { display: block; margin-bottom: 8px; font-size: 11px; }
     .picker-template-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
-    .picker-template-button { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); cursor: pointer; font-size: 11px; font-weight: 750; }
+    .picker-template-button { min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 750; }
     .program-row-actions { display: flex; align-items: center; gap: 6px; }
     /* #71: subtle text delete for program workouts (user 2026-09-11). */
     .program-row-delete-text { margin-left: auto; border: 0; background: none; padding: 8px 4px; color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
@@ -1092,7 +1106,7 @@
     /* #74: "New template" button below the template list — quiet, full-width, 44px touch target. */
     .new-template-button { display: block; width: 100%; min-height: 44px; margin-top: 4px; border: 1px dashed var(--line); border-radius: 12px; background: transparent; color: var(--accent); font-size: 14px; font-weight: 700; cursor: pointer; }
     .new-template-button:active { background: var(--accent-soft); }
-    .setup-program-row { min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 750; }
+    .setup-program-row { min-height: 44px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 750; }
     .program-notice { margin: 0 0 14px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 750; }
     .anatomy-map-shell { min-width: 0; }
     .anatomy-map { width: 100%; min-height: 280px; }
@@ -1138,7 +1152,7 @@
     .trend-change.down { background: var(--rose-soft); color: var(--warning); }
     @container (max-width: 700px) { .muscle-analysis-grid { grid-template-columns: 1fr; } }
     .tracking-segment { display: inline-flex; padding: 3px; gap: 3px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
-    .tracking-segment button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 750; }
+    .tracking-segment button { min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 750; }
     .tracking-segment button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
     .suggestion-card.applied .suggestion-change strong::after { content: ' · applied'; color: var(--accent); font-size: 9px; font-weight: 800; text-transform: uppercase; }
     .time-range-fields { display: contents; }
@@ -1147,7 +1161,7 @@
     .exercise-tag-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
     .exercise-tag-chip { display: inline-flex; align-items: center; min-height: 23px; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink); font-size: 10px; font-weight: 750; }
     .exercise-tag-chip.preset { background: var(--accent-soft); color: var(--accent); }
-    .exercise-tag-button { min-height: 28px; padding: 0 8px; border: 1px dashed var(--line-strong); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 750; }
+    .exercise-tag-button { min-height: 44px; padding: 0 8px; border: 1px dashed var(--line-strong); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 750; }
     .exercise-tag-button:hover, .exercise-tag-button:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
     .exercise-tags-builder { margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--line); }
     .exercise-tags-builder .exercise-tag-row { margin-top: 0; }
@@ -1194,12 +1208,11 @@
     .template-disclosure[open] { grid-column: 1 / -1; }
     .template-disclosure-list { margin-top: 10px; }
     .built-in-label { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
-    .sample-label { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--gold-soft); color: var(--gold); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
     .advanced-options summary::-webkit-details-marker { display: none; }
     .advanced-options summary::after { content: '›'; color: var(--muted); font-size: 18px; font-weight: 500; line-height: 1; transition: transform .18s ease; }
     .advanced-options[open] > summary::after { transform: rotate(90deg); }
     .advanced-options { margin-top: 10px; border-top: 1px solid var(--line); }
-    .advanced-options summary { display: flex; align-items: center; justify-content: space-between; min-height: 40px; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 800; }
+    .advanced-options summary { display: flex; align-items: center; justify-content: space-between; min-height: 44px; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 800; }
     .workout-focus-open .field-help { margin: 8px 0 0; }
     .workout-focus-label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
     .advanced-options-body { display: grid; gap: 10px; padding: 2px 0 8px; }
@@ -1220,16 +1233,18 @@
     .similar-collapse[open] > summary::after { content: '−'; }
     .similar-collapse .section-head { margin-bottom: 0; }
     .set-utility-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .copy-first-set { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 0 13px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; font-weight: 700; }
+    .copy-first-set { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; font-weight: 700; }
     .copy-first-set:disabled { background: transparent; color: var(--muted); opacity: .55; cursor: default; }
     /* Accent circular add-exercises button on the workout page (user 2026-09-10). */
     #addWorkoutExercise { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .rep-preset-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 9px 0 12px; }
-    .rep-preset { min-height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 11px; font-weight: 750; }
+    .rep-preset { min-height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; font-weight: 750; }
     .rep-preset[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     /* #97 (user 2026-09-11): RPE threshold uses square option boxes like the
-       onboarding prototype, not pills. */
-    #settingsRpePills .rep-preset { border-radius: 10px; min-width: 54px; min-height: 48px; padding: 0; font-size: 16px; }
+       onboarding prototype, not pills. Compact squares with green border +
+       tint when selected. */
+    #settingsRpePills { gap: 8px; }
+    #settingsRpePills .rep-preset { border-radius: 10px; width: 44px; height: 44px; min-width: 0; min-height: 0; padding: 0; font-size: 15px; font-weight: 700; }
     .range-fields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
     /* Flat progression section inside program setup (2026-09-10, #45): no
        nested card — same visual language as Settings → Progression defaults,
@@ -1243,7 +1258,7 @@
     .week-range-list { display: grid; gap: 12px; margin-top: 10px; }
     .week-range-row strong { display: block; margin-bottom: 6px; font-size: 11px; }
     .week-range-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-    .week-range-pills .rep-preset { min-height: 32px; padding: 0 10px; font-size: 10px; }
+    .week-range-pills .rep-preset { min-height: 44px; padding: 0 10px; font-size: 12px; }
     /* Settings → default periodization (user 2026-09-11): green text button,
        left-aligned, revealed under the undulating toggle when it is on. */
     .settings-periodization { margin-top: 4px; }
@@ -1252,7 +1267,7 @@
     #settingsUndulatingPanel { margin-top: 4px; }
     .program-cover-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
     /* Compact Edit program button (user 2026-09-11): small pill, not a big CTA. */
-    .program-cover-actions .secondary-button { min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; }
+    .program-cover-actions .secondary-button { min-height: 44px; padding: 0 14px; border-radius: 999px; font-size: 13px; }
     /* Program Workouts + button matches the workout screen's add-exercises paradigm. */
     #addProgramWorkoutBtn { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .program-muscles { margin-top: 18px; }
@@ -1397,6 +1412,12 @@
     .start-option:hover { border-color: var(--accent); }
     .swipe-item { border-radius: var(--radius-md); }
     .swipe-delete-action { background: var(--danger); background: color-mix(in srgb, var(--danger) 82%, var(--accent)); color: var(--on-accent); }
+    /* #107: CLOSED state matches row surface (not transparent) — if iOS WebKit
+       blends at the rounded clip edge, surface-with-surface is invisible.
+       Higher specificity (0,3,0) wins over the base .swipe-delete-action
+       background rules above. Must come AFTER all other .swipe-delete-action
+       background declarations in the cascade. */
+    .swipe-item:not(.is-open):not(.is-swiping) .swipe-delete-action { background: var(--surface); }
     /* Set rows: full-bleed inline ledger rows — no boxes, no side borders (user 2026-09-10, UX consult). */
     .log-set { padding: 12px 0; border: 0; background: transparent; }
     .log-set + .log-set { border-top: 1px solid var(--line); }
@@ -1427,7 +1448,7 @@
       button.suggestion-card:hover { border-color: var(--accent); background: var(--accent-soft); }
     }
     .suggestion-card.applied .suggestion-change strong::after { color: var(--accent); }
-    .progression-banner, .stall-card, .picker-template-options { border-color: var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
+    .progression-banner, .picker-template-options { border-color: var(--line); border-radius: var(--radius-md); background: var(--surface-2); }
     .program-cover { border-color: var(--line-strong); }
     .program-body { background: var(--surface); }
     .week-segment { background: var(--surface-2); }
@@ -1490,7 +1511,7 @@
     .program-next-flexibility { margin: 8px 8px 0; }
     .program-next-flexibility summary { color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 750; }
     .program-next-alternatives { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-    .program-next-alternatives button { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 11px; font-weight: 750; }
+    .program-next-alternatives button { min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; font-weight: 750; }
     .training-recent { padding: 0 2px; }
     .workout-toolbar-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
     .last-session-line { margin: 10px 0 8px; padding: 9px 11px; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--muted); font-size: 12px; }
@@ -1567,14 +1588,15 @@
     .exercise-info-button.plain-glyph { display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 20px; font-weight: 500; line-height: 1; }
     /* × remove button inside a picker rule accordion head. */
     .rule-head-actions { display: inline-flex; align-items: center; gap: 10px; flex: none; }
-    .rule-remove { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 17px; line-height: 1; cursor: pointer; padding: 0 0 2px; }
+    .rule-remove { position: relative; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 17px; line-height: 1; cursor: pointer; padding: 0 0 2px; }
+    .rule-remove::before { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
     .rule-remove:active { transform: scale(.92); }
     .settings-grid { gap: 16px; margin-bottom: 6px; grid-auto-flow: dense; }
     /* Paired fields (increment type+value, rep min+max) always sit side by side. */
     .settings-pair { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
     #settingsView .rule-field { gap: 8px; }
     #settingsView .rule-field > span { font-size: 10px; letter-spacing: .06em; }
-    #settingsView .rule-field input, #settingsView .rule-field select { min-height: 48px; height: 48px; padding: 0 14px; border-radius: 12px; font-size: 15px; }
+    #settingsView .rule-field input, #settingsView .rule-field select { min-height: 48px; height: 48px; padding: 0 14px; border-radius: 12px; font-size: 16px; }
     #settingsView .switch-row { margin-top: 12px; padding: 18px 0 2px; border-top: 1px solid var(--line); }
     #settingsView .switch-copy strong { font-size: 14px; }
     #settingsView .switch-copy span { font-size: 12px; line-height: 1.5; }
@@ -1629,7 +1651,7 @@
     .completed-detail-top-actions { display: flex; gap: 8px; }
     /* "Start new workout" pill next to Back on the completed-workout screen
        (user 2026-09-10): accent pill matching primary-button colors. */
-    .start-new-workout-pill { min-height: 40px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--accent); color: var(--surface-raised); font-size: 14px; font-weight: 750; cursor: pointer; }
+    .start-new-workout-pill { min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--accent); color: var(--surface-raised); font-size: 14px; font-weight: 750; cursor: pointer; }
     .start-new-workout-pill:hover { background: var(--accent-hover); }
     /* Secondary pill (#73, 2026-09-11): "Start new workout" stays reachable
        without competing with the accent "Save as template" pill. */

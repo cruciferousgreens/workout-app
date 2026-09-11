@@ -82,17 +82,16 @@
       </div>`;
     }
 
-    /** Real completed history only — sample workouts are excluded so the progression engine,
-     *  PRs, and exercise stats never treat demo data as the user's own. */
+    /** Completed history for this exercise (per-exercise logs). */
     function getExerciseLogs(id) {
-      return realWorkouts().flatMap(workout => workout.exercises
+      return workoutState.completed.flatMap(workout => workout.exercises
         .filter(item => item.exerciseId === id)
         .map(item => ({workoutId:workout.id,date: formatLogDate(workout.date), isoDate:workout.date, tracking:item.tracking || (item.sets.some(set => set.seconds != null) ? 'time' : 'reps'), progression:item.progression?{...item.progression}:null, exerciseTags:[...(item.exerciseTags||[])], sets:item.sets.map(set => ({w:set.w,r:set.r,seconds:set.seconds,rpe:set.rpe,tags:[...(set.tags || [])]})), name:workout.name})));
     }
 
     function recentExerciseIds() {
       const ids = new Set();
-      realWorkouts().forEach(workout => workout.exercises.forEach(item => ids.add(item.exerciseId)));
+      workoutState.completed.forEach(workout => workout.exercises.forEach(item => ids.add(item.exerciseId)));
       return [...ids].sort((a, b) => {
         const aDate = getExerciseLogs(a)[0]?.isoDate || '';
         const bDate = getExerciseLogs(b)[0]?.isoDate || '';

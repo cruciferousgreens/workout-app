@@ -147,7 +147,7 @@
       const host=$('#workoutRecent'); if(!host)return;
       const sorted=workoutState.completed.slice().sort((a,b)=>b.date.localeCompare(a.date));
       const recent=sorted.slice(0,6);
-      host.innerHTML=recent.length?recent.map(workout=>{const summary=workoutSummary(workout);return `<button class="recent-workout" type="button" data-training-workout="${escapeHtml(workout.id)}"><span><strong>${escapeHtml(workout.name)}${isSampleWorkout(workout)?'<span class="sample-label">Sample</span>':''}</strong><small>${escapeHtml(formatLogDate(workout.date))} · ${summary.sets} sets · ${formatVolume(summary.volume)}</small></span><span aria-hidden="true">›</span></button>`;}).join('')+(sorted.length>6?`<button class="view-all-history" type="button" id="viewAllWorkouts">View all ${sorted.length} workouts ›</button>`:''):'<p class="section-note">Your completed workouts will appear here.</p>';
+      host.innerHTML=recent.length?recent.map(workout=>{const summary=workoutSummary(workout);return `<button class="recent-workout" type="button" data-training-workout="${escapeHtml(workout.id)}"><span><strong>${escapeHtml(workout.name)}</strong><small>${escapeHtml(formatLogDate(workout.date))} · ${summary.sets} sets · ${formatVolume(summary.volume)}</small></span><span aria-hidden="true">›</span></button>`;}).join('')+(sorted.length>6?`<button class="view-all-history" type="button" id="viewAllWorkouts">View all ${sorted.length} workouts ›</button>`:''):'<p class="section-note">Your completed workouts will appear here.</p>';
       document.querySelectorAll('[data-training-workout]').forEach(button=>button.addEventListener('click',()=>{state.workoutDetailReturn='workout';renderCompletedWorkout(workoutState.completed.find(workout=>workout.id===button.dataset.trainingWorkout));}));
       $('#viewAllWorkouts')?.addEventListener('click',showWorkoutHistory);
     }
@@ -188,7 +188,7 @@
       groups.forEach((workouts,key)=>{
         html+=`<div class="history-month-group"><h3 class="history-month">${escapeHtml(monthLabel(key))}</h3>`;
         workouts.forEach(workout=>{const summary=workoutSummary(workout);
-          html+=`<button class="recent-workout" type="button" data-history-workout="${escapeHtml(workout.id)}"><span><strong>${escapeHtml(workout.name)}${isSampleWorkout(workout)?'<span class="sample-label">Sample</span>':''}</strong><small>${escapeHtml(formatLogDate(workout.date))} · ${summary.sets} sets · ${formatVolume(summary.volume)}</small></span><span aria-hidden="true">›</span></button>`;});
+          html+=`<button class="recent-workout" type="button" data-history-workout="${escapeHtml(workout.id)}"><span><strong>${escapeHtml(workout.name)}</strong><small>${escapeHtml(formatLogDate(workout.date))} · ${summary.sets} sets · ${formatVolume(summary.volume)}</small></span><span aria-hidden="true">›</span></button>`;});
         html+=`</div>`;
       });
       host.innerHTML=html;
@@ -265,6 +265,7 @@
          others here too, but it was redundant — the closer always runs before
          any swipe's finish() can open a rail. */
       item.classList.toggle('is-open', open);
+      item.classList.remove('is-swiping'); /* #107: is-open owns the red now */
       const action = item.querySelector(':scope > .swipe-delete-action');
       if (action) action.tabIndex = open ? 0 : -1;
       /* #93 (user 2026-09-11): closing must also clear any leaked inline
@@ -355,6 +356,9 @@
           deltaX = Math.max(-72, Math.min(0, base + dx));
           content.style.transition = 'none';
           content.style.transform = `translateX(${deltaX}px)`;
+          /* #107: paint rail red only when genuinely swiped left (deltaX<0),
+             added synchronously with transform so no first-frame flash. */
+          item.classList.toggle('is-swiping', deltaX < 0);
         });
         const finish = event => {
           if (event.pointerId !== pointerId) return;
@@ -364,7 +368,7 @@
              without clearing it, the rail stays visibly open with no is-open
              class, and nothing (not the #86 close, not the bubble closer) can
              dismiss it. (user 2026-09-11, #93) */
-          const resetDrag = () => { content.style.transition = ''; content.style.transform = ''; horizontal = false; pointerId = null; };
+          const resetDrag = () => { content.style.transition = ''; content.style.transform = ''; horizontal = false; pointerId = null; item.classList.remove('is-swiping'); };
           /* user 2026-09-11: two hard rules. (1) A gesture starting on the
              checkbox is always a tap — never open the rail. (2) A completed
              set can't be swiped open. */
@@ -376,6 +380,7 @@
           if (horizontal && Math.abs(deltaX - (startedOpen ? -72 : 0)) >= 24) {
             event.preventDefault();
             setSwipeOpen(item, deltaX < -36);
+            item.classList.remove('is-swiping'); /* #107: is-open now owns the red */
             suppressClick = true;
           } else {
             resetDrag();
@@ -408,7 +413,7 @@
       // options so the suggestion basis is visible during the workout.
       const prof = item.progression || {};
       const scheme = prof.scheme || 'rpe';
-      const schemeLabel = scheme === 'onerm' ? '%1RM' : scheme === 'linear' ? 'Linear' : 'RPE-based';
+      const schemeLabel = scheme === 'linear' ? 'Linear' : 'RPE-based';
       let target;
       if (prof.mode === 'time' || item.tracking === 'seconds') {
         target = `${prof.timeMin || 30}–${prof.timeMax || 60} sec`;
@@ -420,11 +425,7 @@
         target = `${prof.min || 5}–${prof.max || 8} reps`;
       }
       let detail = '';
-      if (scheme === 'onerm') {
-        const pct = Number(prof.percentOf1RM) || 75;
-        const manual = Number(prof.manual1RM) || 0;
-        detail = `${pct}% of ${manual > 0 ? `manual 1RM (${manual} ${weightUnit()})` : 'estimated 1RM'}`;
-      } else {
+      {
         const incType = prof.incrementType || 'lb';
         const incVal = prof.incrementValue ?? 5;
         detail = prof.repsOnly ? 'reps only, no load progression' : `+${incVal} ${incType === 'percent' ? '%' : weightUnit()} per jump`;
@@ -457,9 +458,11 @@
         const perfFallback = tracking === 'time' ? (target.seconds || rp.value) : (target.r || rp.value);
         const lastSummary = lastSessionSetSummary(item.exerciseId);
         const grouped = item.supersetId && draft.exercises.filter(x => x.supersetId === item.supersetId).length > 1;
-        const doneSets=item.sets.filter(set=>set.complete).length;
         const topWeight=Math.max(0,...item.sets.map(set=>Number(set.w)||0));
-        const cardSummary=`${topWeight?`${displayWeight(topWeight)} ${weightUnit()}`:''}${doneSets?`${topWeight?' · ':''}${doneSets}/${item.sets.length} complete`:''}`;
+        /* #103 (user 2026-09-11): the N/M complete counter doesn't give the
+           user anything — the checkboxes already show progress. Keep just
+           the weight summary. */
+        const cardSummary=`${topWeight?`${displayWeight(topWeight)} ${weightUnit()}`:''}`;
         return `<details class="exercise-accordion workout-exercise" data-workout-exercise="${escapeHtml(item.uid)}" ${item.cardOpen===false?'':'open'}>
             <!-- #12 corner-icon rule (user 2026-09-11): the info button lives in the card's top-right corner, matching the library star. REVERT: delete this button and restore it inside .exercise-accordion-actions above. -->
             <button class="exercise-info-button corner-icon" type="button" data-exercise-info="${escapeHtml(item.exerciseId)}" aria-label="About ${escapeHtml(ex.name)}">i</button>
@@ -571,7 +574,7 @@
       document.querySelectorAll('[data-tag-set-uid]').forEach(button => button.addEventListener('click', () => openTagDialog(button.dataset.tagExerciseUid, button.dataset.tagSetUid)));
       document.querySelectorAll('[data-draft-exercise-tags]').forEach(button => button.addEventListener('click', () => openExerciseTagDialog({mode:'draft',exerciseUid:button.dataset.draftExerciseTags})));
       document.querySelectorAll('[data-exercise-info]').forEach(button => button.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); openExercise(button.dataset.exerciseInfo); }));
-      document.querySelectorAll('[data-add-note]').forEach(button => button.addEventListener('click', () => { const item = draft.exercises.find(x => x.uid === button.dataset.addNote); if (!item) return; item.noteOpen = true; renderWorkoutExercises(); requestAnimationFrame(() => { window.scrollTo(0,window.scrollY); document.querySelector(`[data-exercise-note="${CSS.escape(item.uid)}"]`)?.focus({preventScroll:true}); }); }));
+      document.querySelectorAll('[data-add-note]').forEach(button => button.addEventListener('click', () => { const item = draft.exercises.find(x => x.uid === button.dataset.addNote); if (!item) return; item.noteOpen = true; /* Surgical swap: replace the button with the textarea in place. A full renderWorkoutExercises() here destroys all DOM and causes scroll jumps; the in-place swap keeps layout stable. */ const ta = document.createElement('textarea'); ta.id = `note-${item.uid}`; ta.dataset.exerciseNote = item.uid; ta.setAttribute('aria-label', 'Exercise notes'); ta.placeholder = 'Cues, setup, pain, or anything to remember'; ta.value = item.note || ''; ta.addEventListener('input', () => { item.note = ta.value; markDraftSaved(); }); button.replaceWith(ta); ta.focus({preventScroll:true}); }));
       document.querySelectorAll('[data-exercise-note]').forEach(input => input.addEventListener('input', () => { const item = draft.exercises.find(x => x.uid === input.dataset.exerciseNote); if (item) item.note = input.value; markDraftSaved(); }));
       document.querySelectorAll('[data-tracking-uid]').forEach(button => button.addEventListener('click', () => {
         const item = draft.exercises.find(row => row.uid === button.dataset.trackingUid); if (!item) return;

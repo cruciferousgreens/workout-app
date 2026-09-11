@@ -128,6 +128,7 @@
           </div>
           <div class="draft-status" id="draftStatus" role="status">Changes are saved on this device</div>
           <div class="workout-exercises" id="workoutExercises"></div>
+          <button class="secondary-button add-exercise-bottom" id="addWorkoutExerciseBottom" type="button">+ Add exercise</button>
           <div class="workout-footer">
             <p class="workout-error" id="workoutError" role="alert"></p>
             <div class="workout-actions">
@@ -152,7 +153,7 @@
           <section class="program-progression" aria-labelledby="progressionSetupTitle">
             <div class="section-head settings-head"><div class="settings-title-row"><h3 class="program-progression-title" id="progressionSetupTitle">Progression rules</h3><button class="exercise-info-button" id="programProgressionInfoButton" type="button" aria-label="About progression rules">i</button></div><p class="section-note">Defaults for this program. Exercise-level overrides remain editable inside each workout.</p></div>
             <div class="settings-grid">
-              <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="programSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button><button class="rep-preset" type="button" data-scheme="onerm" aria-pressed="false">%1RM</button></div><p class="field-help">Linear adds the increment every session, no RPE needed. RPE-based adds reps first, then weight, gated by the RPE trigger. %1RM prescribes each exercise's load as a percentage of its estimated 1RM.</p></div>
+              <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="programSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button></div><p class="field-help">Linear adds the increment every session, no RPE needed. RPE-based adds reps first, then weight, gated by the RPE trigger.</p></div>
               <label class="rule-field"><span>Top-set RPE trigger</span><input id="progressionThreshold" type="number" inputmode="decimal" min="1" max="10" step="0.5" value="8"></label>
               <div class="settings-pair">
                 <label class="rule-field"><span>Increment type</span><select id="progressionIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
@@ -169,7 +170,6 @@
               <div class="settings-subsection"><span class="settings-subhead">Time step</span><div class="step-pills" id="programTimeStepPills" role="group" aria-label="Default time step in seconds"></div></div>
               <div class="settings-subsection"><span class="settings-subhead">Next-session suggestions</span><p class="field-help">Targets appear as cards you can tap to apply. Nothing changes until you choose a suggestion.</p></div>
             </div>
-            <div class="switch-row"><span class="switch-copy"><strong>Stall detector</strong><span>Suggest a separate deload week after repeated flat sessions with rising RPE. Never changes the program automatically.</span></span><button class="switch" id="stallDetectorToggle" type="button" role="switch" aria-pressed="true" aria-label="Stall detector on"></button></div>
             <div class="switch-row"><span class="switch-copy"><strong>Vary rep ranges by week</strong><span>Optional undulating periodization. Each program week can inherit its own range.</span></span><button class="switch" id="undulatingToggle" type="button" role="switch" aria-pressed="false" aria-label="Vary rep ranges by week off"></button></div>
             <div class="undulating-panel" id="undulatingPanel" hidden><span class="filter-label">WEEKLY REP RANGE</span><div class="week-range-list" id="weekRangeList"></div></div>
           </section>
@@ -195,7 +195,6 @@
         </div>
         <section class="analysis-panel chart-card"><div class="section-head"><div><h2>Muscle trends</h2><p class="section-note" id="muscleTrendNote">Compared with the previous period</p></div></div><div class="muscle-trend-list" id="muscleTrends"></div></section>
         <section class="dashboard-card chart-card"><div class="section-head"><div><h2>Exercise trends</h2><p class="section-note">Estimated 1RM and volume per session</p></div></div><div class="trend-picker" id="exerciseTrendPicker" role="group" aria-label="Choose exercise for trends"></div><div class="chart-wrap" id="exerciseTrendChart"></div><div class="chart-wrap" id="exerciseVolumeChart"></div></section>
-        <section class="dashboard-card chart-card"><div class="section-head"><div><h2>Exercise trends</h2><p class="section-note">Estimated 1RM and volume per session</p></div></div><div class="trend-picker" id="exerciseTrendPicker" role="group" aria-label="Choose exercise for trends"></div><div class="chart-wrap" id="exerciseTrendChart"></div><div class="chart-wrap" id="exerciseVolumeChart"></div></section>
         <section class="dashboard-card chart-card"><div class="section-head"><h2>Weekly volume</h2><p class="section-note">Last 10 weeks · weight × reps</p></div><div class="chart-wrap" id="volumeChart"></div></section>
       </section>
 
@@ -208,7 +207,6 @@
             <div id="otpStep" hidden>
               <label class="rule-field"><span>Code from the email</span><input id="accountOtp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from the email" maxlength="12"></label>
               <div class="settings-actions"><button class="small-button" id="verifyOtpButton" type="button">Sign in</button></div>
-              <p class="section-note">Or tap the sign-in link in the email.</p>
             </div>
           </div>
           <div id="accountSignedIn" hidden>
@@ -238,7 +236,7 @@
         <section class="dashboard-card">
           <div class="section-head settings-head"><div class="settings-title-row"><h2>Progression defaults</h2><button class="exercise-info-button" id="progressionInfoButton" type="button" aria-label="About progression defaults">i</button></div><p class="section-note">Used for new exercises and programs.</p></div>
           <div class="settings-grid">
-            <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="settingsSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button><button class="rep-preset" type="button" data-scheme="onerm" aria-pressed="false">%1RM</button></div></div>
+            <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="settingsSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button></div></div>
             <div class="rule-field"><span>RPE trigger threshold</span><div class="rep-preset-row" id="settingsRpePills" role="group" aria-label="RPE trigger threshold"><button class="rep-preset" type="button" data-rpe-threshold="7" aria-pressed="false">7</button><button class="rep-preset" type="button" data-rpe-threshold="8" aria-pressed="true">8</button><button class="rep-preset" type="button" data-rpe-threshold="9" aria-pressed="false">9</button></div></div>
             <div class="settings-pair">
               <label class="rule-field"><span>Increment type</span><select id="settingsIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
@@ -257,7 +255,6 @@
               <div class="step-pills" id="settingsTimeStepPills" role="group" aria-label="Time step in seconds"></div>
             </div>
           </div>
-          <div class="switch-row wide"><span class="switch-copy"><strong>Stall detection</strong><span>Suggest a separate deload week after repeated flat sessions with rising RPE. Never changes the program automatically.</span></span><button class="switch" id="settingsStallToggle" type="button" role="switch" aria-pressed="true" aria-label="Stall detector on"></button></div>
           <div class="switch-row wide"><span class="switch-copy"><strong>Vary rep ranges by week</strong><span>Optional undulating periodization for new programs. Each program week can inherit its own range.</span></span><button class="switch" id="settingsUndulatingToggle" type="button" role="switch" aria-pressed="false" aria-label="Vary rep ranges by week off"></button></div>
           <div class="settings-periodization" id="settingsPeriodizationWrap" hidden>
             <button class="periodization-edit-button" id="editDefaultPeriodization" type="button">Edit default periodization</button>
@@ -294,8 +291,6 @@
           <div class="section-head settings-head"><h2>Data</h2><p class="section-note">Backups and storage on this device.</p></div>
           <div class="settings-actions">
             <button class="small-button" id="exportDataButton" type="button">Export data (JSON)</button>
-            <button class="small-button" id="addSampleDataButton" type="button">Add sample data</button>
-            <button class="small-button" id="clearSampleDataButton" type="button">Clear sample data</button>
             <button class="small-button danger" id="deleteAllDataButton" type="button">Delete all data</button>
           </div>
         </section>
@@ -357,6 +352,9 @@
     </dialog>
     <dialog class="custom-dialog compact-dialog" id="discardDraftDialog" aria-labelledby="discardDraftTitle">
       <div class="custom-form"><div class="custom-form-head"><div><h2 id="discardDraftTitle">Discard workout?</h2><p>This permanently deletes the in-progress workout.</p></div><button class="dialog-close" id="closeDiscardDraft" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepDraftButton" type="button">Keep editing</button><button class="primary-button danger-button" id="confirmDiscardDraft" type="button">Discard</button></div></div>
+    </dialog>
+    <dialog class="custom-dialog compact-dialog" id="reviewSetsDialog" aria-labelledby="reviewSetsTitle">
+      <div class="custom-form"><div class="custom-form-head"><div><h2 id="reviewSetsTitle">Review sets</h2><p id="reviewSetsCopy"></p></div><button class="dialog-close" id="closeReviewSets" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="reviewSetsComplete" type="button">Mark all complete</button><button class="secondary-button danger-button" id="reviewSetsDelete" type="button">Finish and delete empty sets</button><button class="secondary-button" id="reviewSetsCancel" type="button">Keep editing</button></div></div>
     </dialog>
     <dialog class="custom-dialog compact-dialog" id="focusConfirmDialog" aria-labelledby="focusConfirmTitle">
       <div class="custom-form"><div class="custom-form-head"><div><h2 id="focusConfirmTitle">Apply to every exercise?</h2><p id="focusConfirmCopy"></p></div><button class="dialog-close" id="closeFocusConfirm" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="focusConfirmApply" type="button">Apply</button><button class="secondary-button" id="focusConfirmCancel" type="button">Cancel</button></div></div>
@@ -433,7 +431,6 @@
           <p><strong>Default focus</strong><span>The rep-range preset applied to new programs and exercises.</span></p>
           <p><strong>Default rep range</strong><span>Min and max reps for double progression: add reps inside the range first, then add weight and return to the bottom of the range.</span></p>
           <p><strong>Time step</strong><span>For timed exercises, how many extra seconds to hold before adding weight.</span></p>
-          <p><strong>Stall detection</strong><span>Suggests scheduling a deload week after repeated flat sessions with rising RPE. It never changes your program automatically.</span></p>
           <p><strong>Vary rep ranges by week</strong><span>Optional undulating periodization for new programs: each program week can inherit its own rep range.</span></p>
         </div>
         <div class="form-actions"><button class="form-action primary" id="doneProgressionInfo" type="button">Got it</button></div>
@@ -648,7 +645,6 @@
 <script src="assets/js/state.js"></script>
 <script src="assets/js/persistence.js"></script>
 <script src="assets/js/sync.js"></script>
-<script src="assets/js/sample-data.js"></script>
 <script src="assets/js/exercise-library.js"></script>
 <script src="assets/js/exercise-detail.js"></script>
 <script src="assets/js/navigation.js"></script>

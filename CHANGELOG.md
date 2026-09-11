@@ -2,6 +2,149 @@
 
 Newest first. Dates are release dates (America/New_York).
 
+## 2026-09-11 — v0.99b (beta prod release)
+
+Consolidation of the day's QA work, promoted to production
+(app.cruciferousgreens.com) on the user's approval.
+
+- **Restored the \"Review sets\" finish dialog.** Tapping Finish with unfilled or
+  unmarked sets opens one review prompt: \"Mark all complete\" (only when every
+  set has valid values — never nulls), \"Finish and delete empty sets\" (only
+  fully-empty sets, never partials), or \"Keep editing\". Known dead-end
+  (partially-filled sets must be fixed or deleted manually) tracked for later
+  revisit.
+- **Pulled out the %1RM programming scheme and siloed it** for later
+  re-discussion (original issue #54, tagged \"before v2\"). Scheme picker now
+  offers RPE-based and Linear only; stored %1RM programs fall back gracefully
+  to RPE-based.
+- **\"Sync failed\" and other account errors now render in red** (were green).
+- **Touch targets brought to 44px iOS minimum across the app**; inputs that
+  trigger iOS auto-zoom are 16px; small-glyph controls keep visual size with
+  44px hit areas.
+- **Metric %1RM rounding fixed** (208.1 lb now converts to 95.00 kg, not 94.64).
+- **\"To failure\" tags no longer affect progression math** — tags are just tags.
+- **Stall detector removed and siloed** for later re-discussion (issue #119).
+- **Duplicate \"Exercise trends\" stats section removed.**
+- **Sample data removed entirely.**
+
+## 2026-09-11 — v0.9999995
+
+- **Restored the "Review sets" finish dialog** (removed earlier today, user
+  asked for it back). Tapping Finish with unfilled or unmarked sets opens one
+  review prompt: "Mark all complete" (only when every set has valid values —
+  never nulls), "Finish and delete empty sets" (only fully-empty sets, never
+  partials), or "Keep editing". The known dead-end (partially-filled sets must
+  be fixed or deleted manually) is tracked for later revisit.
+
+## 2026-09-11 — v0.9999994
+
+- **"Sync failed" and other account errors now render in red.** `#accountStatus`
+  (`.status-note`) was green for both success and failure. Added
+  `.status-note.is-error` (danger red); `setAccountStatus` takes an error flag
+  and all failure paths (sync failures, network errors, invalid email/code,
+  cooldown, send/verify failures, offline-unavailable) pass it. Neutral/progress
+  messages stay green.
+- **Touch targets brought to 44px iOS minimum across the app.** Bumped
+  min-heights on pills, tabs, buttons, toggles, and segmented controls;
+  inputs that trigger iOS auto-zoom are now 16px font with 44px height;
+  small-glyph controls (info "i", set-delete ×, switches, tag ×, rule ×,
+  calendar chevrons) keep their visual size with a 44px ::before hit area.
+  Tiny control text raised to 12px minimum.
+
+## 2026-09-11 — v0.9999993
+
+- **Pulled out the %1RM programming scheme (siloed for later).** The entire
+  `onerm` scheme is removed: the prescription branch in progression.js, the
+  `percentOf1RM`/`manual1RM` reads, the %1RM pill in both Progression mode
+  pickers (program form + Settings), the program-cover %1RM tag, and the
+  field-visibility logic. The scheme was a façade — the engine computed but
+  no UI existed to set the % or a training max (the #100 B7 finding). Full
+  removed code saved to `~/workspace/onerm-siloed/onerm-code.md`; re-discussion
+  tracked in cruciferousgreens/workout-app#54. Stored `scheme:'onerm'` profiles
+  gracefully degrade to the RPE-based path. RPE-based and Linear schemes
+  unaffected.
+
+## 2026-09-11 — v0.9999992
+
+- **#100 B3 — fixed metric %1RM plate-snapping math (blocker).** The
+  kg-snapping formula had multiply/divide swapped:
+  `Math.round(rawLoad/LB_TO_KG/2.5)*2.5*LB_TO_KG` is now
+  `Math.round(rawLoad*LB_TO_KG/2.5)*2.5/LB_TO_KG`. 208.1 lb now snaps to
+  exactly 95.0 kg instead of 94.64 kg. Imperial unaffected.
+- **#100 B2 — "to failure" tag no longer influences top-set math.** Per the
+  user's rule (tags are labels only), `topSetForSession` no longer filters to
+  failure-tagged sets; all sets compete on equal terms (heaviest wins, ties
+  by reps). The write-only `toFailure` flag was removed.
+- **#100 B6 — pulled out the stall detector (siloed for post-v1).** Removed
+  the detection logic, the stall card UI, both toggles (Settings +
+  program setup), the program-cover tag, help text, and `.stall-card` CSS.
+  Full code saved to `~/workspace/stall-detector-siloed/stall-detector-code.md`;
+  reintroduction tracked in cruciferousgreens/workout-app#119. Two bugs were
+  found at removal: the #79 noChange suppression killed the card in the
+  canonical stall case, and "Rep +" co-fired contradictorily with
+  "Possible stall" at RPE == threshold.
+
+## 2026-09-11 — v0.9999991
+
+- **#100 B4 — removed duplicate "Exercise trends" card on Stats.** The
+  section was duplicated byte-identically with triplicated IDs
+  (`exerciseTrendPicker`, `exerciseTrendChart`, `exerciseVolumeChart`);
+  `querySelector` only hydrated the first, leaving the second as a
+  permanent empty shell.
+- **#100 B10 — removed the sample data feature entirely** (user request).
+  Deleted `assets/js/sample-data.js` and all references: the Settings
+  "Add/Clear sample data" buttons, their init/handlers, the SAMPLE
+  badges in dashboard/stats/history/editor, the `sample` flag plumbing,
+  and the `.sample-label` CSS. Callers of the old `realWorkouts()`
+  helper now use `workoutState.completed` directly. Zero "sample"
+  references remain in app code.
+
+## 2026-09-11 — v0.999998
+
+- **#70 — magic-link sign-in error handling completed.** Root cause of the
+  cryptic "Load failed": Safari reports failed fetches as
+  `TypeError: Load failed`, and the auth catch blocks surfaced
+  `err.message` raw. Network-type failures now show "Can't reach the
+  network — check your connection and try again." Also new:
+  - Failed magic-link taps are detected (Supabase swallows PKCE
+    code-exchange failures — a lingering `?code=` with no session means
+    expired, already-used, or opened-in-a-different-browser) and show a
+    human-readable message instead of silence.
+  - Recovery path: the code step is revealed, the 2-minute resend
+    cooldown is lifted so "Email me a code" works immediately, the stale
+    code/error is cleaned from the URL, and messages name the button.
+  - Rate-limit send errors mapped to "Too many requests — wait a moment…";
+    OTP messages updated to match.
+
+## 2026-09-11 — v0.999997
+
+- **Removed "Auto-collapse completed exercises" from Settings** (user
+  request): the feature never worked (#113, deferred). Removed the toggle
+  UI plus all dead code — pref default, init/handler in app-bootstrap,
+  collapse logic in workout-editor, animation CSS.
+
+## 2026-09-11 — v0.999996
+
+- **#107:** closed rail now uses `var(--surface)` instead of transparent
+  (user suggestion) — even if iOS WebKit blends at the clip edge, it blends
+  surface-with-surface which is invisible. More robust than transparent.
+
+## 2026-09-11 — v0.999995
+
+- **Note jump fixed properly:** "Add notes" now swaps the button for the
+  textarea in place via `replaceWith()` instead of full
+  `renderWorkoutExercises()`. No DOM destruction, no scroll fighting.
+
+## 2026-09-11 — v0.999994
+
+- **#107 fixed (swipe-rail red sliver):** root cause was CSS cascade — the
+  transparent-rail fix was overridden by later `.swipe-delete-action`
+  background rules. Added a high-specificity closed-state rule
+  (`.swipe-item:not(.is-open):not(.is-swiping) .swipe-delete-action`) that
+  wins the cascade. Removed `isolation: isolate` defense-in-depth.
+- **Note jump fixed:** "Add notes" captured `window.scrollY` after the
+  re-render (already jumped). Now captures before re-render and restores.
+
 ## 2026-09-10 — UX fix batch
 
 - Settings gear: re-tapping the active gear scrolls to the top instead of

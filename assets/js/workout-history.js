@@ -15,29 +15,67 @@
       }
       pendingDeleteCompletedWorkoutId=null;
     });
-    function finishWorkout() {
+    /** Sets missing required values (reps/seconds, weight for weighted
+        exercises, or exercises with no sets at all). Powers the "Unfilled
+        sets" dialog (user 2026-09-10). */
+    function invalidSetsIn(draft){
+      const rows=[];
+      (draft?.exercises||[]).forEach(item=>{
+        const ex=exercises.find(row=>row.id===item.exerciseId);
+        const weightOptional=ex?.equipment==='body only', tracking=exerciseTracking(item,ex);
+        if(!item.sets.length){rows.push({item,set:null});return;}
+        item.sets.forEach(set=>{
+          const bad=(!weightOptional&&set.w==='')||(tracking==='time'?set.seconds:set.r)===''||Number(set.w||0)<0||Number(tracking==='time'?set.seconds:set.r)<1||(set.rpe!==''&&(Number(set.rpe)<1||Number(set.rpe)>10));
+          if(bad)rows.push({item,set});
+        });
+      });
+      return rows;
+    }
+    /* #43: a set is only bulk-deletable when it holds no user-entered data at
+       all — no values and no tags. Sets with partial values are never silently
+       deleted (that path produced nulls); they must be marked complete or kept
+       for editing. */
+    function isEmptySet(set){
+      return set&&set.w===''&&set.r===''&&set.seconds===''&&set.rpe===''&&!(set.tags?.length);
+    }
+    function finishWorkout(skipReview) {
       const draft = workoutState.draft;
       if (!draft || !draft.exercises.length) { showToast('Add at least one exercise before finishing.'); return; }
-      /* user 2026-09-11: ✓ is the commit point. On finish, drop all
-         incomplete sets (never committed, never null). Drop exercises left
-         with no complete sets. If no complete sets remain, discard the
-         workout entirely. */
-      let droppedSets=0;
-      draft.exercises.forEach(item=>{
-        const before=item.sets.length;
-        item.sets=item.sets.filter(set=>set.complete);
-        droppedSets+=before-item.sets.length;
-      });
-      const beforeEx=draft.exercises.length;
-      draft.exercises=draft.exercises.filter(item=>item.sets.length>0);
-      const droppedEx=beforeEx-draft.exercises.length;
-      if(!draft.exercises.length){
-        workoutState.draft=null;
-        persistNow(); renderWorkoutScreen();
-        showToast('Workout discarded — no completed sets.');
+      /* One review prompt covers both problem kinds (unfilled values and
+         unmarked sets) instead of two stacked dialogs (#43).
+         Buttons: Mark all complete (only when all sets have valid values —
+         never nulls, user 2026-09-11) / Finish and delete empty sets
+         (only fully-empty sets, never partial ones) / Keep editing.
+         skipReview is an internal bypass used only by "Mark all complete":
+         all sets already have valid values, so it just marks them complete
+         without reopening the dialog. */
+      const bad = invalidSetsIn(draft);
+      const unmarked = draft.exercises.flatMap(item=>item.sets.map((set,index)=>({set,index,item}))).filter(row=>!row.set.complete);
+      if (!skipReview && (bad.length || unmarked.length)) {
+        const badSets=new Set(bad.map(r=>r.set).filter(Boolean));
+        const emptyCount=bad.filter(r=>!r.set).length;
+        const extraUnmarked=unmarked.filter(row=>!badSets.has(row.set)).length;
+        const parts=[];
+        if (badSets.size) parts.push(`${badSets.size} set${badSets.size===1?' is':'s are'} missing reps, seconds, or weight.`);
+        if (emptyCount) parts.push(`${emptyCount} exercise${emptyCount===1?' has':'s have'} no sets.`);
+        if (extraUnmarked) parts.push(`${extraUnmarked} set${extraUnmarked===1?' isn’t':'s aren’t'} marked complete.`);
+        $('#reviewSetsCopy').textContent=parts.join(' ');
+        /* user 2026-09-11: never save null data. "Mark all complete" is only
+           offered when every set has valid values (just unmarked) — if any set
+           is missing values, the button hides so the user must fix or delete
+           the bad sets instead of saving nulls. */
+        $('#reviewSetsComplete').hidden=!unmarked.length||badSets.size>0;
+        /* #43: the delete action only removes fully-empty sets (plus exercises
+           left with no sets) — never sets with partial values, so no
+           user-entered data is silently lost. Hidden when nothing qualifies. */
+        const emptySets=draft.exercises.flatMap(item=>item.sets).filter(isEmptySet).length;
+        const deleteBtn=$('#reviewSetsDelete');
+        if(emptySets>0){deleteBtn.hidden=false;deleteBtn.textContent=`Delete ${emptySets} empty set${emptySets===1?'':'s'}`;}
+        else if(emptyCount>0){deleteBtn.hidden=false;deleteBtn.textContent=`Remove ${emptyCount} empty exercise${emptyCount===1?'':'s'}`;}
+        else deleteBtn.hidden=true;
+        $('#reviewSetsDialog').showModal();
         return;
       }
-      if(droppedSets||droppedEx)showToast(`Finished and dropped ${droppedSets} incomplete set${droppedSets===1?'':'s'}${droppedEx?` and ${droppedEx} exercise${droppedEx===1?'':'s'}`:''}.`);
       draft.name = $('#workoutName').value.trim() || 'Workout'; draft.date = $('#workoutDate').value || localIsoDate();
       const completed = { id:draft.editingId || uid('workout'), name:draft.name, date:draft.date, programId:draft.programId||null, programWorkoutUid:draft.programWorkoutUid||null, exercises:draft.exercises.map(item => ({exerciseId:item.exerciseId, tracking:exerciseTracking(item,exercises.find(ex=>ex.id===item.exerciseId)), note:item.note||'', exerciseTags:[...(item.exerciseTags||[])], supersetId:item.supersetId||null, progression:item.progression?{...item.progression}:null, sets:item.sets.map(set => ({w:set.w===''?null:Number(set.w), r:set.r===''?null:Number(set.r), seconds:set.seconds===''?null:Number(set.seconds), rpe:set.rpe === '' ? null : Number(set.rpe), tags:[...set.tags], complete:true}))})) };
       if (draft.editingId) workoutState.completed = workoutState.completed.map(x => x.id === draft.editingId ? completed : x); else workoutState.completed.unshift(completed);
@@ -64,7 +102,7 @@
         const ex=exercises.find(row=>row.id===item.exerciseId);
         const currentWeighted=item.sets.filter(set=>Number(set.w)>0);
         if(!ex||!currentWeighted.length)return;
-        const priorSets=realWorkouts().filter(row=>row.id!==workout.id&&row.date<workout.date).flatMap(row=>row.exercises.filter(entry=>entry.exerciseId===item.exerciseId).flatMap(entry=>entry.sets)).filter(set=>Number(set.w)>0);
+        const priorSets=workoutState.completed.filter(row=>row.id!==workout.id&&row.date<workout.date).flatMap(row=>row.exercises.filter(entry=>entry.exerciseId===item.exerciseId).flatMap(entry=>entry.sets)).filter(set=>Number(set.w)>0);
         if(!priorSets.length)return;
         const currentEst=Math.max(...currentWeighted.map(estimate1RM)),priorEst=Math.max(...priorSets.map(estimate1RM));
         const currentWeight=Math.max(...currentWeighted.map(set=>Number(set.w)||0)),priorWeight=Math.max(...priorSets.map(set=>Number(set.w)||0));
@@ -84,7 +122,7 @@
       const summary=workoutSummary(workout),prs=workoutPRs(workout);
       $('#workoutEditor').hidden = true; $('#workoutStart').hidden = true; $('#workoutComplete').hidden = false;
       noteWorkoutSubScreen('complete');
-      $('#workoutComplete').innerHTML = `<div class="completed-detail-top"><button class="back completed-detail-back" id="backFromWorkoutDetail" type="button" aria-label="Back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>Back</button><div class="completed-detail-top-actions"><button class="start-new-workout-pill" id="saveCompletedTemplateTop" type="button">Save as template</button></div></div><div class="completed-card"><h2>${escapeHtml(workout.name)}${isSampleWorkout(workout)?'<span class="sample-label">Sample</span>':''}</h2><p class="completed-meta">Completed ${escapeHtml(formatLogDate(workout.date))}</p><div class="workout-detail-metrics"><div class="workout-detail-metric"><strong>${workout.exercises.length}</strong><span>exercises</span></div><div class="workout-detail-metric"><strong>${summary.sets}</strong><span>completed sets</span></div><div class="workout-detail-metric"><strong>${formatVolume(summary.volume)}</strong><span>total volume</span></div></div><div class="section-head"><h3>Muscles worked</h3><p class="section-note">Primary and secondary</p></div><div class="workout-muscles">${summary.muscles.length?summary.muscles.map(muscle=>`<span class="tag primary">${escapeHtml(muscle)}</span>`).join(''):'<span class="section-note">No muscle data</span>'}</div>${prs.length?`<div class="section-head"><h3>PRs hit</h3></div><div class="workout-prs">${prs.map(pr=>`<span class="workout-pr">${escapeHtml(pr)}</span>`).join('')}</div>`:''}<div class="section-head"><h3>Set-by-set</h3><p class="section-note">Reps × weight @ RPE</p></div><div class="completed-exercise-details">${workout.exercises.map(item=>completedExerciseMarkup(item,workout.id)).join('')}</div><div class="detail-action-buttons"><button class="primary-button detail-action-primary" id="repeatCompletedWorkout" type="button">Repeat this workout</button><div class="detail-action-row"><button class="secondary-button" id="editCompletedWorkout" type="button">Edit workout</button><button class="secondary-button danger-button" id="deleteCompletedWorkout" type="button">Delete workout</button></div></div><p class="status-note" id="completedSaveStatus" role="status"></p></div>`;
+      $('#workoutComplete').innerHTML = `<div class="completed-detail-top"><button class="back completed-detail-back" id="backFromWorkoutDetail" type="button" aria-label="Back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>Back</button><div class="completed-detail-top-actions"><button class="start-new-workout-pill" id="saveCompletedTemplateTop" type="button">Save as template</button></div></div><div class="completed-card"><h2>${escapeHtml(workout.name)}</h2><p class="completed-meta">Completed ${escapeHtml(formatLogDate(workout.date))}</p><div class="workout-detail-metrics"><div class="workout-detail-metric"><strong>${workout.exercises.length}</strong><span>exercises</span></div><div class="workout-detail-metric"><strong>${summary.sets}</strong><span>completed sets</span></div><div class="workout-detail-metric"><strong>${formatVolume(summary.volume)}</strong><span>total volume</span></div></div><div class="section-head"><h3>Muscles worked</h3><p class="section-note">Primary and secondary</p></div><div class="workout-muscles">${summary.muscles.length?summary.muscles.map(muscle=>`<span class="tag primary">${escapeHtml(muscle)}</span>`).join(''):'<span class="section-note">No muscle data</span>'}</div>${prs.length?`<div class="section-head"><h3>PRs hit</h3></div><div class="workout-prs">${prs.map(pr=>`<span class="workout-pr">${escapeHtml(pr)}</span>`).join('')}</div>`:''}<div class="section-head"><h3>Set-by-set</h3><p class="section-note">Reps × weight @ RPE</p></div><div class="completed-exercise-details">${workout.exercises.map(item=>completedExerciseMarkup(item,workout.id)).join('')}</div><div class="detail-action-buttons"><button class="primary-button detail-action-primary" id="repeatCompletedWorkout" type="button">Repeat this workout</button><div class="detail-action-row"><button class="secondary-button" id="editCompletedWorkout" type="button">Edit workout</button><button class="secondary-button danger-button" id="deleteCompletedWorkout" type="button">Delete workout</button></div></div><p class="status-note" id="completedSaveStatus" role="status"></p></div>`;
       document.querySelectorAll('.completed-exercise-link').forEach(button => button.addEventListener('click', () => openExercise(button.dataset.id, true, button.dataset.returnWorkout ? {view:'completed-workout', workoutId:button.dataset.returnWorkout} : undefined)));
       $('#editCompletedWorkout').addEventListener('click',()=>editCompletedWorkout(workout.id));
       /* Quiet tertiary repeat (user 2026-09-10): the big green button is gone,

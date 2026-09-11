@@ -140,13 +140,13 @@
              the delete-all wipe). */
           if(!syncKeyWasPossessed(key)){syncMeta.keys[key].dirty=false;continue;}
           const {error:delError}=await sb.from('user_data').delete().eq('user_id',user.id).eq('key',key);
-          if(delError){setAccountStatus('Sync failed: '+delError.message);return false;}
+          if(delError){setAccountStatus('Sync failed: '+delError.message, true);return false;}
           syncMeta.keys[key].dirty=false;
           continue;
         }
         const row={user_id:user.id,key:key,value:value,updated_at:syncMeta.keys[key].updatedAt};
         const {error}=await sb.from('user_data').upsert(row,{onConflict:'user_id,key'});
-        if(error){setAccountStatus('Sync failed: '+error.message);return false;}
+        if(error){setAccountStatus('Sync failed: '+error.message, true);return false;}
         syncMeta.keys[key].dirty=false;
         /* Confirmed in the cloud. pullRemote uses this to self-heal: a key
            with non-empty local state, no remote row, and no confirmed push
@@ -234,7 +234,7 @@
       const user=await signedInUser();
       if(!user)return false;
       const {data:rows,error}=await sb.from('user_data').select('key,value,updated_at').eq('user_id',user.id);
-      if(error){setAccountStatus('Sync failed: '+error.message);return false;}
+      if(error){setAccountStatus('Sync failed: '+error.message, true);return false;}
       const byKey={};
       (rows||[]).forEach(r=>{if(r&&typeof r.key==='string')byKey[r.key]=r;});
       /* First-sync baseline: last-write-wins needs a local timestamp. Seed it
@@ -323,9 +323,9 @@
       }catch(_){}
     }
     /* ===== account UI (Settings) ===== */
-    function setAccountStatus(msg){
+    function setAccountStatus(msg, isError){
       const el=$('#accountStatus');
-      if(el)el.textContent=msg||'';
+      if(el){ el.textContent=msg||''; el.classList.toggle('is-error', !!isError); }
     }
     function renderAccount(){
       ensureSyncMeta();
@@ -349,23 +349,23 @@
     async function sendSignInLink(){
       const input=$('#accountEmail');
       const email=(input&&input.value||'').trim();
-      if(!email||email.indexOf('@')<0){setAccountStatus('Enter a valid email address.');return;}
+      if(!email||email.indexOf('@')<0){setAccountStatus('Enter a valid email address.', true);return;}
       const left=magicLinkCooldownRemaining();
-      if(left>0){setAccountStatus('Wait '+fmtCooldown(left)+' before requesting another link.');return;}
+      if(left>0){setAccountStatus('Wait '+fmtCooldown(left)+' before requesting another link.', true);return;}
       const sb=await getSupabase();
-      if(!sb){setAccountStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.');return;}
+      if(!sb){setAccountStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.', true);return;}
       setAccountStatus('Sending code\u2026');
       try{
         const {error}=await sb.auth.signInWithOtp({email:email,options:{emailRedirectTo:location.origin+location.pathname}});
         /* Cooldown starts on any completed attempt — even a rate-limited one —
            so rapid taps can't burn the Supabase email quota. */
         startMagicLinkCooldown();
-        if(error){setAccountStatus(error.message);return;}
+        if(error){setAccountStatus(sendLinkErrorText(error), true);return;}
         /* #75: progressive disclosure — reveal the code step once the email is sent. */
         const otpStep=$('#otpStep');
         if(otpStep)otpStep.hidden=false;
         setAccountStatus('Code sent \u2014 enter it below, or tap the link in the email.');
-      }catch(err){setAccountStatus((err&&err.message)||'Could not send the code.');}
+      }catch(err){setAccountStatus(requestErrorText(err,'Could not send the code.'), true);}
     }
     /* ===== 6-digit sign-in code (2026-09-11) =====
        verifyOtp needs no PKCE code verifier, so it completes wherever the
@@ -376,36 +376,58 @@
       const email=(emailInput&&emailInput.value||'').trim();
       const input=$('#accountOtp');
       const token=((input&&input.value)||'').trim().replace(/[\s-]+/g,'');
-      if(!email||email.indexOf('@')<0){setAccountStatus('Enter your email address above first.');return;}
-      if(!token){setAccountStatus('Enter the code from the email.');return;}
+      if(!email||email.indexOf('@')<0){setAccountStatus('Enter your email address above first.', true);return;}
+      if(!token){setAccountStatus('Enter the code from the email.', true);return;}
       const sb=await getSupabase();
-      if(!sb){setAccountStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.');return;}
+      if(!sb){setAccountStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.', true);return;}
       setAccountStatus('Verifying code\u2026');
       try{
         const {error}=await sb.auth.verifyOtp({email:email,token:token,type:'email'});
-        if(error){setAccountStatus(otpErrorText(error));return;}
+        if(error){setAccountStatus(otpErrorText(error), true);return;}
         if(input)input.value='';
         /* onAuthStateChange -> handleAuthChange picks up the session and
            runs the first sync cycle. */
         setAccountStatus('');
-      }catch(err){setAccountStatus((err&&err.message)||'Could not verify the code.');}
+      }catch(err){setAccountStatus(requestErrorText(err,'Could not verify the code.'), true);}
+    }
+    /* #70: Safari reports failed fetches as TypeError "Load failed" — a
+       cryptic dead end. Translate network-type failures into something
+       actionable everywhere auth touches the network. */
+    function isNetworkError(err){
+      if(typeof navigator!=='undefined'&&navigator&&navigator.onLine===false)return true;
+      const m=String((err&&(err.message||err))||'').toLowerCase();
+      return /load failed|failed to fetch|network error|network request failed|fetch failed|econn|etimedout|enotfound|socket/.test(m);
+    }
+    function requestErrorText(err,fallback){
+      if(isNetworkError(err))return 'Can\u2019t reach the network \u2014 check your connection and try again.';
+      return (err&&err.message)||fallback;
+    }
+    /* Friendlier wording for "Email me a code" send failures (#70). */
+    function sendLinkErrorText(error){
+      const msg=String((error&&error.message)||'');
+      const low=msg.toLowerCase();
+      if(low.indexOf('rate limit')>=0||low.indexOf('too many')>=0||/after \d+ second/.test(low))
+        return 'Too many requests \u2014 wait a moment, then tap \u2018Email me a code\u2019 again.';
+      if(low.indexOf('error sending')>=0||low.indexOf('could not send')>=0)
+        return 'Couldn\u2019t send the email \u2014 double-check the address and try again.';
+      return msg||'Could not send the code.';
     }
     /* Friendlier wording for the common code failures (#70: cryptic errors). */
     function otpErrorText(error){
       const msg=String((error&&error.message)||'');
       const low=msg.toLowerCase();
-      if(low.indexOf('expired')>=0)return 'That code expired \u2014 request a new link and use the fresh code.';
-      if(low.indexOf('invalid')>=0||low.indexOf('token')>=0)return 'That code didn\u2019t work \u2014 double-check it against the email and try again.';
+      if(low.indexOf('expired')>=0)return 'That code expired \u2014 tap \u2018Email me a code\u2019 for a fresh one.';
+      if(low.indexOf('invalid')>=0||low.indexOf('used')>=0||low.indexOf('token')>=0)return 'That code didn\u2019t work \u2014 double-check it against the email and try again.';
       return msg||'Could not verify the code.';
     }
     async function saveDisplayName(){
       const sb=await getSupabase();
-      if(!sb){setAccountStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.');return;}
+      if(!sb){setAccountStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.', true);return;}
       const value=(($('#editNameInput')&&$('#editNameInput').value)||'').trim().slice(0,60);
       try{
         const {error}=await sb.auth.updateUser({data:{display_name:value}});
-        if(error){setAccountStatus(error.message);return;}
-      }catch(err){setAccountStatus((err&&err.message)||'Could not save the name.');return;}
+        if(error){setAccountStatus(error.message, true);return;}
+      }catch(err){setAccountStatus((err&&err.message)||'Could not save the name.', true);return;}
       lastAuthProfile.display_name=value;
       const d=$('#editNameDialog');if(d)d.close();
       setAccountStatus('');
@@ -443,7 +465,7 @@
       setAccountStatus('Syncing\u2026');
       const ok=await syncCycle();
       if(ok)setAccountStatus('');
-      else setAccountStatus('Sync unavailable \u2014 sign in and check your connection.');
+      else setAccountStatus('Sync unavailable \u2014 sign in and check your connection.', true);
       renderAccount();
     }
     /* One pull+push round trip, guarded against concurrent runs. */
@@ -477,7 +499,7 @@
         await syncCycle();
         syncInitialized=true;
         setAccountStatus('');
-      }catch(err){setAccountStatus('Sync failed: '+((err&&err.message)||err));}
+      }catch(err){setAccountStatus('Sync failed: '+((err&&err.message)||err), true);}
       renderAccount();
     }
     function wireAccountUI(){
@@ -554,27 +576,56 @@
     }
     let authListenerAttached=false;
     /* #70: surface human-readable magic-link errors. Supabase puts auth
-       failures in the URL hash (#error=...&error_description=...) when
-       detectSessionInUrl can't establish a session. */
-    function checkAuthCallbackError(){
+       failures in the URL hash (#error=...&error_description=...) when the
+       redirect itself carries an error. Returns the message, or null. */
+    function authCallbackErrorText(){
       const hash=location.hash||'';
-      if(!hash.includes('error='))return false;
+      if(!hash.includes('error='))return null;
       const params=new URLSearchParams(hash.slice(1));
       const desc=(params.get('error_description')||'').toLowerCase();
       const code=(params.get('error')||'').toLowerCase();
       let msg='That sign-in link didn\u2019t work.';
-      if(desc.includes('expired')||code.includes('expired'))msg='That sign-in link expired. Request a new one below.';
-      else if(desc.includes('already')||desc.includes('used')||code.includes('invalid'))msg='That sign-in link was already used or is invalid. Request a new one below.';
-      else if(!navigator.onLine)msg='No network connection. Reconnect and try the link again, or request a new one.';
-      setAccountStatus(msg);
-      /* Clean the error from the URL so refresh doesn't re-show it. */
-      try{history.replaceState(null,'',location.pathname+location.search);}catch(_){}
-      return true;
+      if(typeof navigator!=='undefined'&&navigator&&navigator.onLine===false)msg='No network connection when that link was opened. Reconnect and try again.';
+      else if(desc.includes('expired')||code.includes('expired'))msg='That sign-in link expired.';
+      else if(desc.includes('already')||desc.includes('used')||code.includes('invalid'))msg='That sign-in link was already used or is invalid.';
+      return msg;
+    }
+    /* #70: a failed magic-link attempt must leave a usable recovery path:
+       reveal the code step, lift the resend cooldown (it started when the
+       original link was sent), and drop the stale code/error from the URL. */
+    function clearMagicLinkCooldown(){
+      if(magicLinkCooldownTimer){clearInterval(magicLinkCooldownTimer);magicLinkCooldownTimer=null;}
+      try{localStorage.removeItem(MAGIC_LINK_COOLDOWN_KEY);}catch(_){}
+      const btn=$('#sendMagicLinkButton');
+      if(btn){btn.disabled=false;btn.textContent='Email me a code';}
+    }
+    function showAuthRecovery(msg){
+      const s=$('#otpStep');
+      if(s)s.hidden=false;
+      clearMagicLinkCooldown();
+      /* Drop the stale ?code= / #error= so a refresh doesn't re-trigger. */
+      try{
+        const u=new URL(location.href);
+        u.searchParams.delete('code');
+        u.hash='';
+        history.replaceState(null,'',u.pathname+u.search+u.hash);
+      }catch(_){}
+      setAccountStatus(msg, true);
     }
     async function resumeSync(){
-      checkAuthCallbackError();
+      /* #70: capture before Supabase init — on success the client strips
+         ?code= from the URL, so a lingering code plus no session afterwards
+         means the link failed (expired, already used, or opened in a
+         different browser: PKCE links only work where they were requested).
+         getSession() awaits init, so the exchange has settled by the check. */
+      const hadAuthCode=/[?&]code=/.test(location.search);
+      const hashErr=authCallbackErrorText();
       const sb=await getSupabase();
-      if(!sb){setAccountStatus('Sync unavailable offline \u2014 your data stays on this device.');return;}
+      if(!sb){
+        if(hashErr||hadAuthCode)showAuthRecovery((hashErr||'That sign-in link didn\u2019t work.')+' No network connection \u2014 reconnect and try again.');
+        else setAccountStatus('Sync unavailable offline \u2014 your data stays on this device.', true);
+        return;
+      }
       try{
         if(!authListenerAttached){
           authListenerAttached=true;
@@ -583,6 +634,9 @@
         const {data}=await sb.auth.getSession();
         const session=data&&data.session?data.session:null;
         await handleAuthChange(session);
+        if(!session&&(hadAuthCode||hashErr)){
+          showAuthRecovery((hashErr||'That sign-in link didn\u2019t work \u2014 it may have expired, already been used, or been opened in a different browser.')+' Enter the code from the email below, or tap \u2018Email me a code\u2019 for a fresh one.');
+        }
         /* Startup / back-online catch-up for an already-signed-in user:
            handleAuthChange no-ops for the same uid, so run a cycle explicitly. */
         if(session&&syncInitialized){

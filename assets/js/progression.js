@@ -4,12 +4,14 @@
     function topSetForSession(session) {
       if (!session?.sets?.length) return null;
       const mode=session.tracking==='time'||session.sets.some(set=>set.seconds!=null)?'time':'reps';
-      const failureSets=session.sets.filter(set=>(set.tags||[]).some(tag=>tag.toLowerCase()==='to failure'));
-      const candidates=failureSets.length?failureSets:session.sets;
+      // Tags are labels only — they must not influence the math. All sets
+      // compete for top set on equal terms: heaviest weight wins, ties broken
+      // by reps/seconds.
+      const candidates=session.sets;
       return candidates.reduce((best,set,index) => {
         const weight=Number(set.w)||0, reps=Number(set.r)||0, seconds=Number(set.seconds)||0;
         const performance=mode==='time'?seconds:reps;
-        if(!best || weight>best.weight || (weight===best.weight && performance>best.performance)) return {weight,reps,seconds,performance,mode,rpe:set.rpe==null?null:Number(set.rpe),index,toFailure:failureSets.length>0};
+        if(!best || weight>best.weight || (weight===best.weight && performance>best.performance)) return {weight,reps,seconds,performance,mode,rpe:set.rpe==null?null:Number(set.rpe),index};
         return best;
       },null);
     }
@@ -23,13 +25,10 @@
       const programConfig=config || workoutState.activeProgram?.progression || progressionSetup;
       // Progression scheme: 'rpe' is the default double progression; 'linear'
       // adds the increment every session with no RPE gate (per-program setting,
-      // stamped onto each exercise at program start so repeats stay linear);
-      // 'onerm' prescribes load as a percentage of the estimated 1RM (#54).
+      // stamped onto each exercise at program start so repeats stay linear).
       const scheme=profile?.scheme||programConfig?.scheme||'rpe';
       const logs=getExerciseLogs(exerciseId).sort((a,b)=>b.isoDate.localeCompare(a.isoDate));
-      const manual1RM=Number(profile?.manual1RM)||0;
-      // %1RM with a manual 1RM needs no history at all.
-      if(!logs.length&&!(scheme==='onerm'&&manual1RM>0))return null;
+      if(!logs.length)return null;
       const targetMode=profile?.mode || 'reps';
       const threshold=Number(programConfig.threshold ?? 8);
       // AMRAP has no upper rep bound: a blank max means "as many as possible" from an
@@ -99,40 +98,14 @@
       const repsOnly=!!profile?.repsOnly;
       // Progression scheme: 'rpe' is the default double progression; 'linear'
       // adds the increment every session with no RPE gate (per-program setting,
-      // stamped onto each exercise at program start so repeats stay linear);
-      // 'onerm' prescribes load as a percentage of the estimated 1RM (#54).
+      // stamped onto each exercise at program start so repeats stay linear).
       const previousProfile=latestLog?.progression;
       const previousMin=normMin(previousProfile),previousMax=normMax(previousProfile);
       const hasStoredRange=Number.isFinite(Number(previousProfile?.min))&&(!!previousProfile?.amrap||Number.isFinite(Number(previousProfile?.max))),outsideNewRange=!!latest&&(latest.reps<min||(!profile?.openTop&&!profile?.amrap&&latest.reps>max));
       const repRangeChanged=!!latest&&mode==='reps'&&previousProfile?.mode!=='time'&&((hasStoredRange&&(previousMin!==min||previousMax!==max))||(!hasStoredRange&&outsideNewRange));
       let nextWeight=latest?.weight??0,nextReps=latest?.reps??min,nextSeconds=latest?.seconds??timeMin,kind='hold',reason='Top-set RPE is above the progression trigger.',estimated1RM=0;
-      if(scheme==='onerm'&&mode!=='time'){
-        // %1RM prescription (user's call 2026-09-11, #54): the target load
-        // is a fixed percentage of the estimated 1RM — no RPE gate, no rep
-        // ladder. The estimate comes from the same-zone top set (RPE-based
-        // when RPE was logged, Epley fallback); a manual 1RM covers exercises
-        // with no history yet. Time-based exercises fall through to the
-        // standard path — %1RM is a load prescription for rep work.
-        const pct=Number(profile?.percentOf1RM)||75;
-        let basis=0,basisNote='';
-        if(latest&&latest.weight>0){
-          basis=estimate1RM({w:latest.weight,r:latest.reps,rpe:latest.rpe});
-          basisNote=`estimated 1RM of ${displayWeight(Math.round(basis))} ${weightUnit()}`;
-        }else if(manual1RM>0){
-          basis=manual1RM;basisNote=`your entered 1RM of ${displayWeight(manual1RM)} ${weightUnit()}`;
-        }
-        if(basis>0){
-          // user 2026-09-11: snap %1RM loads to 5 lb plates (2.5 kg metric).
-          const rawLoad=basis*(pct/100);
-          nextWeight=isMetric()?Math.round(rawLoad/LB_TO_KG/2.5)*2.5*LB_TO_KG:Math.round(rawLoad/5)*5;
-          nextReps=min;kind='onerm';
-          reason=`${pct}% of ${basisNote}; suggesting ${displayWeight(nextWeight)} ${weightUnit()} at ${min} rep${min===1?'':'s'}.`;
-          estimated1RM=basis;
-        }else return null;
-      }
-      // The standard path needs real history; only %1RM+manual-1RM reaches here
-      // without it, and time-based %1RM has no prescription — no card.
-      else if(!latest)return null;
+      // The standard path needs real history.
+      if(!latest)return null;
       else if(scheme==='linear'){
         // Linear progression (user's call 2026-09-11): the increment applies
         // every session, even when reps were missed. Reps and seconds carry
@@ -161,10 +134,6 @@
         // reads better as "add load at N reps" than "reset to N reps".
         else{nextWeight=roundedIncrement(latest.weight,incrementType,incrementValueLb);nextReps=min;kind='load';reason=min===max?`Top set was at or below RPE ${threshold}; add ${incrementLabel} at ${min} reps.`:`Rep ceiling reached at RPE ${latest.rpe}; add ${incrementLabel} and reset to ${min} reps.`;}
       } else if(latest.rpe==null){reason='No RPE on the latest top set, so the engine holds the target.';}
-      const recent=logs.slice(0,3).map(topSetForSession).filter(Boolean).reverse();
-      const flat=recent.length>=3 && recent.every((row,i)=>i===0 || (row.weight<=recent[i-1].weight && row.performance<=recent[i-1].performance));
-      const rising=recent.length>=3 && recent.every((row,i)=>i===0 || row.rpe==null || recent[i-1].rpe==null || row.rpe>=recent[i-1].rpe);
-      const stall=!!programConfig.stallDetection && flat && rising;
       /* #79: suppress suggestions that propose no actual change from the latest
          top set (e.g. "25 lb · 6 reps → 25 lb · 6 reps"). A suggestion that
          changes nothing is noise, not guidance. */
@@ -175,16 +144,15 @@
           : profile?.amrap ? weightSame : weightSame&&nextReps===latest.reps;
         if(noChange)return null;
       }
-      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog?.isoDate,sourceWorkout:latestLog?.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,stall,freeform:!!config?.freeform,scheme,amrap:!!profile?.amrap};
+      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog?.isoDate,sourceWorkout:latestLog?.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,freeform:!!config?.freeform,scheme,amrap:!!profile?.amrap};
     }
 
     function suggestionCardMarkup(suggestion,index,interactive=true) {
       const ex=exercises.find(x=>x.id===suggestion.exerciseId);
       const formatTarget=(weight,performance)=>`${weight ? `${displayWeight(weight)} ${weightUnit()} · ` : ''}${performance} ${suggestion.mode==='time'?'sec':'reps'}`;
-      // Manual-1RM %1RM suggestions have no logged top set — show the 1RM basis instead.
       const oldTarget=suggestion.latest?formatTarget(suggestion.latest.weight,suggestion.mode==='time'?suggestion.latest.seconds:suggestion.latest.reps):`1RM ${displayWeight(suggestion.estimated1RM)} ${weightUnit()}`;
       const nextTarget=suggestion.amrap&&suggestion.mode!=='time'?`${suggestion.nextWeight?`${displayWeight(suggestion.nextWeight)} ${weightUnit()} · `:''}AMRAP`:formatTarget(suggestion.nextWeight,suggestion.mode==='time'?suggestion.nextSeconds:suggestion.nextReps);
-      const label=suggestion.applied?'Applied ✓':suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='onerm'?'%1RM':suggestion.kind==='range'?(suggestion.freeform?'New range':'Week range'):suggestion.kind==='time'?'Time +':'Rep +';
+      const label=suggestion.applied?'Applied ✓':suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='range'?(suggestion.freeform?'New range':'Week range'):suggestion.kind==='time'?'Time +':'Rep +';
       // user 2026-09-11 (#44): cards stay lean — name, kind, and the target
       // change only. The reason/basis sentences were gratuitous.
       return `<${interactive?'button':'div'} class="suggestion-card ${suggestion.applied?'applied':''}" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name">${escapeHtml(ex?.name||'Exercise')}<span>${label}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div></${interactive?'button':'div'}>`;
@@ -192,7 +160,7 @@
 
     function renderProgressionPreview() {
       const host=$('#progressionPreview'); if(!host)return;
-      const ids=[...new Set(realWorkouts().flatMap(workout=>workout.exercises.map(item=>item.exerciseId)))];
+      const ids=[...new Set(workoutState.completed.flatMap(workout=>workout.exercises.map(item=>item.exerciseId)))];
       const suggestions=ids.map(id=>progressionForExercise(id,progressionProfileForDraftItem({exerciseId:id}),{...progressionSetup})).filter(Boolean).slice(0,4);
       const fallback='<div class="chart-empty">Complete workouts to generate progression targets.</div>';
       host.innerHTML=`<div class="progression-preview-head"><div><h2 id="progressionPreviewTitle">Next-session suggestions</h2><p>Based on your completed history. Rep- and time-range progression use the same RPE trigger.</p></div></div>${suggestions.length?`<div class="suggestion-list">${suggestions.map((item,i)=>suggestionCardMarkup(item,i,false)).join('')}</div>`:fallback}<p class="progression-footnote">The engine never schedules a deload automatically.</p>`;
@@ -205,10 +173,10 @@
     }
 
     function freeformProgressionConfig() {
-      // Out-of-program workouts: global defaults, no stall detection, and the
-      // freeform flag so the engine follows the lifter's last zone instead of
-      // rebasing into the default range (see progressionForExercise).
-      return {...progressionSetup,stallDetection:false,freeform:true};
+      // Out-of-program workouts: global defaults and the freeform flag so the
+      // engine follows the lifter's last zone instead of rebasing into the
+      // default range (see progressionForExercise).
+      return {...progressionSetup,freeform:true};
     }
 
     function prepareDraftProgression(draft,programConfig) {
@@ -253,7 +221,7 @@
       if(!draft?.exercises?.length){box.hidden=true;return;}
       box.hidden=false;
       if(!suggestions.length){box.hidden=true;return;}
-      box.innerHTML=`<div class="progression-banner-head"><div><h3>${draft.autoAppliedProgression?'Progression targets applied':'Suggestions for this workout'}</h3><p>${draft.autoAppliedProgression?'Targets below appear as ghosted hints in each set. Type to override — completing a set untouched saves the hinted value.':'Only exercises below with completed history appear. Tap a card to apply its target to every set.'}</p></div></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>${suggestions.some(s=>s.stall)?`<div class="stall-card"><strong>Possible stall detected.</strong> Progress has been flat while RPE is rising. Consider scheduling a deload week; nothing has been changed automatically.</div>`:''}`;
+      box.innerHTML=`<div class="progression-banner-head"><div><h3>${draft.autoAppliedProgression?'Progression targets applied':'Suggestions for this workout'}</h3><p>${draft.autoAppliedProgression?'Targets below appear as ghosted hints in each set. Type to override — completing a set untouched saves the hinted value.':'Only exercises below with completed history appear. Tap a card to apply its target to every set.'}</p></div></div><div class="suggestion-list">${suggestions.map((s,i)=>suggestionCardMarkup(s,i,true).replace('data-demo-suggestion','data-real-suggestion')).join('')}</div>`;
       document.querySelectorAll('[data-real-suggestion]').forEach(button=>button.addEventListener('click',()=>applyProgressionSuggestion(draft,suggestions[Number(button.dataset.realSuggestion)])));
     }
 

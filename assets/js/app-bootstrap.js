@@ -106,9 +106,7 @@
       const scheme=progressionSetup.scheme||'rpe';
       document.querySelectorAll('#settingsSchemePills [data-scheme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.scheme===scheme)));
       const thresholdPills=$('#settingsRpePills');
-      if(thresholdPills)thresholdPills.closest('.rule-field').hidden=scheme==='linear'||scheme==='onerm';
-      const incrementField=$('#settingsIncrementType');
-      if(incrementField)incrementField.closest('.settings-pair').hidden=scheme==='onerm';
+      if(thresholdPills)thresholdPills.closest('.rule-field').hidden=scheme==='linear';
     }
     function renderSettings(){
       const darkToggle=$('#darkModeToggle');
@@ -127,19 +125,12 @@
       syncUnitPills();
       syncStatsDefaultPills();
       syncTimeStepPills($('#settingsTimeStepPills'),progressionSetup.timeStep);
-      const stall=$('#settingsStallToggle');
-      stall.setAttribute('aria-pressed',String(!!progressionSetup.stallDetection));
-      stall.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);
       syncSettingsScheme();
       const und=$('#settingsUndulatingToggle');
       und.setAttribute('aria-pressed',String(!!progressionSetup.undulating));
       und.setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);
       syncSettingsPeriodization();
       const del=$('#deleteAllDataButton');
-      const hasSamples=hasSampleData();
-      const addBtn=$('#addSampleDataButton'),clearBtn=$('#clearSampleDataButton');
-      if(addBtn){addBtn.disabled=hasSamples;addBtn.textContent=hasSamples?'Sample data added':'Add sample data';addBtn.title=hasSamples?'Sample workouts are already in your history':'Add 8 labeled sample workouts across the last ~3 weeks';}
-      if(clearBtn){clearBtn.disabled=!hasSamples;clearBtn.title=hasSamples?'Remove all sample workouts (your real workouts stay)':'No sample data to clear';}
     }
     window.addEventListener('load', () => {
       if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
@@ -242,7 +233,6 @@
     const syncAllTimeStepPills=()=>{syncTimeStepPills($('#settingsTimeStepPills'),progressionSetup.timeStep);syncTimeStepPills($('#programTimeStepPills'),programFormProgression().timeStep);};
     wireTimeStepPills($('#settingsTimeStepPills'),()=>progressionSetup.timeStep,v=>{progressionSetup.timeStep=v;syncAllTimeStepPills();schedulePersist();});
     wireTimeStepPills($('#programTimeStepPills'),()=>programFormProgression().timeStep,v=>{programFormProgression().timeStep=v;syncAllTimeStepPills();schedulePersist();});
-    $('#settingsStallToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;const toggle=$('#settingsStallToggle');toggle.setAttribute('aria-pressed',String(progressionSetup.stallDetection));toggle.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);schedulePersist();});
     document.querySelectorAll('#settingsSchemePills [data-scheme]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.scheme=button.dataset.scheme;syncSettingsScheme();schedulePersist();}));
     /* Settings → default periodization editor (user 2026-09-11). Mirrors the
        program week-range editor: 8-week cycle, edits progressionSetup.weeklyRanges
@@ -268,8 +258,6 @@
     $('#closeProgressionInfo').addEventListener('click',()=>$('#progressionInfoDialog').close());
     $('#doneProgressionInfo').addEventListener('click',()=>$('#progressionInfoDialog').close());
     $('#exportDataButton').addEventListener('click',()=>{downloadWorkoutBackup();showToast('Backup downloaded.');});
-    $('#addSampleDataButton').addEventListener('click',()=>{addSampleData();});
-    $('#clearSampleDataButton').addEventListener('click',()=>{clearSampleData();});
     $('#deleteAllDataButton').addEventListener('click',()=>{$('#deleteAllDialog').showModal();});
     $('#cancelDeleteAll').addEventListener('click',()=>$('#deleteAllDialog').close());
     $('#keepDeleteAll').addEventListener('click',()=>$('#deleteAllDialog').close());
@@ -347,7 +335,6 @@
     /* Per-exercise progression overrides are edited inside each program
        workout directly — no separate management screen (#45). */
     document.querySelectorAll('[data-treatment]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.treatment=button.dataset.treatment;document.querySelectorAll('[data-treatment]').forEach(row=>row.setAttribute('aria-pressed',String(row===button)));schedulePersist();}));
-    $('#stallDetectorToggle').addEventListener('click',()=>{const d=programFormProgression();d.stallDetection=!d.stallDetection;$('#stallDetectorToggle').setAttribute('aria-pressed',String(d.stallDetection));$('#stallDetectorToggle').setAttribute('aria-label',`Stall detector ${d.stallDetection?'on':'off'}`);schedulePersist();});
     $('#createProgram').addEventListener('click', createProgram);
     $('#startBlankWorkout').addEventListener('click', () => startBlankWorkout());
     $('#startNewTemplate')?.addEventListener('click', () => { if (typeof openNewTemplateDialog === 'function') openNewTemplateDialog(); });
@@ -363,6 +350,8 @@
       $('#exercisePickerDialog').showModal();
       requestAnimationFrame(() => $('#exercisePickerSearch').focus());
     });
+    // Bottom "Add exercise" button (#112) — same action as the top + button.
+    $('#addWorkoutExerciseBottom')?.addEventListener('click', () => $('#addWorkoutExercise').click());
     $('#closeExercisePicker').addEventListener('click', () => {$('#exercisePickerDialog').close();if(workoutState.pickerMode==='program')renderProgram();else if(workoutState.pickerMode==='template'){schedulePersist();renderWorkoutTemplateList();}});
     $('#doneExercisePicker').addEventListener('click', () => {$('#exercisePickerDialog').close();if(workoutState.pickerMode==='program')renderProgram();else if(workoutState.pickerMode==='template'){schedulePersist();renderWorkoutTemplateList();}});
     /* Workout focus (2026-09-10): one tap applies a rep-range preset to every
@@ -406,6 +395,8 @@
         const card=document.querySelector(`[data-workout-exercise="${CSS.escape(item.uid)}"]`);
         if(!card)return;
         const p=item.progression||{};
+        // Time-based exercises use seconds, never rep ranges (#110).
+        if(p.mode==='time')return;
         let text='';
         if(p.amrap)text=p.min>1?`AMRAP from ${p.min}`:'AMRAP';
         else if(p.openTop&&p.min)text=`${p.min}+`;
@@ -479,6 +470,13 @@
     $('#keepDraftButton').addEventListener('click', () => $('#discardDraftDialog').close());
     $('#confirmDiscardDraft').addEventListener('click', () => { $('#discardDraftDialog').close(); doDiscardDraft(); });
     $('#finishWorkout').addEventListener('click', () => finishWorkout());
+    /* Single review prompt on finish (2026-09-10, #43): unfilled values and
+       unmarked sets are reviewed together — mark all complete, delete the
+       unfinished sets, or keep editing. */
+    $('#closeReviewSets').addEventListener('click',()=>$('#reviewSetsDialog').close());
+    $('#reviewSetsCancel').addEventListener('click',()=>$('#reviewSetsDialog').close());
+    $('#reviewSetsComplete').addEventListener('click',()=>{$('#reviewSetsDialog').close();const draft=workoutState.draft;if(draft){draft.exercises.forEach(item=>item.sets.forEach(set=>{set.complete=true;}));renderWorkoutExercises();markDraftSaved();}finishWorkout(true);});
+    $('#reviewSetsDelete').addEventListener('click',()=>{$('#reviewSetsDialog').close();const draft=workoutState.draft;if(draft){/* #43: bulk delete removes only fully-empty sets (isEmptySet) and prunes exercises left with no sets — never sets with partial values. */let removed=0,removedEx=0;draft.exercises.forEach(item=>{const before=item.sets.length;item.sets=item.sets.filter(set=>!isEmptySet(set));removed+=before-item.sets.length;});const beforeEx=draft.exercises.length;draft.exercises=draft.exercises.filter(item=>item.sets.length);removedEx=beforeEx-draft.exercises.length;renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();if(removed||removedEx)showToast(`Deleted ${removed} empty set${removed===1?'':'s'}${removedEx?` and ${removedEx} empty exercise${removedEx===1?'':'s'}`:''}.`);}finishWorkout();});
 
     $('#searchInput').addEventListener('input', e => {
       state.query = e.target.value;
