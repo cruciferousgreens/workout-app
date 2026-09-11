@@ -79,9 +79,30 @@
       for(const key of SYNCABLE_KEYS){
         const snap=snapshotOf(key);
         const m=syncMeta.keys[key];
-        if(!m||m.snapshot!==snap){syncMeta.keys[key]={updatedAt:now,snapshot:snap,dirty:true};any=true;}
+        if(!m){
+          /* Fresh key (new device / wiped storage): an empty value was never
+             possessed, so it is NOT a delete — record it clean so pullRemote
+             adopts a remote row and pushDirtyKeys never DELETEs data this
+             device never had. Only a non-empty value is genuinely new. */
+          const empty=isEmptySyncValue(key,getSyncableValue(key));
+          syncMeta.keys[key]={updatedAt:now,snapshot:snap,dirty:!empty};
+          if(!empty)any=true;
+          continue;
+        }
+        /* Preserve pushedAt across re-marks: the self-heal's "was this ever
+           confirmed in the cloud" check depends on it surviving. */
+        if(m.snapshot!==snap){syncMeta.keys[key]={updatedAt:now,snapshot:snap,dirty:true,pushedAt:m.pushedAt};any=true;}
       }
       if(any){saveSyncMeta();scheduleSyncPush();}
+    }
+    /** Did this device ever hold a real (non-empty) value for key? Used to
+        tell a genuine local delete apart from a never-possessed key, so a
+        fresh device can never DELETE another device's row. */
+    function syncKeyWasPossessed(key){
+      const m=syncMeta.keys[key]||{};
+      if(m.pushedAt)return true;
+      try{return !isEmptySyncValue(key,JSON.parse(m.snapshot||'null'));}
+      catch(_){return false;}
     }
     function scheduleSyncPush(){
       clearTimeout(syncPushTimer);
@@ -111,9 +132,13 @@
         if(value===undefined)continue;
         if(value===null){
           /* Null local state (e.g. no active program): delete the remote row
-             so a stale value can't resurrect on another device. The column is
-             NOT NULL, so upserting null would abort the whole push. Needs the
-             DELETE RLS policy (same as the delete-all wipe). */
+             so a stale value can't resurrect on another device — BUT only if
+             this device previously possessed a value for the key. A device
+             that never had the key must never DELETE another device's row
+             (fresh-device race). The column is NOT NULL, so upserting null
+             would abort the whole push. Needs the DELETE RLS policy (same as
+             the delete-all wipe). */
+          if(!syncKeyWasPossessed(key)){syncMeta.keys[key].dirty=false;continue;}
           const {error:delError}=await sb.from('user_data').delete().eq('user_id',user.id).eq('key',key);
           if(delError){setAccountStatus('Sync failed: '+delError.message);return false;}
           syncMeta.keys[key].dirty=false;
@@ -123,6 +148,10 @@
         const {error}=await sb.from('user_data').upsert(row,{onConflict:'user_id,key'});
         if(error){setAccountStatus('Sync failed: '+error.message);return false;}
         syncMeta.keys[key].dirty=false;
+        /* Confirmed in the cloud. pullRemote uses this to self-heal: a key
+           with non-empty local state, no remote row, and no confirmed push
+           gets re-uploaded even if its dirty flag was lost. */
+        syncMeta.keys[key].pushedAt=new Date().toISOString();
       }
       syncMeta.lastSyncAt=new Date().toISOString();
       saveSyncMeta();renderAccount();
@@ -131,7 +160,9 @@
     /** Apply one remote row to local state and record its timestamp/snapshot. */
     function applyRemoteKey(key,remote){
       setSyncableValue(key,remote.value);
-      syncMeta.keys[key]={updatedAt:remote.updated_at,snapshot:snapshotOf(key),dirty:false};
+      /* Adopting a remote row confirms the cloud holds this value — record it
+         so a later deliberate delete on another device isn't resurrected. */
+      syncMeta.keys[key]={updatedAt:remote.updated_at,snapshot:snapshotOf(key),dirty:false,pushedAt:remote.updated_at};
     }
     /* ===== union merge for collection keys (Justin's call 2026-09-10) ===== */
     /** Keys whose values are collections: when both sides hold different items,
@@ -226,17 +257,26 @@
         const localVal=getSyncableValue(key);
         const localEmpty=isEmptySyncValue(key,localVal);
         if(!remote){
-          /* No remote row: upload non-empty local state (first-sign-in migration). */
-          if(!localEmpty&&(isNew||m.snapshot!==snapshotOf(key))){m.updatedAt=new Date().toISOString();m.snapshot=snapshotOf(key);m.dirty=true;}
+          /* No remote row: upload non-empty local state (first-sign-in migration).
+             The !m.pushedAt check is self-healing: if this device never got a
+             confirmed push for the key, the snapshot alone can't prove the
+             cloud has it (e.g. the dirty flag was lost while the tab was
+             suspended) — so upload it. A deliberately deleted remote row keeps
+             its pushedAt, so cross-device deletes still converge instead of
+             resurrecting. */
+          if(!localEmpty&&(isNew||!m.pushedAt||m.snapshot!==snapshotOf(key))){m.updatedAt=new Date().toISOString();m.snapshot=snapshotOf(key);m.dirty=true;}
           continue;
         }
         const remoteEmpty=isEmptySyncValue(key,remote.value);
         if(remoteEmpty&&!localEmpty){m.updatedAt=new Date().toISOString();m.snapshot=snapshotOf(key);m.dirty=true;continue;}
         if(!remoteEmpty&&localEmpty){
           /* Adopt real remote data over empty local state — unless the empty
-             local state is a deliberate delete waiting to push (m.dirty), in
-             which case the delete wins and must not be resurrected. */
-          if(!m.dirty){applyRemoteKey(key,remote);changed=true;if(key==='customExercises')customChanged=true;}
+             local state is a deliberate delete waiting to push (m.dirty on a
+             key this device previously possessed), in which case the delete
+             wins and must not be resurrected. A dirty flag on a
+             never-possessed key is poison (fresh-device race): adopt anyway —
+             applyRemoteKey resets it to clean. */
+          if(!m.dirty||!syncKeyWasPossessed(key)){applyRemoteKey(key,remote);changed=true;if(key==='customExercises')customChanged=true;}
           continue;
         }
         if(remote.updated_at>m.updatedAt){
@@ -485,6 +525,9 @@
       renderAccount();
       /* 'online' re-arms the CDN import (getSupabase caches failures) and resumes. */
       window.addEventListener('online',()=>{supabaseUnavailable=false;resumeSync().catch(()=>{});});
+      /* A tab that was hidden/suspended may have missed its debounced push
+         (background timers don't fire reliably) — catch up when visible again. */
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)resumeSync().catch(()=>{});});
       resumeSync().catch(()=>{});
     }
     initSync();

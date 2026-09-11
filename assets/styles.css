@@ -1025,7 +1025,9 @@
       .program-workout { grid-template-columns: 30px minmax(0,1fr); }
       .program-row-actions { grid-column: 2; justify-content: flex-start; }
     }
-    .add-set { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 38px; margin: 12px 0 0; padding: 0 13px; border: 1px solid var(--foam); border-radius: var(--radius-sm); background: var(--pine-soft); color: var(--accent); }
+    /* #67: calm ghost button — the card already has plenty of chrome. */
+    .add-set { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 40px; margin: 12px 0 0; padding: 0 13px; border: 1.5px dashed var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--accent); cursor: pointer; font-size: 13px; font-weight: 750; }
+    .add-set:active { border-color: var(--accent); background: var(--accent-soft); }
     /* (set-count-badge retired 2026-09-10: the accordion summary already carries the set count) */
     .muscle-analysis-grid { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(250px,.85fr); gap: 12px; margin-top: 12px; }
     .analysis-panel { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
@@ -1155,7 +1157,7 @@
     .program-muscle-bar i::after { content:''; display:block; width:var(--fill); height:100%; background:var(--accent); border-radius:inherit; }
     .inline-feedback { color: var(--accent); font-size: 10px; font-weight: 750; }
     .options-apply-row { display: flex; align-items: center; gap: 8px; }
-    .remove-exercise-bottom { width: 100%; margin-top: 16px; padding: 10px 2px; text-align: center; }
+    .remove-exercise-bottom { width: 100%; margin-top: 14px; padding: 12px 2px 4px; border-top: 1px solid var(--line); text-align: center; }
     .search-suggestion-note { padding: 8px 2px; color: var(--muted); font-size: 11px; }
     @container (max-width: 640px) {
       .workout-start-options, .program-muscle-bars { grid-template-columns: 1fr; }
