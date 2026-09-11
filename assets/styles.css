@@ -1227,6 +1227,9 @@
     .rep-preset-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 9px 0 12px; }
     .rep-preset { min-height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 11px; font-weight: 750; }
     .rep-preset[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    /* #97 (user 2026-09-11): RPE threshold uses square option boxes like the
+       onboarding prototype, not pills. */
+    #settingsRpePills .rep-preset { border-radius: 10px; min-width: 54px; min-height: 48px; padding: 0; font-size: 16px; }
     .range-fields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
     /* Flat progression section inside program setup (2026-09-10, #45): no
        nested card — same visual language as Settings → Progression defaults,
@@ -1241,6 +1244,12 @@
     .week-range-row strong { display: block; margin-bottom: 6px; font-size: 11px; }
     .week-range-pills { display: flex; flex-wrap: wrap; gap: 6px; }
     .week-range-pills .rep-preset { min-height: 32px; padding: 0 10px; font-size: 10px; }
+    /* Settings → default periodization (user 2026-09-11): green text button,
+       left-aligned, revealed under the undulating toggle when it is on. */
+    .settings-periodization { margin-top: 4px; }
+    .periodization-edit-button { border: 0; background: none; padding: 8px 0; color: var(--accent); font: inherit; font-size: 14px; font-weight: 700; text-align: left; cursor: pointer; }
+    .periodization-edit-button:active { opacity: .7; }
+    #settingsUndulatingPanel { margin-top: 4px; }
     .program-cover-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
     /* Compact Edit program button (user 2026-09-11): small pill, not a big CTA. */
     .program-cover-actions .secondary-button { min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; }
@@ -1394,6 +1403,10 @@
     .log-set-number { border-radius: var(--radius-sm); background: transparent; }
     .log-set-number.has-tags { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
     .log-set.is-complete { background: transparent; }
+    /* #93 (user 2026-09-11): swipeable rows need an opaque background to hide
+       the delete rail underneath — the transparent above would let the red
+       show through on checked sets. */
+    .set-swipe .log-set.is-complete { background: var(--surface); }
     .log-set.is-complete .log-input { border-color: var(--line); background: var(--surface-raised); }
     /* #86 mirror (user 2026-09-11): swiping open a rail on an already-completed
        set — dim the checkmark so the delete action reads as foreground. */

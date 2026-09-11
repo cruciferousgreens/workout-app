@@ -105,8 +105,8 @@
     function syncSettingsScheme(){
       const scheme=progressionSetup.scheme||'rpe';
       document.querySelectorAll('#settingsSchemePills [data-scheme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.scheme===scheme)));
-      const thresholdField=$('#settingsRpeThreshold');
-      if(thresholdField)thresholdField.closest('.rule-field').hidden=scheme==='linear'||scheme==='onerm';
+      const thresholdPills=$('#settingsRpePills');
+      if(thresholdPills)thresholdPills.closest('.rule-field').hidden=scheme==='linear'||scheme==='onerm';
       const incrementField=$('#settingsIncrementType');
       if(incrementField)incrementField.closest('.settings-pair').hidden=scheme==='onerm';
     }
@@ -116,7 +116,7 @@
       const swipeToggle=$('#swipeDeleteSetsToggle');
       if(swipeToggle){swipeToggle.setAttribute('aria-pressed',String(swipeToDeleteSets));swipeToggle.setAttribute('aria-label',`Swipe to delete sets ${swipeToDeleteSets?'on':'off'}`);}
       document.querySelectorAll('#themePills [data-theme-name]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.themeName===themeName)));
-      $('#settingsRpeThreshold').value=progressionSetup.threshold;
+      document.querySelectorAll('#settingsRpePills [data-rpe-threshold]').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.rpeThreshold)===progressionSetup.threshold)));
       $('#settingsIncrementType').value=progressionSetup.incrementType;
       $('#settingsIncrementValue').value=progressionSetup.incrementValue;
       syncSettingsIncrementUnit();
@@ -134,6 +134,7 @@
       const und=$('#settingsUndulatingToggle');
       und.setAttribute('aria-pressed',String(!!progressionSetup.undulating));
       und.setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);
+      syncSettingsPeriodization();
       const del=$('#deleteAllDataButton');
       const hasSamples=hasSampleData();
       const addBtn=$('#addSampleDataButton'),clearBtn=$('#clearSampleDataButton');
@@ -233,7 +234,7 @@
       /* Apply immediately: both Stats toggles follow the new default. */
       state.topExercisesMode=def; state.muscleVolumeMode=def; renderStats();
     }));
-    $('#settingsRpeThreshold').addEventListener('input',e=>{progressionSetup.threshold=Math.min(10,Math.max(1,Number(e.target.value)||8));schedulePersist();});
+    document.querySelectorAll('#settingsRpePills [data-rpe-threshold]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.threshold=Number(button.dataset.rpeThreshold);document.querySelectorAll('#settingsRpePills [data-rpe-threshold]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));schedulePersist();}));
     $('#settingsIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;syncSettingsIncrementUnit();schedulePersist();});
     $('#settingsIncrementValue').addEventListener('input',e=>{progressionSetup.incrementValue=Math.max(0,Number(e.target.value)||0);schedulePersist();});
     $('#settingsRepMin').addEventListener('input',e=>{progressionSetup.defaultRange.min=Math.max(1,Number(e.target.value)||1);progressionSetup.defaultRange.preset='custom';document.querySelectorAll('#settingsRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
@@ -243,7 +244,25 @@
     wireTimeStepPills($('#programTimeStepPills'),()=>programFormProgression().timeStep,v=>{programFormProgression().timeStep=v;syncAllTimeStepPills();schedulePersist();});
     $('#settingsStallToggle').addEventListener('click',()=>{progressionSetup.stallDetection=!progressionSetup.stallDetection;const toggle=$('#settingsStallToggle');toggle.setAttribute('aria-pressed',String(progressionSetup.stallDetection));toggle.setAttribute('aria-label',`Stall detector ${progressionSetup.stallDetection?'on':'off'}`);schedulePersist();});
     document.querySelectorAll('#settingsSchemePills [data-scheme]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.scheme=button.dataset.scheme;syncSettingsScheme();schedulePersist();}));
-    $('#settingsUndulatingToggle').addEventListener('click',()=>{progressionSetup.undulating=!progressionSetup.undulating;const toggle=$('#settingsUndulatingToggle');toggle.setAttribute('aria-pressed',String(!!progressionSetup.undulating));toggle.setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);schedulePersist();});
+    /* Settings → default periodization editor (user 2026-09-11). Mirrors the
+       program week-range editor: 8-week cycle, edits progressionSetup.weeklyRanges
+       (the default new programs inherit via cloneProgression). */
+    function renderSettingsWeekRanges(){
+      const list=$('#settingsWeekRangeList');if(!list)return;
+      if(!Array.isArray(progressionSetup.weeklyRanges))progressionSetup.weeklyRanges=[];
+      while(progressionSetup.weeklyRanges.length<8)progressionSetup.weeklyRanges.push(progressionSetup.weeklyRanges.length%3===0?'strength':progressionSetup.weeklyRanges.length%3===1?'hypertrophy':'endurance');
+      progressionSetup.weeklyRanges=progressionSetup.weeklyRanges.slice(0,8);
+      list.innerHTML=progressionSetup.weeklyRanges.map((preset,index)=>`<div class="week-range-row"><strong>Week ${index+1}</strong><div class="week-range-pills" role="group" aria-label="Week ${index+1} rep range">${Object.entries(REP_PRESETS).map(([key,value])=>{const short=value.amrap?'AMRAP':value.openTop?'15+':`${value.min}–${value.max}`;return `<button type="button" class="rep-preset" data-settings-week-pill="${index}" data-preset="${key}" aria-pressed="${key===preset}">${short}</button>`;}).join('')}</div></div>`).join('');
+      list.querySelectorAll('[data-settings-week-pill]').forEach(button=>button.addEventListener('click',()=>{const index=Number(button.dataset.settingsWeekPill);progressionSetup.weeklyRanges[index]=button.dataset.preset;list.querySelectorAll(`[data-settings-week-pill="${index}"]`).forEach(other=>other.setAttribute('aria-pressed',String(other===button)));schedulePersist();}));
+    }
+    function syncSettingsPeriodization(){
+      const wrap=$('#settingsPeriodizationWrap');if(!wrap)return;
+      wrap.hidden=!progressionSetup.undulating;
+      if(progressionSetup.undulating)renderSettingsWeekRanges();
+      else{const panel=$('#settingsUndulatingPanel');if(panel)panel.hidden=true;}
+    }
+    $('#editDefaultPeriodization')?.addEventListener('click',()=>{const panel=$('#settingsUndulatingPanel');if(!panel)return;panel.hidden=!panel.hidden;if(!panel.hidden)renderSettingsWeekRanges();});
+    $('#settingsUndulatingToggle').addEventListener('click',()=>{progressionSetup.undulating=!progressionSetup.undulating;const toggle=$('#settingsUndulatingToggle');toggle.setAttribute('aria-pressed',String(!!progressionSetup.undulating));toggle.setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);syncSettingsPeriodization();schedulePersist();});
     $('#progressionInfoButton').addEventListener('click',()=>$('#progressionInfoDialog').showModal());
     $('#programProgressionInfoButton').addEventListener('click',()=>$('#progressionInfoDialog').showModal());
     $('#closeProgressionInfo').addEventListener('click',()=>$('#progressionInfoDialog').close());
@@ -372,7 +391,29 @@
         item.progression={...(item.progression||{}),preset:key,min:preset.min,max:preset.max,openTop:!!preset.openTop,amrap:!!preset.amrap,custom:true};
       });
       prepareDraftProgression(workoutState.draft,freeformProgressionConfig());
-      renderWorkoutExercises(); renderWorkoutProgression(); syncWorkoutFocusPills(); markDraftSaved();
+      /* #92 (user 2026-09-11): don't full re-render the exercise list here —
+         the innerHTML teardown/rebuild flashes unpleasantly. Update the
+         rep-range placeholders in place instead; the data is already correct
+         and the next natural re-render picks up everything else. */
+      updateFocusPlaceholders();
+      renderWorkoutProgression(); syncWorkoutFocusPills(); markDraftSaved();
+    }
+    /* #92: surgically refresh the reps-input placeholders after a focus-pill
+       change, without rebuilding the exercise cards. */
+    function updateFocusPlaceholders(){
+      const draft=workoutState.draft; if(!draft)return;
+      draft.exercises.forEach(item=>{
+        const card=document.querySelector(`[data-workout-exercise="${CSS.escape(item.uid)}"]`);
+        if(!card)return;
+        const p=item.progression||{};
+        let text='';
+        if(p.amrap)text=p.min>1?`AMRAP from ${p.min}`:'AMRAP';
+        else if(p.openTop&&p.min)text=`${p.min}+`;
+        else if(p.min&&p.max)text=p.min===p.max?String(p.min):`${p.min}–${p.max}`;
+        else if(p.min)text=String(p.min);
+        if(!text)return;
+        card.querySelectorAll('.reps-input').forEach(input=>{input.placeholder=text;});
+      });
     }
     let pendingFocusKey=null;
     document.querySelectorAll('[data-workout-focus]').forEach(button=>button.addEventListener('click',()=>{

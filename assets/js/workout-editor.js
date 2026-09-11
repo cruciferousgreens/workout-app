@@ -135,7 +135,10 @@
     }
 
     function startBlankWorkout(name = '', programId = null, programWorkoutUid = null) {
-      workoutState.draft = {name, date:localIsoDate(), exercises:[], programId, programWorkoutUid, editingId:null};
+      /* #95 (user 2026-09-11): new workouts default to the Settings Default
+         Focus, so the matching pill renders highlighted from the start. */
+      const defaultFocus = progressionSetup.defaultRange?.preset || null;
+      workoutState.draft = {name, date:localIsoDate(), exercises:[], programId, programWorkoutUid, editingId:null, focusPreset:defaultFocus};
       $('#workoutComplete').hidden = true;
       renderWorkoutScreen();
     }
@@ -264,6 +267,15 @@
       item.classList.toggle('is-open', open);
       const action = item.querySelector(':scope > .swipe-delete-action');
       if (action) action.tabIndex = open ? 0 : -1;
+      /* #93 (user 2026-09-11): closing must also clear any leaked inline
+         translateX from a pointermove whose finish() never ran (iOS can
+         swallow pointerup or deliver it with a mismatched pointerId). The
+         class toggle alone can't repair that — the rail would stay visibly
+         open with no is-open class for the #86 close to find. */
+      if (!open) {
+        const content = item.querySelector(':scope > .swipe-content');
+        if (content) { content.style.transition = ''; content.style.transform = ''; }
+      }
     }
     function installSwipeOutsideCloser() {
       if (swipeOutsideCloserInstalled) return;
@@ -288,28 +300,27 @@
            closure only, so the pointermove blur line threw a ReferenceError
            on every swipe start — every swipe since v0.86 died right there.) */
         const isSetSwipe = item.classList.contains('set-swipe');
-        let startX = 0, startY = 0, deltaX = 0, tracking = false, horizontal = false, startedOpen = false, pointerId = null, suppressClick = false, interactiveStart = false;
+        let startX = 0, startY = 0, deltaX = 0, tracking = false, horizontal = false, startedOpen = false, pointerId = null, suppressClick = false, interactiveStart = false, startedOnCheckbox = false;
         content.addEventListener('pointerdown', event => {
+          suppressClick = false;
           if (event.pointerType === 'mouse' && event.button !== 0) return;
           /* Set-row swipe is touch-only and toggle-gated (user 2026-09-11):
              desktop keeps the × button, and the gesture never engages when the
              Settings toggle is off. */
           if (isSetSwipe && (typeof swipeDeleteSetsEnabled!=='function' || !swipeDeleteSetsEnabled())) return;
+          /* user 2026-09-11: checked rows aren't swipeable (stopgap; #101
+             tracks revisiting). Don't even start tracking the gesture. */
+          if (isSetSwipe && content.classList.contains('is-complete')) return;
           /* No stopPropagation here: the document-level outside closer must see
              this tap, or open rows can never be dismissed by tapping away. */
-          startX = event.clientX; startY = event.clientY; deltaX = 0; tracking = true; horizontal = false; suppressClick = false;
+          startX = event.clientX; startY = event.clientY; deltaX = 0; tracking = true; horizontal = false;
+          /* user 2026-09-11: a gesture starting on the complete-set checkbox is
+             always a tap, never a swipe. */
+          startedOnCheckbox = isSetSwipe && !!event.target.closest('.complete-set');
           startedOpen = item.classList.contains('is-open'); pointerId = event.pointerId;
           /* Set rows are mostly text fields: the swipe may start anywhere on
-             the row, including the checkbox and set-number (v0.91: the
-             v0.89 exclusion that made those two tap-only turned out to be
-             the blocker — the row is densely packed with no bare background,
-             so those are the two most natural places to grab, and a
-             deliberate swipe starting on either visibly did nothing.
-             user 2026-09-11 explicitly asked for swipe-from-checkbox).
-             Tap vs swipe is decided at release by how far the finger actually
-             traveled (see finish): a tap without movement still clicks
-             through, so the checkbox just checks, the set-number still opens
-             its tag dialog, and a field just focuses. */
+             the row except the checkbox (see above). Tap vs swipe is decided
+             at release by how far the finger actually traveled (see finish). */
           interactiveStart = isSetSwipe
             ? false
             : !!event.target.closest('input, button, textarea, select, a, summary');
@@ -317,13 +328,16 @@
              implicit capture to its touch target, and these listeners sit on an
              ancestor so the events arrive regardless. An explicit
              setPointerCapture mid-gesture makes WebKit yank capture back ~1ms
-             later and fire lostpointercapture, which cancels the drag one event
-             after the horizontal lock — every swipe died and taps randomly
-             opened the rail (user 2026-09-11). No version of explicit
-             capture survives that on a scrollable page. */
+             later and fire lostpointercapture, which cancels the drag. */
         });
         content.addEventListener('pointermove', event => {
           if (!tracking || event.pointerId !== pointerId || interactiveStart) return;
+          /* #93 (user 2026-09-11): checked rows never visually slide — the
+             rail can't even flash red during the drag. Gated only on
+             is-complete (stable mid-gesture; toggled on click after the gesture
+             ends), never on where the gesture started, so normal swiping from
+             the checkbox still works. */
+          if (isSetSwipe && content.classList.contains('is-complete')) return;
           const dx = event.clientX - startX, dy = event.clientY - startY;
           if (!horizontal && Math.abs(dx) < 7 && Math.abs(dy) < 7) return;
           /* Vertical wins: hand the gesture back untouched so page scroll
@@ -345,21 +359,26 @@
         const finish = event => {
           if (event.pointerId !== pointerId) return;
           tracking = false;
-          content.style.transition = '';
-          content.style.transform = '';
-          /* Tap vs swipe is decided here, not at the 7px lock: a tap with
-             finger jitter can cross the lock threshold, and treating it as a
-             swipe both pops the rail open by accident and gets an open rail
-             stuck (the dismissing tap re-locks as a micro-swipe and its click
-             gets swallowed — user 2026-09-11). Only a deliberate drag
-             (>= 24px of travel) counts as a swipe; anything smaller is a tap,
-             so the click goes through untouched — the checkbox just checks,
-             a field just focuses, and a tap on an open row dismisses it via
-             the bubble closer below. */
+          /* Reset any live-drag transform when the rail isn't opening. A tap
+             with finger drift applies translateX via pointermove; if we return
+             without clearing it, the rail stays visibly open with no is-open
+             class, and nothing (not the #86 close, not the bubble closer) can
+             dismiss it. (user 2026-09-11, #93) */
+          const resetDrag = () => { content.style.transition = ''; content.style.transform = ''; horizontal = false; pointerId = null; };
+          /* user 2026-09-11: two hard rules. (1) A gesture starting on the
+             checkbox is always a tap — never open the rail. (2) A completed
+             set can't be swiped open. */
+          if (startedOnCheckbox) { resetDrag(); return; }
+          if (isSetSwipe && content.classList.contains('is-complete')) { resetDrag(); return; }
+          /* Tap vs swipe is decided here, not at the 7px lock: only a
+             deliberate drag (>= 24px of travel) counts as a swipe; anything
+             smaller is a tap, so the click goes through untouched. */
           if (horizontal && Math.abs(deltaX - (startedOpen ? -72 : 0)) >= 24) {
             event.preventDefault();
             setSwipeOpen(item, deltaX < -36);
-            suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+            suppressClick = true;
+          } else {
+            resetDrag();
           }
           horizontal = false; pointerId = null;
         };
@@ -497,10 +516,13 @@
       document.querySelectorAll('.delete-set,.delete-set-swipe').forEach(button => button.addEventListener('click', () => deleteWorkoutSet(button.dataset.exerciseUid,button.dataset.setUid)));
       document.querySelectorAll('.log-input').forEach(input => input.addEventListener('input', () => { const row=input.closest('.log-set'); const exerciseUid = input.closest('.workout-exercise').dataset.workoutExercise; const setUid = row.dataset.setUid; const set = draft.exercises.find(item => item.uid === exerciseUid)?.sets.find(itemSet => itemSet.uid === setUid); if (set) { set[input.dataset.field] = input.dataset.field==='w' ? storageWeight(input.value) : input.value; if (set.complete) { set.complete = false; row.classList.remove('is-complete'); const check=row.querySelector('.complete-set'); check?.setAttribute('aria-pressed','false'); check?.setAttribute('aria-label','Mark set complete'); } } $('#workoutError').textContent = ''; markDraftSaved(); }));
       document.querySelectorAll('.complete-set').forEach(button => button.addEventListener('click', () => {
-        /* #86 (user 2026-09-11): completing a set must dismiss its open
-           swipe rail — the rail must not linger behind the green checkmark. */
+        /* #93 (user 2026-09-11): a checkbox click means the user's intent was
+           to toggle the set, not to swipe — so unconditionally clear any swipe
+           state. The click is the most reliable event in iOS touch handling
+           (it fires even when pointerup is swallowed), and setSwipeOpen(false)
+           clears leaked inline transforms that the is-open class never tracked. */
         const swipeItem = button.closest('.swipe-item');
-        if (swipeItem && swipeItem.classList.contains('is-open')) setSwipeOpen(swipeItem, false);
+        if (swipeItem) setSwipeOpen(swipeItem, false);
         const set = findDraftSet(button.dataset.exerciseUid, button.dataset.setUid);
         const item=draft.exercises.find(row=>row.uid===button.dataset.exerciseUid);
         const ex=exercises.find(row=>row.id===item?.exerciseId);

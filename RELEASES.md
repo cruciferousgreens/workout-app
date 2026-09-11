@@ -3,6 +3,15 @@
 Newest first. Only user-facing milestones — the full batch-by-batch history
 lives in [CHANGELOG.md](CHANGELOG.md).
 
+## v0.9998
+
+- **#93 fixed (the checkbox/red-rail bug):** tapping a set's checkbox no longer
+  reveals the red delete rail behind it. Root cause was CSS, not gestures —
+  `.log-set.is-complete { background: transparent; }` made checked rows
+  see-through, exposing the rail underneath. Checked swipe rows now keep an
+  opaque background. Also hardened the gesture code: checkbox clicks
+  unconditionally clear swipe state, and checked rows refuse the drag.
+
 ## v0.91
 
 - Swipe can now start anywhere on a set row, including the checkbox and

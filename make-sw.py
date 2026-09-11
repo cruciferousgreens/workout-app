@@ -15,7 +15,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # User-facing app version shown in Settings → About ("Cruciferous Greens
 # Workout · vX"). Bump this whenever a build ships user-visible changes.
-APP_VERSION = "0.991"
+APP_VERSION = "0.9998"
 
 now = datetime.datetime.now(datetime.timezone.utc)
 # Seconds in the stamp (user 2026-09-11): two builds in the same minute
