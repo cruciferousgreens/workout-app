@@ -1,9 +1,8 @@
 'use strict';
 /* Share landing layout pins (user 2026-09-12):
-   - Header (all versions): compact icon buttons — bookmark for "Add to my
-     library", play for "Start workout" — next to the ×. Icon order follows
-     the #180 action order per state (signed-in: Add leads; signed-out:
-     Start leads).
+   - Header (all versions): a green Start button (#297) + the bookmark icon
+     for "Add to my library" next to the ×. Order follows the #180 action
+     order per state (signed-in: Add leads; signed-out: Start leads).
    - Footer (all versions): the full descriptive buttons in the approved
      pattern — big primary pill + green text link + quiet grey note.
    - #213: identical pill + text-link + note treatment on the workout landing
@@ -11,7 +10,9 @@
    - #214: the landing is always the full page — the modal variant is gone;
      a share link arriving mid-session opens the full page over a live draft
      without destroying it (pane-selection pin lives in
-     workout-screen-logic.test.js). */
+     workout-screen-logic.test.js).
+   - #296: a cold-opened share link lands directly on the share landing
+     (loading state) — the home tab never flashes first. */
 const {describe,it}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -27,22 +28,25 @@ const cardStart=shareSrc.indexOf('function sharePreviewCardHtml(payload){');
 assert.ok(cardStart!==-1,'sharePreviewCardHtml found');
 const card=shareSrc.slice(cardStart);
 
-describe('header icon buttons',()=>{
-  it('bookmark + play icons sit next to the dismiss ×',()=>{
+describe('header actions (#297: green Start button, not a play icon)',()=>{
+  it('green Start button + bookmark icon sit next to the dismiss ×',()=>{
     const h=card.indexOf('share-header-actions');
     assert.ok(h!==-1,'share-header-actions present');
     const dismiss=card.indexOf('data-share-act="dismiss"',h);
-    assert.ok(dismiss!==-1&&dismiss<h+2000,'× follows the icon buttons in the header');
+    assert.ok(dismiss!==-1&&dismiss<h+2000,'× follows the header actions');
   });
-  it('bookmark wires Add to my library, play wires Start workout',()=>{
+  it('bookmark wires Add to my library, the Start button wires Start workout',()=>{
     assert.ok(card.includes('class="share-icon-button" data-share-act="add"'),'bookmark icon adds to library');
     assert.ok(card.includes('aria-label="Add to my library"'),'bookmark labeled');
-    assert.ok(card.includes('class="share-icon-button" data-share-act="start"'),'play icon starts the workout');
-    assert.ok(card.includes('aria-label="Start workout"'),'play labeled');
+    assert.ok(card.includes('class="primary-button share-start-btn" data-share-act="start"'),'green Start button starts the workout');
+    assert.ok(card.includes('>Start</button>'),'Start button labeled');
   });
-  it('icon order follows the #180 action order per state',()=>{
+  it('no bare play icon remains in the header',()=>{
+    assert.ok(!card.includes('aria-label="Start workout"><svg'),'no icon-only play button');
+  });
+  it('order follows the #180 action order per state',()=>{
     assert.ok(card.includes('signedIn?bookmarkBtn+playBtn:playBtn+bookmarkBtn'),
-      'signed-in: bookmark first; signed-out: play first');
+      'signed-in: bookmark first; signed-out: Start first');
   });
   it('program landings get the bookmark icon (no start action)',()=>{
     assert.ok(card.includes(':bookmarkBtn;'),'program header is bookmark-only');
@@ -114,8 +118,48 @@ describe('share landing styles',()=>{
     assert.ok(/\.share-icon-button\s*\{/.test(css),'.share-icon-button styled');
     assert.ok(/\.share-footer-actions\s*\{/.test(css),'.share-footer-actions styled');
   });
+  it('.share-start-btn is a compact green button for the header (#297)',()=>{
+    assert.ok(/\.share-header-actions \.share-start-btn\s*\{/.test(css),'.share-start-btn styled');
+  });
   it('the dead corner-action style is gone',()=>{
     assert.ok(!css.includes('.share-corner-action'),'no .share-corner-action remains');
+  });
+});
+
+describe('#296: cold-open share links land directly on the landing',()=>{
+  it('the boot detects the share route before the initial tab render',()=>{
+    const det=bootstrapSrc.indexOf('const bootShareAttempt=');
+    assert.ok(det!==-1,'bootShareAttempt detection present');
+    const initial=bootstrapSrc.indexOf("const initialId = decodeURIComponent(location.hash.slice(1));");
+    assert.ok(initial!==-1&&initial>det,'detection runs before the initial route');
+    const boot=bootstrapSrc.slice(det,det+900);
+    assert.ok(boot.includes("#share="),'hash links detected');
+    assert.ok(boot.includes('shortLinkAttemptFromPath'),'short-link paths detected');
+    assert.ok(boot.includes('takeSpaRedirectSlug'),'404-handoff slugs detected');
+  });
+  it('a detected share renders the loading landing immediately',()=>{
+    assert.ok(bootstrapSrc.includes("if(bootShareAttempt&&typeof openSharePreviewLoading==='function')openSharePreviewLoading();"),
+      'loading landing renders on a share boot');
+    const fn=shareSrc.match(/function openSharePreviewLoading\(\)\{([\s\S]*?)\n    \}/)[1];
+    assert.ok(fn.includes('state.sharePreview={loading:true}'),'loading sentinel set');
+    assert.ok(fn.includes('showWorkouts(false,true)'),'landing renders on the workout tab');
+    assert.ok(!fn.includes('workoutEditorOpen'),'live editor flag untouched');
+  });
+  it('the loading sentinel renders a loading card with a dismiss escape hatch',()=>{
+    const fn=shareSrc.match(/function renderSharePreview\(\)\{([\s\S]*?)\n    \}/)[1];
+    assert.ok(fn.includes('payload.loading'),'loading branch present');
+    assert.ok(fn.includes('shareLoadingDismiss'),'dismiss escape hatch on the loading card');
+  });
+  it('the normal initial route is skipped on a share boot',()=>{
+    const initial=bootstrapSrc.indexOf("const initialId = decodeURIComponent(location.hash.slice(1));");
+    const tail=bootstrapSrc.slice(initial,initial+900);
+    assert.ok(tail.includes('if (bootShareAttempt)'),'share boot skips the tab render');
+  });
+  it('a failed share resolve falls back to the home tab',()=>{
+    assert.ok(bootstrapSrc.includes("dismissSharePreview();showToast('That share link didn\\u2019t open"),
+      'failed hash resolve dismisses the loading landing');
+    assert.ok(bootstrapSrc.includes('const shareFailed=()=>{if(bootShareAttempt&&bootShareAttempt.type===\'short\'){dismissSharePreview();showDashboard(false);}'),
+      'failed short-link resolve falls back to home');
   });
 });
 

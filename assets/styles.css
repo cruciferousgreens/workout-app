@@ -301,13 +301,16 @@
     .share-context { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
     .share-actions { display: grid; gap: 2px; justify-items: center; }
     .share-actions .primary-button { width: 100%; min-height: 52px; }
-    /* Share landing header (user 2026-09-12): compact icon buttons —
-       bookmark saves to the library, play starts the workout — next to the
-       ×, so the actions are one tap away without scrolling. */
+    /* Share landing header (user 2026-09-12): green Start button (#297) plus
+       the bookmark icon next to the ×, so the actions are one tap away
+       without scrolling. */
     .share-header-actions { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
     .share-icon-button { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; padding: 0; }
     .share-icon-button:hover { background: var(--surface-2); }
     .share-icon-button:active { opacity: .6; }
+    /* #297 (user 2026-09-12): the header Start is a compact green button,
+       sized to sit with the icon buttons. */
+    .share-header-actions .share-start-btn { min-height: 40px; padding: 0 18px; font-size: 15px; }
     /* Share landing footer (user 2026-09-12): the full descriptive buttons —
        big primary pill + green text link + quiet grey note. */
     .share-footer-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }

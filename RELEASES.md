@@ -2,6 +2,11 @@
 
 Newest first. Only user-facing milestones.
 
+## v1.1.1 (2026-09-12)
+Hotfix for two share-link regressions (user-approved):
+- #296: opening a shared workout link now lands directly on the share landing (with a loading state) instead of flashing the home tab first.
+- #297: the share landing's header start control is a green Start button, not a bare play icon.
+
 ## v1.1 (2026-09-12)
 First minor release after v1.000. Highlights since v1.000: short share links for workouts (app.cruciferousgreens.com/s/…), in-modal sign-in to share, Rosé theme, the review-sets dialog (Finish anyway / Delete N unfinished sets / Keep editing), completed sets keep their other fields frozen while the checkbox stays tappable to uncheck, saving a completed workout as a template now offers Start, opaque PR toast, program sharing temporarily removed (returns with working short links), a progression guard so rep-range changes can't recommend less than the current top-set weight, the new app icon, and the home share card. Full detail in the v1.001–v1.026 entries below.
 

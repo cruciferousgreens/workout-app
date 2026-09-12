@@ -220,6 +220,18 @@
       showWorkouts(false,true);
       window.scrollTo(0,0);
     }
+    /* #296 (user 2026-09-12): a cold-opened share link must land directly on
+       the share landing — never flash the home tab first while the payload
+       decodes (hash links) or resolves over the network (server short
+       links). The landing renders immediately in a loading state; the
+       resolved payload fills it in. */
+    function openSharePreviewLoading(){
+      state.sharePreview={loading:true};
+      state.savedWorkoutId=null;state.builderOpen=false;
+      state.workoutHistoryOpen=false;$('#workoutComplete').hidden=true;
+      showWorkouts(false,true);
+      window.scrollTo(0,0);
+    }
     function dismissSharePreview(){
       state.sharePreview=null;
       clearShareHash();
@@ -246,8 +258,8 @@
     /* The share card renders as its own full-screen page (#214, user
        2026-09-12: the old modal variant is gone — a share link always lands
        on the full page, opening over a live draft without disturbing it).
-       Header: compact icon buttons (bookmark = add to library, play = start)
-       next to the ×, so the actions are one tap away without scrolling.
+       Header: a green Start button (#297) plus the bookmark icon next to the
+       ×, so the actions are one tap away without scrolling.
        Footer: the full descriptive buttons in the approved pattern —
        full-width primary pill + green text link + quiet grey note.
        #213: every version uses the same pattern and the #180 order per
@@ -273,7 +285,10 @@
          saves). One primary per the account state; the other path stays one
          tap away as a quiet text action. */
       const bookmarkBtn=`<button class="share-icon-button" data-share-act="add" type="button" aria-label="Add to my library"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg></button>`;
-      const playBtn=`<button class="share-icon-button" data-share-act="start" type="button" aria-label="Start workout"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>`;
+      /* #297 (user 2026-09-12): the header start control is a green Start
+         button, not a bare play icon — the primary action must read at a
+         glance. */
+      const playBtn=`<button class="primary-button share-start-btn" data-share-act="start" type="button">Start</button>`;
       /* Header icon order follows the #180 action order per state. */
       const headerBtns=isTemplate
         ?(signedIn?bookmarkBtn+playBtn:playBtn+bookmarkBtn)
@@ -304,6 +319,13 @@
       const host=$('#sharePreviewBody');if(!host)return;
       const payload=state.sharePreview;
       if(!payload){host.innerHTML='';return;}
+      /* #296: boot-time loading sentinel — the resolved payload fills this
+         in. The × is an escape hatch if the resolve hangs. */
+      if(payload.loading){
+        host.innerHTML='<div class="completed-card"><span class="continue-kicker">Shared link</span><div class="detail-title-row"><h2>Loading…</h2><button class="dialog-close" id="shareLoadingDismiss" type="button" aria-label="Dismiss">×</button></div><p class="share-context">Opening the shared link.</p></div>';
+        host.querySelector('#shareLoadingDismiss')?.addEventListener('click',()=>{dismissSharePreview();showDashboard(false);});
+        return;
+      }
       host.innerHTML=sharePreviewCardHtml(payload);
       hydrateBodyMaps();
       wireSharePreviewButtons(host,payload,()=>{collapseWorkoutSubScreen();});

@@ -738,14 +738,30 @@
 applySwipeSets();
 updateLiveWorkoutIndicator();
 populateFilters(); renderLibrary(); renderDashboard(); renderStats();
+/* #296 (user 2026-09-12): detect a share route synchronously, BEFORE the
+   initial tab render — a cold-opened share link must land directly on the
+   share landing (loading state), never flash the home tab first while the
+   payload decodes (hash links) or resolves over the network (short links). */
+const bootShareAttempt=(()=>{
+  try{
+    if(/^#share=/.test(location.hash||''))return {type:'hash'};
+    let slug=null;
+    try{slug=typeof shortLinkAttemptFromPath==='function'?shortLinkAttemptFromPath(location.pathname):null;}catch(_){slug=null;}
+    if(!slug){try{slug=typeof takeSpaRedirectSlug==='function'?takeSpaRedirectSlug():null;}catch(_){slug=null;}}
+    if(slug)return {type:'short',slug};
+  }catch(_){}
+  return null;
+})();
+if(bootShareAttempt&&typeof openSharePreviewLoading==='function')openSharePreviewLoading();
 /* #32: a share link (#share=...) renders the shared workout/program
    full-screen after boot, with Start / Add actions over it. Decode is
-   async (v2 links are deflated); the landing tab renders first and the
-   share takes over as soon as it decodes. */
+   async (v2 links are deflated); #296 renders the landing in a loading
+   state first so the home tab never flashes underneath. */
 parseShareHash().then(sharePayload=>{
   if(sharePayload)openSharePreview(sharePayload);
   /* P8/E1: a share-looking hash that doesn't decode gets a visible
      message instead of silently landing on Home. */
+  else if(bootShareAttempt&&bootShareAttempt.type==='hash'){dismissSharePreview();showToast('That share link didn\u2019t open \u2014 it may be broken or from an older version of the app.');showDashboard(false);}
   else if(/^#share=/.test(location.hash||''))showToast('That share link didn\u2019t open \u2014 it may be broken or from an older version of the app.');
 });
 /* #177: server short links (/s/<slug>). Logged-in-only creation, public
@@ -761,15 +777,22 @@ parseShareHash().then(sharePayload=>{
   try{
     if(typeof shortLinkAttemptFromPath!=='function'||typeof resolveShortShareLink!=='function')return;
     const INVALID_LINK_MSG='That share link didn\u2019t open \u2014 it may be broken or from an older version of the app.';
-    let attempt=null;
-    try{attempt=shortLinkAttemptFromPath(location.pathname);}catch(_){attempt=null;}
-    if(!attempt&&typeof takeSpaRedirectSlug==='function')attempt=takeSpaRedirectSlug();
+    /* #296: the boot detection above already consumed the slug (the 404
+       handoff is take-once), so reuse it instead of re-taking. */
+    let attempt=bootShareAttempt&&bootShareAttempt.type==='short'?bootShareAttempt.slug:null;
+    if(!attempt){
+      try{attempt=shortLinkAttemptFromPath(location.pathname);}catch(_){attempt=null;}
+      if(!attempt&&typeof takeSpaRedirectSlug==='function')attempt=takeSpaRedirectSlug();
+    }
     if(!attempt)return; /* not a short-link route at all -- boot normally */
-    if(typeof isValidShareSlug!=='function'||!isValidShareSlug(attempt)){showToast(INVALID_LINK_MSG);return;}
+    /* #296: a failed cold-open share falls back to the home tab instead of
+       stranding the user on the loading landing. */
+    const shareFailed=()=>{if(bootShareAttempt&&bootShareAttempt.type==='short'){dismissSharePreview();showDashboard(false);}};
+    if(typeof isValidShareSlug!=='function'||!isValidShareSlug(attempt)){shareFailed();showToast(INVALID_LINK_MSG);return;}
     resolveShortShareLink(attempt).then(payload=>{
       if(payload)openSharePreview(payload);
-      else showToast(INVALID_LINK_MSG);
-    }).catch(()=>showToast(INVALID_LINK_MSG));
+      else{shareFailed();showToast(INVALID_LINK_MSG);}
+    }).catch(()=>{shareFailed();showToast(INVALID_LINK_MSG);});
   }catch(_){/* short links are best-effort; boot continues */}
 })();
 
@@ -784,5 +807,8 @@ window.addEventListener('hashchange',()=>{
   });
 });
 const initialId = decodeURIComponent(location.hash.slice(1));
-if (initialId === 'library') showLibrary(false); else if (initialId === 'workout') showWorkouts(false); else if (initialId === 'program') showProgram(false); else if (initialId === 'stats') showStats(false); else if (initialId === 'settings') showSettings(false); else if (initialId && exercises.some(x => x.id === initialId)) openExercise(initialId, false); else showDashboard(false);
+/* #296: a cold-opened share link already rendered its loading landing above —
+   don't paint a tab underneath it. */
+if (bootShareAttempt) { /* share landing owns the boot */ }
+else if (initialId === 'library') showLibrary(false); else if (initialId === 'workout') showWorkouts(false); else if (initialId === 'program') showProgram(false); else if (initialId === 'stats') showStats(false); else if (initialId === 'settings') showSettings(false); else if (initialId && exercises.some(x => x.id === initialId)) openExercise(initialId, false); else showDashboard(false);
   
