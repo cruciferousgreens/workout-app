@@ -636,6 +636,11 @@
        script has loaded, which is true by the time this init block runs. */
     workoutState.templates=cloneWorkoutTemplates();
     restorePersisted();
+    /* P0 hotfix 2026-09-12: the #99 sync.js split dropped sync.js's trailing
+       initSync() self-call, so no account control was ever wired (Email me a
+       code / verify / sign out all dead) and sync never started on boot.
+       Boot must kick it. */
+    if(window.Sync&&typeof Sync.initSync==='function'){try{Sync.initSync();}catch(_){}}
     /* Stats metric default (user 2026-09-11): the Volume|Sets toggles on the
        Stats page initialize to the saved Units → Stats default on every load. */
     state.topExercisesMode=state.muscleVolumeMode=(progressionSetup.statsDefaultMetric==='sets'?'sets':'volume');
