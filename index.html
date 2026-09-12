@@ -8,8 +8,26 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Cruciferous Greens" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IkxlYWZ5IGdyZWVuIj4KICA8cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjM4IiBmaWxsPSIjZjZmN2Y0Ii8+CiAgPHRleHQgeD0iOTAiIHk9IjEyOSIgZm9udC1zaXplPSIxMTIiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJBcHBsZSBDb2xvciBFbW9qaSwgU2Vnb2UgVUkgRW1vamksIE5vdG8gQ29sb3IgRW1vamksIHNhbnMtc2VyaWYiPvCfpaw8L3RleHQ+Cjwvc3ZnPgo=" />
+  <meta name="description" content="Log workouts, track progression, and share training sessions." />
+  <link rel="icon" type="image/png" href="icon-192.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+  <!-- v1.013: default/home share card (user-approved 2026-09-12). Static hosting
+       can't render per-workout dynamic images, so this one branded card covers
+       every share landing. Absolute prod URL — the github.io QA tree is not the
+       public face of shared links. og-card.png is retained as a spare branded
+       asset (previously the default card). Never AI imagery. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Cruciferous Greens Workout" />
+  <meta property="og:title" content="Cruciferous Greens Workout — 800+ exercises, free forever" />
+  <meta property="og:description" content="Log workouts, track progression, and share training sessions." />
+  <meta property="og:image" content="https://app.cruciferousgreens.com/share-card-home-1200.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Cruciferous Greens Workout — log workouts, track progression" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Cruciferous Greens Workout — 800+ exercises, free forever" />
+  <meta name="twitter:description" content="Log workouts, track progression, and share training sessions." />
+  <meta name="twitter:image" content="https://app.cruciferousgreens.com/share-card-home-1200.png" />
   <title>Cruciferous Greens</title>
   <script>
    /* #99 B20: write the EFFECTIVE theme pre-paint — the same vocabulary
@@ -45,7 +63,7 @@
     <section id="dashboardView" class="dashboard-view active" aria-label="Home">
       <div class="calendar-toolbar">
        <button class="calendar-page" id="previousWeek" type="button" aria-label="Previous week">‹</button>
-       <div><strong id="calendarWeekLabel"></strong><p class="calendar-summary" id="calendarSummary">This week.</p><span>Swipe or use arrows to browse</span></div>
+       <div><strong id="calendarWeekLabel"></strong><p class="calendar-summary" id="calendarSummary"></p></div>
        <button class="calendar-page" id="nextWeek" type="button" aria-label="Next week">›</button>
       </div>
       <div class="week-strip" id="weekStrip" aria-label="One-week training calendar."></div>
@@ -111,7 +129,7 @@
        <section class="training-saved" aria-labelledby="savedWorkoutsTitle"><div class="section-head"><div><h2 id="savedWorkoutsTitle">Saved workouts</h2><p class="section-note">Tap one to view, edit, or start it</p></div><button class="filter-button saved-filter-btn" id="savedFilterBtn" type="button" aria-label="Filter saved workouts"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="filter-count" id="savedFilterCount" hidden></span></button></div><div class="history-search"><input id="savedSearch" type="search" placeholder="Search saved workouts…" autocomplete="off" aria-label="Search saved workouts by name or exercise"></div><div id="savedWorkoutList"></div></section>
       </div>
       <div id="workoutHistory" hidden>
-       <div class="section-head"><div><h2>Workout logs</h2><p class="section-note" id="historyCountNote">All completed sessions</p></div></div>
+       <div class="section-head"><div><p class="section-note" id="historyCountNote">All completed sessions</p></div></div>
        <div class="history-search"><input id="historySearch" type="search" placeholder="Search workouts…" autocomplete="off" aria-label="Search workouts by name"></div>
        <div class="period-tabs log-period-tabs" id="logPeriodTabs" role="group" aria-label="Workout logs period"></div>
        <div id="workoutHistoryList"></div>
@@ -133,7 +151,7 @@
         <div class="workout-focus-open" id="workoutFocus">
           <span class="workout-focus-label" id="workoutFocusLabel">Workout focus</span>
           <div class="rep-preset-row" role="group" aria-labelledby="workoutFocusLabel"><button class="rep-preset" type="button" data-workout-focus="strength">Strength · 1–5</button><button class="rep-preset" type="button" data-workout-focus="hypertrophy">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-workout-focus="endurance">Endurance · 12–20</button><button class="rep-preset" type="button" data-workout-focus="open">15+</button><button class="rep-preset" type="button" data-workout-focus="amrap">AMRAP</button></div>
-          <p class="field-help">Applies the rep range to every reps-tracked exercise in this workout, replacing any per-exercise ranges you set.</p>
+          <p class="field-help">Replaces per-exercise ranges on every reps-tracked exercise.</p>
         </div>
         <div class="field date-field"><label for="workoutDate">DATE</label><span class="date-display" id="workoutDateDisplay" aria-hidden="true">Thu, Sep 10, 2026</span><input id="workoutDate" type="date" class="date-input-overlay" aria-label="Workout date" /></div>
        </div>
@@ -160,7 +178,7 @@
 
     <section id="programView" class="program-view" aria-label="Program">
       <div id="programSetup" class="program-setup">
-       <h2>Create your active program.</h2>
+       <h2 id="programSetupTitle">Create your active program.</h2>
        <p>Give the block a name, length, and a short focus. You can add its workouts in order next.</p>
        <div class="program-form">
         <div class="field wide"><label for="programName">PROGRAM NAME</label><input id="programName" type="text" autocomplete="off" placeholder="e.g. Fall strength block" /></div>
@@ -171,12 +189,19 @@
        <section class="program-progression" aria-labelledby="progressionSetupTitle">
         <div class="section-head settings-head"><div class="settings-title-row"><h3 class="program-progression-title" id="progressionSetupTitle">Progression rules</h3><button class="exercise-info-button" id="programProgressionInfoButton" type="button" aria-label="About progression rules">i</button></div><p class="section-note">Defaults for this program. Exercise-level overrides remain editable inside each workout.</p></div>
         <div class="settings-grid">
-          <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="programSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button></div><p class="field-help">Linear adds the increment every session, no RPE needed. RPE-based adds reps first, then weight, gated by the RPE trigger.</p></div>
+          <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="programSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button><button class="rep-preset" type="button" data-scheme="onerm" aria-pressed="false">%1RM</button></div><p class="field-help">Linear adds the increment every session, no RPE needed. RPE-based adds reps first, then weight, gated by the RPE trigger. %1RM sets loads from a percent of the training max or estimated 1RM.</p></div>
           <label class="rule-field"><span>Top-set RPE trigger</span><input id="progressionThreshold" type="number" inputmode="decimal" min="1" max="10" step="0.5" value="8"></label>
           <div class="settings-pair">
            <label class="rule-field"><span>Increment type</span><select id="progressionIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
            <label class="rule-field"><span>Increment value</span><input id="progressionIncrementValue" type="number" inputmode="decimal" min="0.5" step="0.5" value="5"><em class="unit" id="programIncrementUnit">lb</em></label>
           </div>
+          <label class="rule-field" id="progressionPctRow"><span>% of 1RM</span><input id="progressionPercentOf1RM" type="number" inputmode="numeric" min="1" max="100" step="1" value="75"><em class="unit">%</em></label>
+          <p class="field-help">Training loads are set from this percent of the training max (or best estimated 1RM).</p>
+          <div class="settings-pair" id="deloadRow">
+           <label class="rule-field"><span>Deload every N weeks</span><input id="deloadEvery" type="number" inputmode="numeric" min="0" step="1" value="0"></label>
+           <label class="rule-field"><span>Deload intensity</span><input id="deloadPct" type="number" inputmode="numeric" min="40" max="80" step="1" value="60"><em class="unit">%</em></label>
+          </div>
+          <p class="field-help">E.g. 4 = every 4th week is a deload. 0 = off.</p>
           <div class="settings-subsection">
            <span class="settings-subhead">Default rep range</span>
            <div class="rep-preset-row" id="programRepPresets" role="group" aria-label="Default rep range"><button class="rep-preset" type="button" data-rep-preset="strength" aria-pressed="false">Strength · 1–5</button><button class="rep-preset" type="button" data-rep-preset="hypertrophy" aria-pressed="true">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-rep-preset="endurance" aria-pressed="false">Endurance · 12–20</button><button class="rep-preset" type="button" data-rep-preset="open" aria-pressed="false">15+</button><button class="rep-preset" type="button" data-rep-preset="amrap" aria-pressed="false">AMRAP</button></div>
@@ -190,10 +215,14 @@
         </div>
         <div class="switch-row"><span class="switch-copy"><strong>Vary rep ranges by week</strong><span>Optional undulating periodization. Each program week can inherit its own range.</span></span><button class="switch" id="undulatingToggle" type="button" role="switch" aria-pressed="false" aria-label="Vary rep ranges by week off"></button></div>
         <div class="undulating-panel" id="undulatingPanel" hidden><span class="filter-label">WEEKLY REP RANGE</span><div class="week-range-list" id="weekRangeList"></div></div>
+        <div class="switch-row"><span class="switch-copy"><strong>Vary % of 1RM by week</strong><span>Optional weekly % wave for %1RM programs. Each program week can use its own percent.</span></span><button class="switch" id="pctWaveToggle" type="button" role="switch" aria-pressed="false" aria-label="Vary percent of 1RM by week off"></button></div>
+        <div class="undulating-panel" id="pctWavePanel" hidden><span class="filter-label">WEEKLY % OF 1RM</span><div class="week-pct-list" id="weekPctList"></div></div>
        </section>
        <p class="form-error" id="programError" role="alert"></p>
        <button class="primary-button" id="createProgram" type="button">Create active program</button>
-       <p class="session-note">Program edits are saved automatically on this device.</p>
+       <!-- #173: explicit-save model — the button above commits the form (a
+            discard-changes modal guards unsaved edits), so the old
+            "saved automatically" note was removed as contradictory. -->
       </div>
       <div id="programCover" class="program-cover" hidden></div>
       <section class="dashboard-card archived-programs" id="archivedPrograms" aria-labelledby="archivedProgramsTitle" hidden><h2 id="archivedProgramsTitle">Archived programs</h2><div id="archivedProgramList"></div></section>
@@ -252,12 +281,18 @@
       <section class="dashboard-card">
        <div class="section-head settings-head"><div class="settings-title-row"><h2>Progression defaults</h2><button class="exercise-info-button" id="progressionInfoButton" type="button" aria-label="About progression defaults">i</button></div><p class="section-note">Used for new exercises and programs.</p></div>
        <div class="settings-grid">
-        <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="settingsSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button></div></div>
+        <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="settingsSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button><button class="rep-preset" type="button" data-scheme="onerm" aria-pressed="false">%1RM</button></div><p class="field-help" id="settingsSchemeDesc" aria-live="polite"></p></div>
         <div class="rule-field"><span>RPE trigger threshold</span><div class="rep-preset-row" id="settingsRpePills" role="group" aria-label="RPE trigger threshold"><button class="rep-preset" type="button" data-rpe-threshold="7" aria-pressed="false">7</button><button class="rep-preset" type="button" data-rpe-threshold="8" aria-pressed="true">8</button><button class="rep-preset" type="button" data-rpe-threshold="9" aria-pressed="false">9</button></div></div>
         <div class="settings-pair">
           <label class="rule-field"><span>Increment type</span><select id="settingsIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
           <label class="rule-field"><span>Increment value</span><input id="settingsIncrementValue" type="number" min="0" step="0.5" value="5"><em class="unit" id="settingsIncrementUnit">lb</em></label>
         </div>
+        <div class="settings-pair" id="settingsPctRow">
+          <label class="rule-field"><span>% of 1RM default</span><input id="settingsPercentOf1RM" type="number" min="1" max="100" step="1" value="75"><em class="unit">%</em></label>
+          <label class="rule-field"><span>Deload every N weeks</span><input id="settingsDeloadEvery" type="number" min="0" step="1" value="0"></label>
+        </div>
+        <p class="field-help">E.g. 4 = every 4th week is a deload. 0 = off.</p>
+        <label class="rule-field" id="settingsDeloadPctRow"><span>Deload intensity default</span><input id="settingsDeloadPct" type="number" min="40" max="80" step="1" value="60"><em class="unit">%</em></label>
         <div class="rule-field"><span>Default focus</span><div class="rep-preset-row" id="settingsRepPresets"><button class="rep-preset" type="button" data-rep-preset="strength" aria-pressed="false">Strength · 1–5</button><button class="rep-preset" type="button" data-rep-preset="hypertrophy" aria-pressed="true">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-rep-preset="endurance" aria-pressed="false">Endurance · 12–20</button><button class="rep-preset" type="button" data-rep-preset="open" aria-pressed="false">15+</button><button class="rep-preset" type="button" data-rep-preset="amrap" aria-pressed="false">AMRAP</button></div></div>
         <div class="settings-subsection">
           <span class="settings-subhead">Default rep range</span>
@@ -291,7 +326,6 @@
        <p class="section-note" id="appVersionLine">Cruciferous Greens Workout</p>
        <p class="section-note" id="buildUpdatedLine">Last updated: —</p>
        <p class="section-note"><button class="small-button" id="checkUpdatesButton" type="button">Check for updates</button></p>
-       <p class="section-note"><a href="https://github.com/cruciferousgreens/workout-app-accounts/blob/main/RELEASES.md" target="_blank" rel="noreferrer">Release notes</a></p>
       </section>
       <section class="dashboard-card">
        <div class="section-head settings-head"><h2>Attributions</h2></div>
@@ -326,24 +360,21 @@
 
       <div class="stats" id="stats"></div>
       <!-- Card order (user 2026-09-12): header, stats, muscle map, trends,
-           similar, how-to, notes, history. #125 moved trends here from Stats;
+           how-to, similar, history. #125 moved trends here from Stats;
            2026-09-12 puts the muscle map ahead of the charts.
            Phone QA 2026-09-11: exercise images removed for now; similar
-           exercises auto-collapse. -->
+           exercises auto-collapse; #202 removed the notes card;
+           #203 moved similar below how-to. -->
       <section class="dashboard-card chart-card exercise-musclemap"><button class="exercise-info-button musclemap-info" id="muscleMapInfoButton" type="button" aria-label="About this movement">i</button><div class="section-head"><h2>Muscles worked</h2></div><div id="exerciseBodyMap"></div></section>
-      <section class="dashboard-card chart-card"><div class="section-head"><h2>Progress</h2><p class="section-note" id="progressNote">Estimated 1RM and volume per session · tap a point to inspect it</p></div><div class="chart-wrap" id="exerciseProgressChart"></div><div class="chart-wrap" id="exerciseVolumeChart"></div></section>
-      <details class="dashboard-card similar-disclosure">
-        <summary><span><strong>Similar exercises</strong><span class="section-note">Ranked by movement overlap</span></span><span class="disclosure-chev" aria-hidden="true">›</span></summary>
-        <div class="similar-grid" id="similarGrid"></div>
-      </details>
+      <section class="dashboard-card chart-card"><div class="section-head"><div><h2>Progress</h2><p class="section-note" id="progressNote">Estimated 1RM and volume per session · tap a point to inspect it</p></div><div class="mini-segmented" role="group" aria-label="Progress metric" id="progressMetricToggle"><button type="button" data-progress-metric="e1rm">1RM</button><button type="button" data-progress-metric="heaviest">Heaviest</button></div></div><div class="chart-wrap" id="exerciseProgressChart"></div><div class="chart-wrap" id="exerciseVolumeChart"></div></section>
       <section class="dashboard-card" aria-labelledby="howHeading">
         <div class="section-head"><h2 id="howHeading">How to</h2></div>
         <ol class="instructions" id="instructions"></ol>
       </section>
-      <section class="dashboard-card" aria-labelledby="notesHeading">
-        <div class="section-head"><h2 id="notesHeading">Notes</h2></div>
-        <div class="note-card" id="noteCard"></div>
-      </section>
+      <details class="dashboard-card similar-disclosure">
+        <summary><span><strong>Similar exercises</strong><span class="section-note">Ranked by movement overlap</span></span><span class="disclosure-chev" aria-hidden="true">›</span></summary>
+        <div class="similar-grid" id="similarGrid"></div>
+      </details>
       <section class="dashboard-card" aria-labelledby="historyHeading">
         <div class="section-head"><h2 id="historyHeading">History</h2><p class="section-note" id="historyCount"></p></div>
         <button class="history-toggle" id="historyToggle" type="button" aria-expanded="false" aria-controls="historyList"><span id="historyToggleLabel">Show history</span><span class="toggle-chevron" aria-hidden="true">›</span></button>
@@ -364,7 +395,7 @@
 
    <div class="app-toast" id="appToast" role="status" aria-live="polite" hidden></div>
    <dialog class="custom-dialog compact-dialog" id="updateAvailableDialog" aria-labelledby="updateAvailableTitle">
-    <div class="custom-form"><div class="custom-form-head"><div><h2 id="updateAvailableTitle">Update ready</h2><p>A new version of the app has finished downloading.</p></div><button class="dialog-close" id="closeUpdateAvailable" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="updateRefreshNow" type="button">Refresh now</button><button class="secondary-button" id="updateLater" type="button">Later</button></div></div>
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="updateAvailableTitle">Update ready</h2><p>A new version of the app has finished downloading.</p></div><button class="dialog-close" id="closeUpdateAvailable" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="updateLater" type="button">Later</button><button class="primary-button" id="updateRefreshNow" type="button">Refresh now</button></div></div>
    </dialog>
    <dialog class="custom-dialog compact-dialog" id="replaceDraftDialog" aria-labelledby="replaceDraftTitle">
     <div class="custom-form"><div class="custom-form-head"><div><h2 id="replaceDraftTitle">Replace current workout?</h2><p>Your in-progress workout will be discarded and replaced with the selected session.</p></div><button class="dialog-close" id="closeReplaceDraft" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepCurrentDraft" type="button">Keep current</button><button class="primary-button" id="confirmReplaceDraft" type="button">Replace workout</button></div></div>
@@ -379,10 +410,10 @@
     <div class="custom-form"><div class="custom-form-head"><div><h2 id="builderDraftExistsTitle">Saved workout draft in progress</h2><p>You have an unfinished saved workout draft.</p></div><button class="dialog-close" id="closeBuilderDraftExists" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepBuilderDraft" type="button">Keep draft</button><button class="primary-button danger-button" id="deleteBuilderDraft" type="button">Delete draft</button></div></div>
    </dialog>
    <dialog class="custom-dialog compact-dialog" id="reviewSetsDialog" aria-labelledby="reviewSetsTitle">
-    <div class="custom-form"><div class="custom-form-head"><div><h2 id="reviewSetsTitle">Review sets</h2><p id="reviewSetsCopy"></p></div><button class="dialog-close" id="closeReviewSets" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="reviewSetsComplete" type="button">Mark all complete</button><button class="secondary-button danger-button" id="reviewSetsDelete" type="button">Finish and delete empty sets</button><button class="secondary-button" id="reviewSetsCancel" type="button">Keep editing</button></div></div>
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="reviewSetsTitle">Review sets</h2><p id="reviewSetsCopy"></p></div><button class="dialog-close" id="closeReviewSets" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="reviewSetsComplete" type="button">Mark all complete</button><button class="primary-button" id="reviewSetsFinishAnyway" type="button">Finish anyway</button><button class="secondary-button" id="reviewSetsDeleteUnfinished" type="button">Delete unfinished sets</button><button class="secondary-button" id="reviewSetsDelete" type="button">Finish and delete empty sets</button><button class="text-link" id="reviewSetsCancel" type="button">Keep editing</button></div></div>
    </dialog>
    <dialog class="custom-dialog compact-dialog" id="focusConfirmDialog" aria-labelledby="focusConfirmTitle">
-    <div class="custom-form"><div class="custom-form-head"><div><h2 id="focusConfirmTitle">Apply to every exercise?</h2><p id="focusConfirmCopy"></p></div><button class="dialog-close" id="closeFocusConfirm" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="focusConfirmApply" type="button">Apply</button><button class="secondary-button" id="focusConfirmCancel" type="button">Cancel</button></div></div>
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="focusConfirmTitle">Apply to every exercise?</h2><p id="focusConfirmCopy"></p></div><button class="dialog-close" id="closeFocusConfirm" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="focusConfirmCancel" type="button">Cancel</button><button class="primary-button" id="focusConfirmApply" type="button">Apply</button></div></div>
    </dialog>
 
    <dialog class="custom-dialog" id="customExerciseDialog" aria-labelledby="customExerciseTitle">
@@ -450,7 +481,7 @@
        <button class="dialog-close" id="closeProgressionInfo" type="button" aria-label="Close">×</button>
       </div>
       <div class="info-list">
-       <p><strong>Progression mode</strong><span>RPE-based adds reps inside the range first, then weight, when the top set hits the RPE trigger. Linear adds the increment every session with no RPE needed.</span></p>
+       <p><strong>Progression mode</strong><span>RPE-based adds reps inside the range first, then weight, when the top set hits the RPE trigger. Linear adds the increment every session with no RPE needed. %1RM sets each session's load from a percent of the training max (or best estimated 1RM); scheduled deload weeks scale that load back by the deload intensity.</span></p>
        <p><strong>RPE trigger threshold</strong><span>When your top set comes in at or under this RPE, the app suggests progressing next session.</span></p>
        <p><strong>Increment type &amp; value</strong><span>How much load to add on a progression: a fixed amount (lb or kg) or a percent of the current weight.</span></p>
        <p><strong>Default focus</strong><span>The rep-range preset applied to new programs and exercises.</span></p>
@@ -465,11 +496,8 @@
    <dialog class="custom-dialog" id="deleteAllDialog" aria-labelledby="deleteAllTitle">
     <div class="custom-form">
       <div class="custom-form-head">
-       <div><h2 id="deleteAllTitle">Delete all data?</h2><p>This erases everything on this device and in your cloud backup.</p></div>
+       <div><h2 id="deleteAllTitle">Delete all data?</h2><p>This erases everything on this device and in your cloud backup. This cannot be undone.</p></div>
        <button class="dialog-close" id="cancelDeleteAll" type="button" aria-label="Close">×</button>
-      </div>
-      <div class="info-list">
-       <p><span>All workouts, saved workouts, programs, custom exercises, favorites, tags, and settings will be permanently erased. This cannot be undone.</span></p>
       </div>
       <div class="form-actions">
        <button class="form-action secondary" id="keepDeleteAll" type="button">Keep my data</button>
@@ -519,12 +547,40 @@
      </div>
     </div>
    </dialog>
-   <!-- Incoming share modal (user 2026-09-12): a share link tapped while the
-        app is already open pops the shared workout/program as a modal over
-        the current screen instead of yanking the user to a new page. -->
-   <dialog class="custom-dialog share-incoming-dialog" id="shareIncomingDialog" aria-labelledby="shareIncomingTitle">
-    <h2 id="shareIncomingTitle" class="sr-only">Shared workout</h2>
-    <div id="shareIncomingBody" class="share-incoming-body"></div>
+   <dialog class="custom-dialog compact-dialog" id="shareSignInDialog" aria-labelledby="shareSignInTitle">
+    <div class="custom-form">
+     <div class="custom-form-head">
+      <div><h2 id="shareSignInTitle">Sign in to share</h2><p>Sharing needs an account — sign in and your links stay tied to you on any device.</p></div>
+      <button class="dialog-close" id="closeShareSignInDialog" type="button" aria-label="Close">×</button>
+     </div>
+     <div id="shareSignInStep1">
+      <div class="form-actions">
+       <button class="form-action primary" id="goShareSignIn" type="button">Sign in</button>
+       <button class="form-action secondary" id="cancelShareSignIn" type="button">Not now</button>
+      </div>
+     </div>
+     <div id="shareSignInStep2" hidden>
+      <label class="rule-field"><span>Email</span><input id="shareSignInEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com"></label>
+      <div class="settings-actions"><button class="small-button" id="shareSignInSendCode" type="button">Email me a code</button></div>
+      <div id="shareSignInOtpStep" hidden>
+       <label class="rule-field"><span>Code from the email</span><input id="shareSignInOtp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from the email" maxlength="12"></label>
+       <div class="settings-actions"><button class="small-button" id="shareSignInVerify" type="button">Sign in</button></div>
+      </div>
+      <p class="status-note" id="shareSignInStatus" role="status"></p>
+      <div class="form-actions">
+       <button class="form-action secondary" id="cancelShareSignIn2" type="button">Not now</button>
+      </div>
+     </div>
+     <div id="shareSignInStep3" hidden>
+      <input id="shareSignInLinkField" class="share-link-field" readonly autocomplete="off" spellcheck="false" aria-label="Share link">
+      <p class="status-note" id="shareSignInLinkNote"></p>
+      <div class="form-actions share-info-actions">
+       <button class="form-action primary" id="shareSignInCopyBtn" type="button">Copy link</button>
+       <button class="form-action secondary share-with-icon" id="shareSignInNativeBtn" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>Share…</button>
+       <button class="text-link" id="shareSignInDone" type="button">Done</button>
+      </div>
+     </div>
+    </div>
    </dialog>
    <dialog class="custom-dialog" id="removeExerciseDialog" aria-labelledby="removeExerciseTitle">
     <div class="custom-form">
@@ -568,9 +624,10 @@
    <dialog class="custom-dialog" id="addSavedToProgramDialog" aria-labelledby="addSavedToProgramTitle">
     <div class="custom-form">
       <div class="custom-form-head">
-       <div><h2 id="addSavedToProgramTitle">Add saved workout</h2><p>Choose a saved workout to add to this program.</p></div>
+       <div><h2 id="addSavedToProgramTitle">Add workout to program</h2><p>Choose a saved workout or a past session to add.</p></div>
        <button class="dialog-close" id="closeAddSavedToProgram" type="button" aria-label="Close">×</button>
       </div>
+      <div class="tracking-segment add-to-program-tabs" role="group" aria-label="Workout source"><button type="button" id="addToProgramTabSaved" aria-pressed="true">Saved</button><button type="button" id="addToProgramTabPast" aria-pressed="false">Past sessions</button></div>
       <div id="addSavedToProgramList" class="dialog-list"></div>
     </div>
    </dialog>
@@ -647,7 +704,7 @@
    <dialog class="custom-dialog" id="exercisePickerDialog" aria-labelledby="exercisePickerTitle">
     <div class="custom-form">
       <div class="custom-form-head">
-       <div><h2 id="exercisePickerTitle">Add exercise</h2><p>Choose a movement for this workout.</p></div>
+       <div><h2 id="exercisePickerTitle">Add exercise</h2><p>Choose a movement for this workout.</p><p class="picker-hint" id="exercisePickerHint" aria-live="polite"></p></div>
        <button class="dialog-close" id="closeExercisePicker" type="button" aria-label="Close">×</button>
       </div>
       <label class="sr-only" for="exercisePickerSearch">Search exercises</label>
@@ -767,9 +824,11 @@
 <script src="assets/js/programs.js"></script>
 <script src="assets/js/custom-exercises.js"></script>
 <script src="assets/js/app-updates.js"></script>
+<script src="data/exercise-aliases.js"></script>
 <script src="assets/js/csv-import.js"></script>
 <script src="assets/js/share-codec.js"></script>
 <script src="assets/js/share.js"></script>
+<script src="assets/js/share-shortlinks.js"></script>
 <script src="assets/js/app-bootstrap.js"></script>
 </body>
 </html>

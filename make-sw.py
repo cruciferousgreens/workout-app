@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # User-facing app version shown in Settings → About ("Cruciferous Greens
 # Workout · vX"). Bump this whenever a build ships user-visible changes.
-APP_VERSION = "1.000"
+APP_VERSION = "1.1"
 
 now = datetime.datetime.now(datetime.timezone.utc)
 # Seconds in the stamp (user 2026-09-11): two builds in the same minute
@@ -36,15 +36,35 @@ assets = [
     "index.html",
     "manifest.webmanifest",
     "icon-180.png",
+    "icon-192.png",
     "icon-512.png",
+    "og-card.png",
+    "share-card-home-1200.png",
     "assets/styles.css",
     "data/exercises-db.js",
+    "data/exercise-aliases.js",
     "data/sasha-male-body.svg",
 ]
 js_dir = os.path.join(ROOT, "assets", "js")
 for f in sorted(os.listdir(js_dir)):
     if f.endswith(".js"):
         assets.append(f"assets/js/{f}")
+
+# v1.005: the unit-test harness lives in tests/ but must never ship to
+# phones — neither in the SW cache nor (via _config.yml's Jekyll exclude)
+# in the Pages deployment. Fail loudly instead of caching it by accident.
+# v1.014 (#177): 404.html (the GitHub Pages SPA fallback for /s/<slug>
+# short-share links) is DELIBERATELY absent from this list. The host serves
+# it for unknown paths; precaching it as an app-shell asset risks the SW
+# serving stale redirect logic, and the fetch handler already falls back to
+# network for uncached navigations (a 404 response is never cached since
+# only res.ok responses are put). Do not add it here.
+leaked = [a for a in assets if a == "tests" or a.startswith("tests/")]
+if leaked:
+    sys.stderr.write(
+        f'make-sw.py: refusing to cache test files: {", ".join(leaked)}\n'
+    )
+    sys.exit(1)
 
 # #99 B24: the SW cache auto-scans assets/js, but index.html hand-orders the
 # <script> tags (load order is load-bearing — do NOT let this generate the

@@ -8,10 +8,11 @@
     against the live catalog, previews with fuzzy suggestions for unmatched
     names, then writes completed workouts into workoutState.completed and
     new customs into state.customExercises. */
+    /* Module map (v1.006) — Key: openCsvImport(), obDispatchImport(), obExecuteCsvImport(), obExecuteMfTemplateImport(), obCsvFuzzy(). Depends on: catalog (exercise matching), workout-editor factories (newSet()), state (obState, completed), persistence (schedulePersist()). */
 
 /* Import overlay state. standaloneImport is always true while the gate is
    gone — kept as documentation of the mode the overlay runs in. */
-const obState={csvPlan:null,csvImportDone:null,mfTemplateDone:null,standaloneImport:false};
+const obState={csvPlan:null,csvImportDone:null,mfTemplateDone:null,standaloneImport:false,existingMap:{}}; /* #139: csvName -> library id for "Use existing exercise" picks */
 function obEl(id){return document.getElementById(id);}
 /** Build the overlay shell once and unhide it. */
 function obEnsureGate(){
@@ -39,6 +40,7 @@ function openCsvImport(){
   obState.csvPlan=null;
   obState.csvImportDone=null;
   obState.mfTemplateDone=null;
+  obState.existingMap={};
   /* Header: no back button or step progress in standalone mode — a × closes. */
   const back=obEl('obBack');if(back){back.classList.remove('show');back.style.display='none';}
   const prog=obEl('obProgress');if(prog)prog.style.display='none';
@@ -73,19 +75,29 @@ function obHideGate(){
 const OB_CSV_BATCH_KEY='workout-app:csv-import-batches';
 const OB_CSV_COLUMNS=['date','workout_name','exercise','set','reps','weight_lb','rpe','tags','notes'];
 const OB_CSV_DEFAULT_TAGS=['Warmup','Dropset','Full ROM','Slow and controlled','Cheat set','Paused','Assisted','To failure'];
-let obCsvNameToId=null, obCsvIdSet=null, obCsvStemToId=null;
+let obCsvNameToId=null, obCsvIdSet=null, obCsvStemToId=null, obCsvAliasToId=null;
 function obCsvNorm(s){return (s||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
 function obCsvBuildLookup(){
   if(obCsvNameToId)return;
-  obCsvNameToId={};obCsvIdSet={};obCsvStemToId={};
+  obCsvNameToId={};obCsvIdSet={};obCsvStemToId={};obCsvAliasToId={};
   for(const ex of exercises){
     if(!ex||!ex.id||!ex.name)continue;
     obCsvIdSet[ex.id]=true;
     obCsvNameToId[obCsvNorm(ex.name)]=ex.id;
     const sk=obFzTokens(ex.name).join('');
-    if(sk){
-      if(sk in obCsvStemToId)obCsvStemToId[sk]=null; /* ambiguous: never auto */
-      else obCsvStemToId[sk]=ex.id;
+    /* User 2026-09-12: a stem shared by several DB entries (duplicate-ish
+       variants) auto-maps to the FIRST catalog entry instead of staying
+       manual — first write wins. */
+    if(sk&&!(sk in obCsvStemToId))obCsvStemToId[sk]=ex.id;
+  }
+  /* Generic-name aliases (data/exercise-aliases.js): "deadlift"→Barbell
+     Deadlift, "ohp"→Barbell Shoulder Press, etc. Normalized the same
+     case-/punctuation-insensitive way the file documents; first write wins
+     on collisions, and ids missing from this catalog are skipped. */
+  if(typeof EXERCISE_ALIASES!=='undefined'&&EXERCISE_ALIASES){
+    for(const k in EXERCISE_ALIASES){
+      const nk=obCsvNorm(k),aid=EXERCISE_ALIASES[k];
+      if(nk&&aid&&obCsvIdSet[aid]&&!(nk in obCsvAliasToId))obCsvAliasToId[nk]=aid;
     }
   }
 }
@@ -251,16 +263,18 @@ function obFzContent(tokens){
 /* F1 token overlap, with two guards: a candidate whose extra words are
    movement-defining (not ignorable position/grip words) scores lower, and
    contradictory equipment ("dumbbell" vs "barbell") is heavily penalized so
-   it never presents as a confident match. */
+   it never presents as a confident match. Returns {score, strongExtra} —
+   strongExtra counts the candidate's movement-defining words beyond the
+   query, used to rank cleaner matches first. */
 function obFzScore(qt,ct){
   const qset={};
   qt.forEach(function(t){qset[t]=1;});
   let inter=0;const seen={};
   ct.forEach(function(t){if(qset[t]&&!seen[t]){inter++;seen[t]=1;}});
-  if(!inter)return 0;
-  let score=2*inter/(qt.length+ct.length);
   let strongExtra=0;
   ct.forEach(function(t){if(!qset[t]&&!OB_FZ_IGNORABLE[t])strongExtra++;});
+  if(!inter)return {score:0,strongExtra:strongExtra};
+  let score=2*inter/(qt.length+ct.length);
   if(strongExtra)score*=Math.pow(0.85,strongExtra);
   const qE=obFzEquipSet(qt),cE=obFzEquipSet(ct);
   const qKeys=Object.keys(qE),cKeys=Object.keys(cE);
@@ -268,7 +282,7 @@ function obFzScore(qt,ct){
     const shared=qKeys.some(function(k){return cE[k];});
     if(!shared)score*=0.45;
   }
-  return score;
+  return {score:score,strongExtra:strongExtra};
 }
 function obFzEligible(qt,ct){
   /* Auto-match candidates only: no equipment contradiction, and the
@@ -297,30 +311,76 @@ function obCsvFuzzy(name,limit){
     if(!nm)continue;
     const ct=obFzTokens(nm);
     if(!ct.length)continue;
-    const score=obFzScore(qt,ct);
+    const sr=obFzScore(qt,ct);
+    const score=sr.score;
     if(score<0.35)continue;
     const cSet={};
     ct.forEach(function(t){cSet[t]=1;});
     let droppedContent=0;
     for(const t in qcSet)if(!cSet[t])droppedContent++;
-    out.push({id:item.id,name:nm,score:score,droppedContent:droppedContent,eligible:obFzEligible(qt,ct)});
+    out.push({id:item.id,name:nm,score:score,strongExtra:sr.strongExtra,droppedContent:droppedContent,eligible:obFzEligible(qt,ct)});
   }
-  /* Best score first; ties broken by fewest dropped content words, so
-     "Barbell Romanian Deadlift" prefers "Romanian Deadlift" (drops only the
-     implement) over "Barbell Deadlift" (drops the movement). */
-  out.sort((a,b)=>b.score-a.score||a.droppedContent-b.droppedContent);
+  /* Best score first; ties broken by fewest dropped content words, then
+     fewest movement-defining extras — so "Barbell Deadlift" (implement
+     only) outranks "Axle Deadlift" for the query "Deadlift", and the
+     dropdown suggestions lead with the cleanest match. */
+  out.sort((a,b)=>b.score-a.score||a.droppedContent-b.droppedContent||a.strongExtra-b.strongExtra);
   return out.slice(0,limit);
 }
 function obCsvObvious(name,fuzzy){
-  /* Confident auto-match: top candidate is eligible, scores well, and no
-     other eligible candidate is comparably good (ambiguity stays manual). */
+  /* Confident auto-match (#140). The pick is the eligible candidate with
+     the fewest movement-defining extra words (implement/grip/position
+     words don't count), synonym affinity breaking movement ties
+     ("rear delt"→"reverse fly" prefers the Fly over the Row), fuzzy rank
+     order last. Token-subset picks — every query word appears in the
+     candidate — promote at 0.5 instead of 0.6: "Deadlift"→"Barbell
+     Deadlift", "Bicep curl"→"Dumbbell Bicep Curl", "Arnold press"→"Arnold
+     Dumbbell Press", "Rear delt"→"Cable Rear Delt Fly".
+     Guards that stay: equipment contradiction vetoes via eligibility; a
+     token-subset pick below 0.6 that adds a movement word with no synonym
+     backing stays manual too ("Press" must not become "Leg Press"). A
+     same-band rival the synonyms can't resolve used to stay manual — user
+     2026-09-12: those ties now auto-map to the first catalog variant.
+     Every auto-match stays reviewable behind the tap-to-review toggle. */
   if(!fuzzy||!fuzzy.length)return null;
-  const top=fuzzy[0];
-  if(!top.eligible||top.score<0.6)return null;
-  for(let i=1;i<fuzzy.length;i++){
-    const f=fuzzy[i];
-    if(!f.eligible)continue;
-    if(top.score-f.score<0.05&&f.droppedContent<=top.droppedContent)return null;
+  const qt=obFzTokens(name);
+  if(!qt.length)return null;
+  const qset={};qt.forEach(function(t){qset[t]=1;});
+  const moveWords=function(nm){const s={};obFzTokens(nm).forEach(function(t){if(!qset[t]&&!OB_FZ_IGNORABLE[t])s[t]=1;});return s;};
+  const mwSubset=function(a,b){for(const t in a)if(!b[t])return false;return true;};
+  const isSubset=function(nm){const s={};obFzTokens(nm).forEach(function(t){s[t]=1;});return qt.every(function(t){return s[t];});};
+  let synToks=null;
+  if(typeof searchSynonyms!=='undefined'&&searchSynonyms){
+    const phrases=searchSynonyms[String(name||'').toLowerCase().trim()];
+    if(phrases){synToks={};phrases.forEach(function(p){String(p).toLowerCase().split(/[^a-z0-9]+/).forEach(function(t){if(t)synToks[t]=1;});});}
+  }
+  const affinity=function(f){if(!synToks)return 0;const s={};obFzTokens(f.name).forEach(function(t){s[t]=1;});let n=0;for(const t in synToks)if(s[t])n++;return n;};
+  const band=fuzzy.filter(function(f){return f.eligible&&f.score>=0.5;});
+  if(!band.length)return null;
+  const best=band[0].score,bestDc=band[0].droppedContent;
+  const contenders=band.filter(function(f){return best-f.score<0.05&&f.droppedContent<=bestDc;});
+  contenders.sort(function(a,b){return a.strongExtra-b.strongExtra||affinity(b)-affinity(a);});
+  const top=contenders[0];
+  const subset=isSubset(top.name);
+  if(top.score<(subset?0.5:0.6))return null;
+  if(subset&&top.score<0.6&&top.strongExtra>0&&affinity(top)===0)return null;
+  const topMw=moveWords(top.name),topAff=affinity(top);
+  let vetoed=false;
+  for(let i=1;i<contenders.length;i++){
+    const c=contenders[i];
+    /* A rival whose movement words aren't a superset of the pick's names a
+       genuinely different exercise — it vetoes unless the app's synonym
+       map resolves the tie in the pick's favor. Pure implement/grip/
+       position differences never veto. */
+    if(!mwSubset(topMw,moveWords(c.name))&&!(topAff>affinity(c))){vetoed=true;break;}
+  }
+  if(vetoed){
+    /* User 2026-09-12: a tie across DB variants auto-maps to the FIRST
+       catalog variant instead of staying manual — the user picks a
+       different one in review if the first wasn't right. */
+    const dbRank={};
+    (typeof exercises!=='undefined'?exercises:[]).forEach(function(e,i){if(e&&e.id&&!(e.id in dbRank))dbRank[e.id]=i;});
+    return contenders.slice().sort(function(a,b){return (dbRank[a.id]??1e9)-(dbRank[b.id]??1e9);})[0];
   }
   return top;
 }
@@ -333,6 +393,8 @@ function obResolveCsvExercise(name){
   if(id)return {status:'matched',id:id,via:'name'};
   const stemId=obCsvStemToId[obFzTokens(raw).join('')];
   if(stemId)return {status:'matched',id:stemId,via:'stem'};
+  const aliasId=obCsvAliasToId[obCsvNorm(raw)];
+  if(aliasId)return {status:'matched',id:aliasId,via:'alias'};
   const cands=obCsvAliasCandidates(raw);
   for(const c of cands){
     const aid=obCsvNameToId[obCsvNorm(c)];
@@ -415,7 +477,7 @@ function obRenderImport(){
   <div class="ob-screen">
     <span class="ob-kicker">Import</span>
     <h1 class="ob-h1">Bring your training with you</h1>
-    <p class="ob-sub">Upload a workout-history CSV — our template format, a Hevy export, or a MacroFactor history export — or a MacroFactor program spreadsheet (.xlsx) to import it as saved workouts. We&rsquo;ll match the exercises.</p>
+    <p class="ob-sub">Upload a workout-history CSV or MacroFactor spreadsheet to import saved workouts.</p>
     <div class="ob-upload" id="obUploadBox" role="button" tabindex="0" aria-label="Upload a workout file">
       <div class="ob-upload-icon">↑</div>
       <div><strong>Tap to choose a file</strong></div>
@@ -488,12 +550,7 @@ function obRenderTemplatePreview(plan,box,btn){
         const tgt=item.timed?'timed':(item.range?item.range.min+'–'+item.range.max+' reps':'');
         const meta=item.sets.length+' set'+(item.sets.length===1?'':'s')+(tgt?' · '+tgt:'');
         const head='<span class="ob-imp-nm">'+escapeHtml(item.csvName)+' <span class="ob-muted">('+escapeHtml(meta)+')</span></span>';
-        const fz=obCsvFuzzy(item.csvName,5);
-        const obx=obCsvObvious(item.csvName,fz);
-        let opts='<option value="create"'+(obx?'':' selected')+'>Create custom</option>';
-        fz.forEach(f=>{opts+='<option value="lib:'+escapeHtml(f.id)+'"'+(obx&&obx.id===f.id?' selected':'')+'>Match: '+escapeHtml(f.name)+'</option>';});
-        opts+='<option value="skip">Skip</option>';
-        html+='<div class="ob-imp-ex">'+head+'<span class="ob-imp-no">unmatched</span><select class="ob-input ob-imp-sel" data-csv-name="'+escapeHtml(item.csvName)+'">'+opts+'</select></div>';
+        html+='<div class="ob-imp-ex">'+head+'<span class="ob-imp-no">unmatched</span><select class="ob-input ob-imp-sel" data-csv-name="'+escapeHtml(item.csvName)+'">'+obImpUnmatchedOptions(item.csvName)+'</select>'+obImpExistingPanel()+'</div>';
         if(item.notes.length)html+='<div class="ob-imp-note">'+escapeHtml(item.notes.join('; '))+'</div>';
       });
       html+=obImpAutoBlock(auto,item=>{
@@ -510,6 +567,7 @@ function obRenderTemplatePreview(plan,box,btn){
   }
   box.innerHTML=html;
   obWireImportSkips(box);
+  obWireExistingPickers(box);
 }
 function obRenderImportPreview(){
   const plan=obState.csvPlan,box=obEl('obImportPreview'),btn=obEl('obImportNowBtn');
@@ -528,12 +586,7 @@ function obRenderImportPreview(){
       const need=[],auto=[];
       w.exercises.forEach(item=>{(item.resolution.status==='matched'?auto:need).push(item);});
       need.forEach(item=>{
-        const fz=obCsvFuzzy(item.csvName,5);
-        const obx=obCsvObvious(item.csvName,fz);
-        let opts='<option value="create"'+(obx?'':' selected')+'>Create custom</option>';
-        fz.forEach(f=>{opts+='<option value="lib:'+escapeHtml(f.id)+'"'+(obx&&obx.id===f.id?' selected':'')+'>Match: '+escapeHtml(f.name)+'</option>';});
-        opts+='<option value="skip">Skip</option>';
-        html+='<div class="ob-imp-ex"><span class="ob-imp-nm">'+escapeHtml(item.csvName)+'</span><span class="ob-imp-no">unmatched</span><select class="ob-input ob-imp-sel" data-csv-name="'+escapeHtml(item.csvName)+'">'+opts+'</select></div>';
+        html+='<div class="ob-imp-ex"><span class="ob-imp-nm">'+escapeHtml(item.csvName)+'</span><span class="ob-imp-no">unmatched</span><select class="ob-input ob-imp-sel" data-csv-name="'+escapeHtml(item.csvName)+'">'+obImpUnmatchedOptions(item.csvName)+'</select>'+obImpExistingPanel()+'</div>';
       });
       html+=obImpAutoBlock(auto,item=>'<div class="ob-imp-ex"><span class="ob-imp-nm">'+escapeHtml(item.csvName)+'</span><span class="ob-imp-ok">✓ '+escapeHtml(obCsvExName(item.resolution.id))+'</span></div>');
       html+='</div>';
@@ -543,7 +596,77 @@ function obRenderImportPreview(){
   }
   box.innerHTML=html;
   obWireImportSkips(box);
+  obWireExistingPickers(box);
 }
+/* Unmatched-exercise dropdown options, shared by the history and template
+   previews: Create custom (default unless there's an obvious match),
+   fuzzy Match suggestions, "Use existing exercise…" (#139: library
+   search mapping), Skip. */
+function obImpUnmatchedOptions(csvName){
+  const fz=obCsvFuzzy(csvName,5);
+  const obx=obCsvObvious(csvName,fz);
+  let opts='<option value="create"'+(obx?'':' selected')+'>Create custom</option>';
+  fz.forEach(f=>{opts+='<option value="lib:'+escapeHtml(f.id)+'"'+(obx&&obx.id===f.id?' selected':'')+'>Match: '+escapeHtml(f.name)+'</option>';});
+  opts+='<option value="existing">Use existing exercise…</option>';
+  opts+='<option value="skip">Skip</option>';
+  return opts;
+}
+/* #139: inline library search for the "Use existing exercise…" option.
+   The chosen mapping is shown in the preview before confirm. */
+function obImpExistingPanel(){
+  return '<div class="ob-imp-existing" hidden>'+
+    '<input type="search" class="ob-input ob-imp-exsearch" placeholder="Search your exercise library…" aria-label="Search your exercise library">'+
+    '<div class="ob-imp-exresults" role="listbox"></div></div>'+
+    '<div class="ob-imp-exchosen" hidden><span class="ob-imp-ok">→ <span class="ob-imp-exchosen-nm"></span></span> '+
+    '<button type="button" class="ob-btn-link ob-imp-exchange">change</button></div>';
+}
+function obWireExistingPickers(box){
+  if(typeof rankedExerciseMatches!=='function')return;
+  box.querySelectorAll('.ob-imp-ex').forEach(row=>{
+    const sel=row.querySelector('select.ob-imp-sel');
+    const panel=row.querySelector('.ob-imp-existing');
+    const chosen=row.querySelector('.ob-imp-exchosen');
+    if(!sel||!panel||!chosen)return;
+    const csvName=sel.getAttribute('data-csv-name');
+    const input=panel.querySelector('.ob-imp-exsearch');
+    const results=panel.querySelector('.ob-imp-exresults');
+    const nameEl=chosen.querySelector('.ob-imp-exchosen-nm');
+    if(!input||!results||!nameEl)return;
+    const paintChosen=()=>{
+      const id=obState.existingMap&&obState.existingMap[csvName];
+      if(id){nameEl.textContent=obCsvExName(id);chosen.hidden=false;panel.hidden=true;}
+      else chosen.hidden=true;
+    };
+    const renderResults=q=>{
+      results.innerHTML='';
+      if(!q){results.innerHTML='<div class="ob-muted">Type to search — the top matches appear here.</div>';return;}
+      const hits=rankedExerciseMatches(q,6);
+      if(!hits.length){results.innerHTML='<div class="ob-muted">No matches — try fewer words.</div>';return;}
+      hits.forEach(ex=>{
+        const b=document.createElement('button');
+        b.type='button';b.className='ob-imp-exhit';b.setAttribute('role','option');
+        b.setAttribute('data-exid',ex.id);
+        b.innerHTML='<strong>'+escapeHtml(ex.name)+'</strong>'+(ex.equipment?'<span class="ob-muted"> · '+escapeHtml(ex.equipment)+'</span>':'');
+        b.addEventListener('click',()=>{
+          obState.existingMap=obState.existingMap||{};
+          obState.existingMap[csvName]=ex.id;
+          paintChosen();
+        });
+        results.appendChild(b);
+      });
+    };
+    sel.addEventListener('change',()=>{
+      if(sel.value==='existing'){panel.hidden=false;input.value='';renderResults('');input.focus();}
+      else panel.hidden=true;
+    });
+    input.addEventListener('input',()=>renderResults(input.value.trim()));
+    const changeBtn=chosen.querySelector('.ob-imp-exchange');
+    if(changeBtn)changeBtn.addEventListener('click',()=>{chosen.hidden=true;panel.hidden=false;renderResults(input.value.trim());input.focus();});
+    if(sel.value==='existing')paintChosen();
+  });
+}
+/* Routes the reviewed import plan to the right writer: MacroFactor program sheets
+   become saved-workout templates, everything else becomes completed workouts. */
 function obDispatchImport(){
   const plan=obState.csvPlan;
   if(plan&&plan.kind==='templates')obExecuteMfTemplateImport();
@@ -564,9 +687,10 @@ function obWireImport(){
       reader.onload=async()=>{
         try{
           const sheets=await obReadXlsxWorkbook(reader.result);
-          obState.csvPlan=obPlanMfTemplateImport(sheets);
+          obState.csvPlan=obPlanMfTemplateImport(sheets);obState.existingMap={};
         }catch(err){
           obState.csvPlan={batchId:'bad-'+Date.now(),source:'mf-template',kind:'templates',workouts:[],unmatched:[],errors:['Couldn\u2019t read that spreadsheet'+(err&&err.message?' ('+err.message+')':'')+'.'],totalSets:0};
+          obState.existingMap={};
         }
         obRenderImportPreview();
       };
@@ -575,7 +699,7 @@ function obWireImport(){
       return;
     }
     const reader=new FileReader();
-    reader.onload=()=>{obState.csvPlan=obPlanCsvImport(reader.result);obRenderImportPreview();};
+    reader.onload=()=>{obState.csvPlan=obPlanCsvImport(reader.result);obState.existingMap={};obRenderImportPreview();};
     reader.onerror=()=>{obEl('obUploadNote').textContent='Couldn\u2019t read that file.';};
     reader.readAsText(file);
   });
@@ -601,10 +725,51 @@ function obUniqueCustomId(base){
   while(exercises.some(e=>e.id===id)){id=`${base}-${n}`;n++;}
   return id;
 }
+/** Mint one custom exercise for an import decision and register it. */
+function obCreateCustomForImport(csvName){
+  const id=obUniqueCustomId(newCustomExerciseId(csvName));
+  const customExercise={id:id,name:csvName,force:null,level:null,mechanic:null,equipment:null,tracking:'reps',primary:[],secondary:[],category:null,instructions:[],custom:true};
+  exercises=[customExercise,...exercises];
+  state.customExercises.unshift(customExercise);
+  return id;
+}
+/* Read the per-exercise import decisions from the preview dropdowns.
+   #141: a "Skip" on ANY card for an exercise wins globally. The old
+   first-select-wins order let an untouched "Create custom" dropdown on
+   another workout card override a Skip the user had tapped, so the
+   exercise came through anyway (and minted a custom). Selects on
+   skipped workout cards (data-wskip) are excluded before this runs. */
+function obReadImportDecisions(){
+  const finalId={};
+  const sels=[...document.querySelectorAll('#obImportPreview select[data-csv-name]')]
+    .filter(sel=>!sel.getAttribute('data-wskip'));
+  const skipNames={};
+  sels.forEach(sel=>{if(sel.value==='skip')skipNames[sel.getAttribute('data-csv-name')]=true;});
+  sels.forEach(sel=>{
+    const csvName=sel.getAttribute('data-csv-name');
+    if(csvName in finalId)return;
+    if(skipNames[csvName]){finalId[csvName]=null;return;}
+    const v=sel.value;
+    if(v==='skip'){finalId[csvName]=null;}
+    else if(v.indexOf('lib:')===0){finalId[csvName]=v.slice(4);}
+    else if(v==='existing'){
+      /* #139: map onto the library exercise picked in the inline search.
+         Nothing picked falls back to Create custom (the default) so no
+         data is silently dropped. */
+      const xid=obState.existingMap?obState.existingMap[csvName]:null;
+      finalId[csvName]=(xid&&exercises.some(e=>e&&e.id===xid))?xid:obCreateCustomForImport(csvName);
+    }
+    else if(v==='create'){finalId[csvName]=obCreateCustomForImport(csvName);}
+  });
+  return finalId;
+}
+/* Writes the reviewed CSV plan into workoutState.completed (plus new customs into
+   state.customExercises) and records the batch id so the same file can't be imported
+   twice. */
 function obExecuteCsvImport(){
   const plan=obState.csvPlan;
   if(!plan||plan.errors.length)return;
-  const tagState={dropped:[]},finalId={};
+  const tagState={dropped:[]};
   const skipWi={};
   const cards=document.querySelectorAll('#obImportPreview .ob-imp-workout');
   cards.forEach((card,ci)=>{
@@ -615,21 +780,7 @@ function obExecuteCsvImport(){
       if(skipped)sel.setAttribute('data-wskip','1');else sel.removeAttribute('data-wskip');
     });
   });
-  document.querySelectorAll('#obImportPreview select[data-csv-name]').forEach(sel=>{
-    const csvName=sel.getAttribute('data-csv-name');
-    if(sel.getAttribute('data-wskip'))return;
-    if(csvName in finalId)return;
-    const v=sel.value;
-    if(v==='skip'){finalId[csvName]=null;}
-    else if(v.indexOf('lib:')===0){finalId[csvName]=v.slice(4);}
-    else if(v==='create'){
-      const id=obUniqueCustomId(newCustomExerciseId(csvName));
-      const customExercise={id:id,name:csvName,force:null,level:null,mechanic:null,equipment:null,tracking:'reps',primary:[],secondary:[],category:null,instructions:[],custom:true};
-      exercises=[customExercise,...exercises];
-      state.customExercises.unshift(customExercise);
-      finalId[csvName]=id;
-    }
-  });
+  const finalId=obReadImportDecisions();
   const built=[];
   plan.workouts.forEach((workout,wi)=>{
     if(skipWi[wi])return;
@@ -662,6 +813,7 @@ function obExecuteCsvImport(){
   const setCount=built.reduce((n,w)=>n+w.exercises.reduce((m,e)=>m+e.sets.length,0),0);
   obState.csvImportDone={workouts:built.length,sets:setCount};
   obState.csvPlan=null;
+  obState.existingMap={};
   const dropped=tagState.dropped.length?' <span class="ob-muted">('+tagState.dropped.length+' unknown tag'+(tagState.dropped.length===1?'':'s')+' skipped: '+escapeHtml(tagState.dropped.join(', '))+')</span>':'';
   obEl('obImportPreview').innerHTML='<div class="ob-imp-ok">✓ <strong>'+built.length+' workout'+(built.length===1?'':'s')+', '+setCount+' sets</strong> imported into your history.'+dropped+'</div>';
   obEl('obImportNowBtn').hidden=true;
@@ -923,10 +1075,12 @@ function obPlanMfTemplateImport(sheets){
   }));
   return plan;
 }
+/* Writes a MacroFactor program spreadsheet as saved-workout templates instead of
+   completed history. */
 function obExecuteMfTemplateImport(){
   const plan=obState.csvPlan;
   if(!plan||plan.errors.length||plan.kind!=='templates')return;
-  const finalId={},skipWi={};
+  const skipWi={};
   document.querySelectorAll('#obImportPreview .ob-imp-workout').forEach(function(card,ci){
     const cb=card.querySelector('.ob-wskip-cb');
     const skipped=!!(cb&&cb.checked);
@@ -935,21 +1089,7 @@ function obExecuteMfTemplateImport(){
       if(skipped)sel.setAttribute('data-wskip','1');else sel.removeAttribute('data-wskip');
     });
   });
-  document.querySelectorAll('#obImportPreview select[data-csv-name]').forEach(function(sel){
-    const csvName=sel.getAttribute('data-csv-name');
-    if(sel.getAttribute('data-wskip'))return;
-    if(csvName in finalId)return;
-    const v=sel.value;
-    if(v==='skip'){finalId[csvName]=null;}
-    else if(v.indexOf('lib:')===0){finalId[csvName]=v.slice(4);}
-    else if(v==='create'){
-      const id=obUniqueCustomId(newCustomExerciseId(csvName));
-      const customExercise={id:id,name:csvName,force:null,level:null,mechanic:null,equipment:null,tracking:'reps',primary:[],secondary:[],category:null,instructions:[],custom:true};
-      exercises=[customExercise].concat(exercises);
-      state.customExercises.unshift(customExercise);
-      finalId[csvName]=id;
-    }
-  });
+  const finalId=obReadImportDecisions();
   const built=[];
   plan.workouts.forEach(function(workout,wi){
     if(skipWi[wi])return;
@@ -973,6 +1113,7 @@ function obExecuteMfTemplateImport(){
   obCsvMarkImported(plan.batchId);
   obState.mfTemplateDone={workouts:built.length,sets:plan.totalSets};
   obState.csvPlan=null;
+  obState.existingMap={};
   obEl('obImportPreview').innerHTML='<div class="ob-imp-ok">✓ <strong>'+built.length+' saved workout'+(built.length===1?'':'s')+'</strong> imported. Find them under Workout → Saved workouts.</div>';
   obEl('obImportNowBtn').hidden=true;
 }

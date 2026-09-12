@@ -1,6 +1,7 @@
 
 /* ===== module: app-bootstrap.js ===== */
     /** Connects static controls to feature modules and performs initial rendering. */
+    /* Module map (v1.006) — Key: touch-viewport IIFE, the static-control wiring block, renderSettings(), applyTheme(), setThemeName(), renderSettingsWeekRanges(). Depends on: every feature module (loads last — it wires the static DOM controls to all feature modules and performs the initial render). */
     /* Native-app feel (2026-09-11): on touch devices (phones/tablets — NOT
        desktop), lock the viewport scale and hide scrollbars so the app
        feels native in both the home-screen app and mobile browser tabs.
@@ -117,8 +118,19 @@
     function syncSettingsScheme(){
       const scheme=progressionSetup.scheme||'rpe';
       document.querySelectorAll('#settingsSchemePills [data-scheme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.scheme===scheme)));
+      /* #205: show only the selected mode's description under the pills. The
+         container keeps a fixed min-height (styles.css) so swapping copy never
+         moves the scroll position. */
+      const schemeDesc=$('#settingsSchemeDesc');
+      if(schemeDesc)schemeDesc.textContent=schemeDescription(scheme);
       const thresholdPills=$('#settingsRpePills');
-      if(thresholdPills)thresholdPills.closest('.rule-field').hidden=scheme==='linear';
+      if(thresholdPills)thresholdPills.closest('.rule-field').hidden=scheme==='linear'||scheme==='onerm';
+      /* %1RM defaults (#54, v1.001): fixed increments don't apply; show the
+         % / deload defaults instead. */
+      const incPair=$('#settingsIncrementValue')?.closest('.settings-pair');
+      if(incPair)incPair.hidden=scheme==='onerm';
+      const pctRow=$('#settingsPctRow'); if(pctRow)pctRow.hidden=scheme!=='onerm';
+      const deloadPctRow=$('#settingsDeloadPctRow'); if(deloadPctRow)deloadPctRow.hidden=scheme!=='onerm';
     }
     function renderSettings(){
       const darkToggle=$('#darkModeToggle');
@@ -139,6 +151,9 @@
       syncUnitPills();
       syncStatsDefaultPills();
       syncTimeStepPills($('#settingsTimeStepPills'),progressionSetup.timeStep);
+      const pctDef=$('#settingsPercentOf1RM'); if(pctDef)pctDef.value=progressionSetup.percentOf1RM??75;
+      const deloadEveryDef=$('#settingsDeloadEvery'); if(deloadEveryDef)deloadEveryDef.value=progressionSetup.deloadEvery??0;
+      const deloadPctDef=$('#settingsDeloadPct'); if(deloadPctDef)deloadPctDef.value=progressionSetup.deloadPct??60;
       syncSettingsScheme();
       const und=$('#settingsUndulatingToggle');
       if(und){und.setAttribute('aria-pressed',String(!!progressionSetup.undulating));und.setAttribute('aria-label',`Vary rep ranges by week ${progressionSetup.undulating?'on':'off'}`);}
@@ -251,6 +266,9 @@
     wireTimeStepPills($('#settingsTimeStepPills'),()=>progressionSetup.timeStep,v=>{progressionSetup.timeStep=v;syncAllTimeStepPills();schedulePersist();});
     wireTimeStepPills($('#programTimeStepPills'),()=>programFormProgression().timeStep,v=>{programFormProgression().timeStep=v;syncAllTimeStepPills();schedulePersist();});
     document.querySelectorAll('#settingsSchemePills [data-scheme]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.scheme=button.dataset.scheme;syncSettingsScheme();schedulePersist();}));
+    $('#settingsPercentOf1RM')?.addEventListener('input',e=>{progressionSetup.percentOf1RM=clampPct1RM(Number(e.target.value)||75);schedulePersist();});
+    $('#settingsDeloadEvery')?.addEventListener('input',e=>{progressionSetup.deloadEvery=Math.max(0,Math.floor(Number(e.target.value)||0));schedulePersist();});
+    $('#settingsDeloadPct')?.addEventListener('input',e=>{progressionSetup.deloadPct=clampDeloadPct(Number(e.target.value)||60);schedulePersist();});
     /* Settings → default periodization editor (user 2026-09-11). Mirrors the
        program week-range editor: 8-week cycle, edits progressionSetup.weeklyRanges
        (the default new programs inherit via cloneProgression). */
@@ -380,12 +398,18 @@
         document.body.appendChild(fly);
         const dx = (endRect.left + endRect.width / 2) - (startRect.left + startRect.width / 2);
         const dy = (endRect.top + endRect.height / 2) - (startRect.top + startRect.height / 2);
+        /* #184: the title dot's live-pulse CSS animation overrides inline
+           opacity (animations beat inline styles in the cascade), so
+           opacity='0' alone never hid it — two dots showed during the
+           flight. Kill the animation too, restore both when the fly lands. */
+        titleDot.style.animation='none';
         titleDot.style.opacity = '0';
         fly.animate([
           { transform: 'translate(0,0)', opacity: 1 },
           { transform: `translate(${dx}px,${dy}px)`, opacity: 1 }
         ], { duration: 420, easing: 'cubic-bezier(.25,.8,.3,1)' }).onfinish = () => {
           fly.remove();
+          titleDot.style.animation='';
           titleDot.style.opacity = '';
         };
       }
@@ -429,13 +453,18 @@
     $('#progressionThreshold').addEventListener('input',e=>{programFormProgression().threshold=Number(e.target.value)||8;schedulePersist();});
     $('#progressionIncrementType').addEventListener('change',e=>{programFormProgression().incrementType=e.target.value;syncProgramIncrementUnit();schedulePersist();});
     $('#progressionIncrementValue').addEventListener('input',e=>{programFormProgression().incrementValue=Number(e.target.value)||5;schedulePersist();});
+    /* %1RM + scheduled deloads (#54, v1.001). */
+    $('#progressionPercentOf1RM').addEventListener('input',e=>{programFormProgression().percentOf1RM=clampPct1RM(Number(e.target.value)||75);schedulePersist();});
+    $('#deloadEvery').addEventListener('input',e=>{const d=programFormProgression();d.deloadEvery=Math.max(0,Math.floor(Number(e.target.value)||0));schedulePersist();});
+    $('#deloadPct').addEventListener('input',e=>{programFormProgression().deloadPct=clampDeloadPct(Number(e.target.value)||60);schedulePersist();});
     $('#programRepMin').addEventListener('input',e=>{const d=programFormProgression();d.defaultRange.min=Math.max(1,Number(e.target.value)||1);d.defaultRange.preset='custom';document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
     $('#programRepMax').addEventListener('input',e=>{const d=programFormProgression(),v=e.target.value.trim();d.defaultRange.max=v===''?null:Math.max(d.defaultRange.min,Number(v)||d.defaultRange.min);d.defaultRange.preset='custom';document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
     document.querySelectorAll('#settingsRepPresets [data-rep-preset]').forEach(button=>button.addEventListener('click',()=>{applyRepPreset(button.dataset.repPreset);schedulePersist();}));
     document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.addEventListener('click',()=>{applyRepPreset(button.dataset.repPreset,programFormProgression());schedulePersist();}));
     document.querySelectorAll('#programSchemePills [data-scheme]').forEach(button=>button.addEventListener('click',()=>{programFormProgression().scheme=button.dataset.scheme;syncProgramForm();schedulePersist();}));
     $('#undulatingToggle').addEventListener('click',()=>{const d=programFormProgression();d.undulating=!d.undulating;$('#undulatingToggle').setAttribute('aria-pressed',String(d.undulating));$('#undulatingToggle').setAttribute('aria-label',`Vary rep ranges by week ${d.undulating?'on':'off'}`);renderWeekRanges(d);schedulePersist();});
-    $('#programLength').addEventListener('input',()=>renderWeekRanges());
+    $('#pctWaveToggle').addEventListener('click',()=>{const d=programFormProgression();d.pctWave=!d.pctWave;ensureWeeklyPcts(d,Number($('#programLength')?.value)||8);$('#pctWaveToggle').setAttribute('aria-pressed',String(d.pctWave));$('#pctWaveToggle').setAttribute('aria-label',`Vary percent of 1RM by week ${d.pctWave?'on':'off'}`);$('#pctWavePanel').hidden=!d.pctWave;renderWeekPcts(d);schedulePersist();});
+    $('#programLength').addEventListener('input',()=>{renderWeekRanges();renderWeekPcts();});
     /* Per-exercise progression overrides are edited inside each program
        workout directly — no separate management screen (#45). */
     document.querySelectorAll('[data-treatment]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.treatment=button.dataset.treatment;document.querySelectorAll('[data-treatment]').forEach(row=>row.setAttribute('aria-pressed',String(row===button)));schedulePersist();}));
@@ -449,13 +478,25 @@
       $('#exercisePickerSearch').value = '';
       preparePickerFilters();
       resetPickerSession();
+      /* #192: remember where the user was — closing the picker restores this
+         position instead of snapping to the new card. */
+      workoutState.pickerScrollY=window.scrollY;
       renderExercisePicker();
       $('#exercisePickerDialog').showModal();
       requestAnimationFrame(() => $('#exercisePickerSearch').focus());
     });
     // Bottom "Add exercise" button (#112) — same action as the top + button.
     $('#addWorkoutExerciseBottom')?.addEventListener('click', () => $('#addWorkoutExercise').click());
-    const afterExercisePicker=()=>{if(workoutState.pickerMode==='template'){schedulePersist();if(typeof refreshTemplateViews==='function')refreshTemplateViews();}if(state.savedBuilder&&state.builderOpen&&typeof renderSavedBuilder==='function')renderSavedBuilder();};
+    /* #192 (user 2026-09-12): adding exercises must not move the viewport.
+       The old #143 behavior scrolled to the newest card on close — the snap
+       felt wrong. The new cards render expanded behind the dialog on every
+       tap already, so on close we just restore the exact scroll position
+       from when the picker opened (exercisePickerCloseScrollY). Runs in a
+       frame so it wins over the dialog's focus-restore scroll. */
+    const afterExercisePicker=()=>{if(workoutState.pickerMode==='template'){schedulePersist();if(typeof refreshTemplateViews==='function')refreshTemplateViews();}if(state.savedBuilder&&state.builderOpen&&typeof renderSavedBuilder==='function')renderSavedBuilder();
+      if(workoutState.pickerMode!=='template'&&workoutState.draft&&typeof pickerSessionAdded!=='undefined'&&pickerSessionAdded.size){
+        requestAnimationFrame(()=>{window.scrollTo({top:exercisePickerCloseScrollY(),behavior:'auto'});});
+      }};
     $('#closeExercisePicker').addEventListener('click', () => {$('#exercisePickerDialog').close();afterExercisePicker();});
     $('#doneExercisePicker').addEventListener('click', () => {$('#exercisePickerDialog').close();afterExercisePicker();});
     /* Workout focus (2026-09-10): one tap applies a rep-range preset to every
@@ -578,7 +619,55 @@
     $('#closeReviewSets').addEventListener('click',()=>$('#reviewSetsDialog').close());
     $('#reviewSetsCancel').addEventListener('click',()=>$('#reviewSetsDialog').close());
     $('#reviewSetsComplete').addEventListener('click',()=>{$('#reviewSetsDialog').close();const draft=workoutState.draft;if(draft){draft.exercises.forEach(item=>item.sets.forEach(set=>{set.complete=true;}));renderWorkoutExercises();markDraftSaved();}finishWorkout(true);});
-    $('#reviewSetsDelete').addEventListener('click',()=>{$('#reviewSetsDialog').close();const draft=workoutState.draft;if(draft){/* #43: bulk delete removes only fully-empty sets (isEmptySet) and prunes exercises left with no sets — never sets with partial values. */let removed=0,removedEx=0;draft.exercises.forEach(item=>{const before=item.sets.length;item.sets=item.sets.filter(set=>!isEmptySet(set));removed+=before-item.sets.length;});const beforeEx=draft.exercises.length;draft.exercises=draft.exercises.filter(item=>item.sets.length);removedEx=beforeEx-draft.exercises.length;renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();if(removed||removedEx)showToast(`Deleted ${removed} empty set${removed===1?'':'s'}${removedEx?` and ${removedEx} empty exercise${removedEx===1?'':'s'}`:''}.`);}finishWorkout();});
+    $('#reviewSetsDelete').addEventListener('click',()=>{
+      $('#reviewSetsDialog').close();
+      const draft=workoutState.draft;
+      if(draft){
+        /* #43: bulk delete removes only fully-empty sets (isEmptySet) and prunes exercises left with no sets — never sets with partial values. */
+        let removed=0,removedEx=0;
+        draft.exercises.forEach(item=>{const before=item.sets.length;item.sets=item.sets.filter(set=>!isEmptySet(set));removed+=before-item.sets.length;});
+        const beforeEx=draft.exercises.length;draft.exercises=draft.exercises.filter(item=>item.sets.length);removedEx=beforeEx-draft.exercises.length;
+        renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();
+        if(removed||removedEx)showToast(`Deleted ${removed} empty set${removed===1?'':'s'}${removedEx?` and ${removedEx} empty exercise${removedEx===1?'':'s'}`:''}.`);
+        /* #189: one modal, not two. If anything still has invalid values it
+           genuinely needs the user's eyes — re-show the ONE review dialog.
+           Otherwise everything left is value-valid: mark the sets complete
+           and finish without a second prompt. */
+        const outcome=reviewDeleteEmptiesOutcome(draft);
+        if(outcome==='refinish'){finishWorkout();return;}
+        if(outcome==='finish'){draft.exercises.forEach(item=>item.sets.forEach(set=>{set.complete=true;}));renderWorkoutExercises();markDraftSaved();}
+      }
+      finishWorkout(true);
+    });
+    /* #178: explicit finish-anyway — the user's deliberate decision, recorded
+       on the workout. Drops only fully-empty sets (no user data whatsoever),
+       prunes exercises left with no sets, keeps partial sets as entered.
+       Correction: the bypass runs only when pruning resolved every invalid
+       set. A surviving invalid set (e.g. partial values, or tags with no
+       values) falls back to the review dialog — partial values must never
+       ride the bypass into a null serialization. */
+    /* User 2026-09-12 (phone QA): "Finish anyway" (primary) and "Delete
+       unfinished sets" (middle) share one operation — drop every unfinished
+       set and finish in one tap. Partial values are dropped, never saved
+       half-filled (never-nulls, user 2026-09-11). One dialog only (#189):
+       after the drop everything left is value-valid, so it finishes
+       directly without re-prompting. Neither returns to editing. */
+    function reviewFinishAfterDrop(){
+      $('#reviewSetsDialog').close();
+      const draft=workoutState.draft;
+      if(draft){
+        const dropped=dropInvalidSets(draft);
+        renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();
+        const bits=[];
+        if(dropped.droppedSets)bits.push(`${dropped.droppedSets} unfinished set${dropped.droppedSets===1?'':'s'}`);
+        if(dropped.droppedExercises)bits.push(`${dropped.droppedExercises} empty exercise${dropped.droppedExercises===1?'':'s'}`);
+        if(!draft.exercises.length)showToast('Finished — no sets were logged.');
+        else if(bits.length)showToast(`Deleted ${bits.join(' and ')}.`);
+      }
+      finishWorkout(true,{finishedAnyway:true});
+    }
+    $('#reviewSetsFinishAnyway').addEventListener('click',reviewFinishAfterDrop);
+    $('#reviewSetsDeleteUnfinished').addEventListener('click',reviewFinishAfterDrop);
 
     $('#searchInput').addEventListener('input', e => {
       state.query = e.target.value;
@@ -636,10 +725,9 @@
        script has loaded, which is true by the time this init block runs. */
     workoutState.templates=cloneWorkoutTemplates();
     restorePersisted();
-    /* P0 hotfix 2026-09-12: the #99 sync.js split dropped sync.js's trailing
-       initSync() self-call, so no account control was ever wired (Email me a
-       code / verify / sign out all dead) and sync never started on boot.
-       Boot must kick it. */
+    /* #99 B15 regression (2026-09-12): the sync.js split dropped sync.js's
+       trailing initSync() call, leaving every account control unwired and
+       sync never starting. Boot must kick it. */
     if(window.Sync&&typeof Sync.initSync==='function'){try{Sync.initSync();}catch(_){}}
     /* Stats metric default (user 2026-09-11): the Volume|Sets toggles on the
        Stats page initialize to the saved Units → Stats default on every load. */
@@ -660,15 +748,38 @@ parseShareHash().then(sharePayload=>{
      message instead of silently landing on Home. */
   else if(/^#share=/.test(location.hash||''))showToast('That share link didn\u2019t open \u2014 it may be broken or from an older version of the app.');
 });
+/* #177: server short links (/s/<slug>). Logged-in-only creation, public
+   read; the payload is the same v2 string long links carry, so it decodes
+   through shareDecodeAny and lands on the same share preview. Reached
+   either directly (hosts serving index.html for the path) or via the
+   404.html sessionStorage handoff on static hosts. Unknown slugs reuse the
+   long-link invalid feedback. #177 follow-up: ANY /s/<segment> route --
+   malformed, unknown, corrupt, or unavailable -- takes the invalid-link
+   feedback path instead of silently opening Home. Best-effort: any failure
+   boots normally. */
+(function(){
+  try{
+    if(typeof shortLinkAttemptFromPath!=='function'||typeof resolveShortShareLink!=='function')return;
+    const INVALID_LINK_MSG='That share link didn\u2019t open \u2014 it may be broken or from an older version of the app.';
+    let attempt=null;
+    try{attempt=shortLinkAttemptFromPath(location.pathname);}catch(_){attempt=null;}
+    if(!attempt&&typeof takeSpaRedirectSlug==='function')attempt=takeSpaRedirectSlug();
+    if(!attempt)return; /* not a short-link route at all -- boot normally */
+    if(typeof isValidShareSlug!=='function'||!isValidShareSlug(attempt)){showToast(INVALID_LINK_MSG);return;}
+    resolveShortShareLink(attempt).then(payload=>{
+      if(payload)openSharePreview(payload);
+      else showToast(INVALID_LINK_MSG);
+    }).catch(()=>showToast(INVALID_LINK_MSG));
+  }catch(_){/* short links are best-effort; boot continues */}
+})();
 
-/* Share links tapped while the app is already open (user 2026-09-12):
-   cold boot takes the full-screen share page; a link arriving
-   mid-session opens the share as a modal popup over wherever the user
-   is, so their context is never yanked away. */
+/* Share links tapped while the app is already open (#214, user 2026-09-12):
+   the landing is always the full page — the old modal variant is gone. A
+   live draft stays intact underneath; dismissing the landing returns to it. */
 window.addEventListener('hashchange',()=>{
   if(!/^#share=/.test(location.hash||''))return;
   parseShareHash().then(payload=>{
-    if(payload)openShareModal(payload);
+    if(payload)openSharePreview(payload);
     else showToast('That share link didn\u2019t open \u2014 it may be broken or from an older version of the app.');
   });
 });

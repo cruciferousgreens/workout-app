@@ -10,6 +10,7 @@
        share.js, which loads right after this file. The validSharePayload
        gates below are the security boundary for hand-edited/corrupt links —
        keep them byte-for-byte in sync with any change here. */
+       /* Module map (v1.006) — Key: buildTemplateShare()/buildProgramShare()/buildTemplateLikeShare(), slimSharePayload()/expandSharePayload(), validSharePayload(). Depends on: native CompressionStream only; no app-module deps. */
     /* Shareable template/program links (#32, user 2026-09-12).
        v2 (user 2026-09-12, "much shorter links"): the payload is slimmed
        (every structurally-empty field dropped — uids, empty strings/arrays,
@@ -57,7 +58,8 @@
        set: positional [w,r,seconds,rpe,tags?,targetRpe?], trailing empties trimmed
        (targetRpe is trailing so pre-A7 links decode identically)
        prog: {d:mode?,r:[min,max]?,o:1?,a:1?,t:[timeMin,timeMax]?,
-              s:timeStep?,i:[incType,incVal]?,l:1?,c:1?}
+              s:timeStep?,i:[incType,incVal]?,l:1?,c:1?,
+              m:scheme?,p:percentOf1RM?,x:trainingMax?,u:tmSource?}
        Everything the decoder re-derives is dropped (uids, empty note/tags,
        false flags, default progression fields). Value-bearing fields are
        always kept — the recipient's own defaults must never leak in. */
@@ -81,6 +83,10 @@
       if(p.incrementType||p.incrementValue!=null)o.i=[p.incrementType??null,p.incrementValue??null];
       if(p.repsOnly)o.l=1;
       if(p.custom)o.c=1;
+      if(p.scheme&&p.scheme!=='rpe')o.m=p.scheme;
+      if(p.percentOf1RM!=null)o.p=p.percentOf1RM;
+      if(p.trainingMax!=null)o.x=p.trainingMax;
+      if(p.tmSource)o.u=p.tmSource;
       return o;
     }
     function slimShareExercise(item){
@@ -94,6 +100,9 @@
       o.e=(item.sets||[]).map(slimShareSet);
       return o;
     }
+    /* Shrinks a share payload to the compact v2 wire format (drops uids, empty fields,
+       false flags, default-valued progression fields). expandSharePayload must stay its
+       exact inverse. */
     function slimSharePayload(payload){
       const slim={v:SHARE_VERSION,k:payload.kind==='template'?'t':'p',n:payload.name};
       if(payload.kind==='template'){
@@ -120,6 +129,10 @@
       if(p.i){o.incrementType=p.i[0]??null;o.incrementValue=p.i[1]??null;}
       if(p.l)o.repsOnly=true;
       if(p.c)o.custom=true;
+      if(p.m)o.scheme=p.m;
+      if(p.p!=null)o.percentOf1RM=p.p;
+      if(p.x!=null)o.trainingMax=p.x;
+      if(p.u)o.tmSource=p.u;
       return o;
     }
     /* Re-expand a v2 payload to the full shape the import side expects —
@@ -172,6 +185,8 @@
       return {v:SHARE_VERSION,kind:'template',name:name||'Shared workout',
         template:{name:name,exercises:rows},customExercises:shareCustomExercises(rows)};
     }
+    /* Encodes a saved-workout template into a shareable link string (v2 compact; v1
+       plain-JSON links still decode). */
     function buildTemplateShare(templateId){
       const t=(workoutState.templates||[]).find(x=>x.id===templateId);
       if(!t)return null;
@@ -217,10 +232,12 @@
     function validShareProgression(p){
       if(p==null)return true;
       if(typeof p!=='object')return false;
-      for(const k of ['min','max','timeMin','timeMax','timeStep','incrementValue']){
+      for(const k of ['min','max','timeMin','timeMax','timeStep','incrementValue','percentOf1RM','trainingMax']){
         if(p[k]!==undefined&&p[k]!==null&&!Number.isFinite(Number(p[k])))return false;
       }
       if(p.mode!==undefined&&p.mode!==null&&p.mode!=='reps'&&p.mode!=='time')return false;
+      if(p.scheme!==undefined&&p.scheme!==null&&p.scheme!=='rpe'&&p.scheme!=='linear'&&p.scheme!=='onerm')return false;
+      if(p.tmSource!==undefined&&p.tmSource!==null&&p.tmSource!=='manual'&&p.tmSource!=='auto')return false;
       return true;
     }
     function validShareExercise(item){

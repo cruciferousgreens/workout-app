@@ -8,6 +8,7 @@
     omits undefined values) and every boot-time read keeps its old falsy value.
     Factories return fresh objects (fresh Sets/arrays) so a reset can never
     share mutable state with a previous incarnation. */
+    /* Module map (v1.006) — Key: state, workoutState, customDraft, progressionSetup, DEFAULT_PROGRESSION_SETUP, the fresh*() factories. Depends on: none (pure shape factories). */
 const DEFAULT_SET_TAGS=['Warmup','Dropset','Full ROM','Slow and controlled','Cheat set','Paused','Assisted','To failure'];
 const DEFAULT_EXERCISE_TAG_PRESETS=['Main lift','Accessory','Unilateral','Straight sets','Tempo','Technique','Rehab','To failure'];
 /* Library tab UI: filters, selection, user-created exercises. */
@@ -42,7 +43,7 @@ const workoutState=freshWorkoutData();
 /* Canonical progression defaults (efficiency pass 2026-09-12): one
    deep-copyable source. The live object is const (never reassigned), so
    resets copy fresh values INTO it — every reset path shares this. */
-const DEFAULT_PROGRESSION_SETUP={threshold:8,incrementType:'lb',incrementValue:5,timeStep:5,treatment:'suggestions',scheme:'rpe',defaultRange:{preset:'hypertrophy',min:6,max:12,openTop:false,amrap:false},undulating:false,weeklyRanges:[],units:'imperial',statsDefaultMetric:'volume'};
+const DEFAULT_PROGRESSION_SETUP={threshold:8,incrementType:'lb',incrementValue:5,timeStep:5,treatment:'suggestions',scheme:'rpe',percentOf1RM:75,deloadEvery:0,deloadPct:60,pctWave:false,weeklyPcts:[],weeklyDeloads:[],defaultRange:{preset:'hypertrophy',min:6,max:12,openTop:false,amrap:false},undulating:false,weeklyRanges:[],units:'imperial',statsDefaultMetric:'volume'};
 function freshProgressionSetup(){return JSON.parse(JSON.stringify(DEFAULT_PROGRESSION_SETUP));}
 function resetProgressionSetup(){
   const fresh=freshProgressionSetup();

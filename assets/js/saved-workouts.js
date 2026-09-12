@@ -7,6 +7,7 @@
        conflict dialog. Program-domain rendering it navigates back to
        (openProgramWorkoutPage) lives in programs.js, which loads right
        after this file. */
+       /* Module map (v1.006) — Key: renderSavedBuilder(), openSavedWorkoutEditor(), startWorkoutFromTemplate(), repeatWorkout(), saveCompletedAsTemplate(), duplicateSavedWorkout(). Depends on: workout-editor factories, supersets.js + set-tags.js dialogs, state builder state. */
     let pendingRepeatWorkout=null;
     function repeatWorkout(workout,confirmed=false){
       if(!workout)return;
@@ -34,9 +35,22 @@
     function saveCompletedAsTemplate(workout,statusEl) {
       if(!workout?.exercises?.length)return;
       const template={id:newTemplateId(),name:workout.name||'Saved workout',exercises:templateExercisesFromCompleted(workout)};
+      /* #240: remember which log this template came from, so the completed
+         view can offer Start (not another Save as template) on re-render. */
+      template.sourceLogId=workout.id;
       workoutState.templates.unshift(template); schedulePersist();
       const message=`Saved “${template.name}” as a saved workout.`;
       if(statusEl)statusEl.textContent=message; showToast(message);
+      /* #240 (user 2026-09-12): the completed workout's button becomes Start
+         — the template now exists, so the next tap trains it. The old
+         addEventListener handler is dropped by replacing the node. */
+      const btn=document.getElementById('saveCompletedWorkoutTop');
+      if(btn){
+        const start=document.createElement('button');
+        start.type='button';start.id='saveCompletedWorkoutTop';start.className=btn.className;start.textContent='Start';
+        start.addEventListener('click',()=>startWorkoutFromTemplate(template.id));
+        btn.replaceWith(start);
+      }
     }
     function startWorkoutFromTemplate(id) {
       const t=workoutState.templates.find(x=>x.id===id);if(!t)return;
@@ -172,6 +186,10 @@
        will add the share-link action here too. */
     function openSavedWorkoutEditor(id){
       if(!workoutState.templates.some(t=>t.id===id))return;
+      /* #135: the saved-workout detail is a Workout-tab page — own the tab
+         switch (like the builder does) so the header/tab can never claim
+         Program while the screen shows Workout content. */
+      if(state.activeView!=='workout')showWorkouts(false);
       state.savedWorkoutId=id;state.workoutEditorOpen=false;state.builderOpen=false;renderWorkoutScreen();
     }
     function savedExerciseSummary(item){
@@ -189,7 +207,7 @@
         return `${p.label} · ${p.min}–${p.max} reps`;})():'';
       const muscles=[...new Set((t.exercises||[]).flatMap(item=>{const ex=exercises.find(e=>e.id===item.exerciseId);return [...(ex?.primary||[]),...(ex?.secondary||[])];}))];
       const totalSets=(t.exercises||[]).reduce((n,item)=>n+(item.sets||[]).length,0);
-      const rows=(t.exercises||[]).map(item=>{const s=savedExerciseSummary(item);return `<div class="picker-item saved-editor-row"><span><strong>${escapeHtml(s.name)}</strong><span>${escapeHtml(s.meta)}</span></span></div>`;}).join('');
+      const rows=(t.exercises||[]).map(item=>{const s=savedExerciseSummary(item);return `<button class="picker-item saved-editor-row" type="button" data-saved-exercise="${escapeHtml(item.exerciseId)}" aria-label="Open ${escapeHtml(s.name)} details"><span><strong>${escapeHtml(s.name)}</strong><span>${escapeHtml(s.meta)}</span></span><span class="picker-state" aria-hidden="true">\u203a</span></button>`;}).join('');
       /* Layout (user 2026-09-12): Start sits inline with the workout name,
          top-right (just "Start"), not a full-width button under the stats.
          Edit opens the builder in edit mode (the creation page reused);
@@ -206,6 +224,9 @@
       $('#startSavedWorkoutBtn').addEventListener('click',()=>requestStartSavedWorkout(t.id));
       if(!t.builtIn)$('#editSavedWorkoutBtn')?.addEventListener('click',()=>startSavedBuilder({templateId:t.id}));
       $('#duplicateSavedWorkoutBtn')?.addEventListener('click',()=>duplicateSavedWorkout(t.id));
+      /* #181: exercise rows open the exercise detail — Back returns to this
+         saved workout via the saved sub-screen return route. */
+      document.querySelectorAll('[data-saved-exercise]').forEach(b=>b.addEventListener('click',()=>openExercise(b.dataset.savedExercise,true,makeReturnRoute(ROUTES.VIEW.WORKOUT,{sub:ROUTES.WORKOUT_SUB.SAVED,savedWorkoutId:t.id}))));
       $('#shareSavedWorkoutBtn')?.addEventListener('click',()=>shareTemplate(t.id));
       if(!t.builtIn){
         $('#archiveSavedWorkoutBtn')?.addEventListener('click',()=>{
@@ -215,7 +236,7 @@
         });
         $('#deleteSavedWorkoutBtn')?.addEventListener('click',()=>{
           pendingDeleteTemplateId=t.id;
-          $('#deleteTemplateDesc').textContent=`Delete “${t.name}”? This cannot be undone.`;
+          $('#deleteTemplateDesc').textContent=`Delete "${t.name}"? This cannot be undone.`;
           $('#deleteTemplateDialog').showModal();
         });
       }
@@ -351,7 +372,8 @@
       const groupNum=grouped?supersetGroupNumber(list,item.supersetId):0;
       const setRows=(item.sets||[]).map((set,i)=>{
         const val=time?(set.seconds??''):(set.r??'');
-        return `<div class="builder-set-row"><span class="builder-set-num">${i+1}</span><input class="log-input" type="number" inputmode="numeric" min="1" value="${escapeHtml(String(val))}" placeholder="${escapeHtml(rangeSummary||'Target')}" data-builder-set="${i}" data-builder-uid="${uidAttr}" aria-label="Set ${i+1} target ${unit}"><button class="builder-x" type="button" data-builder-del-set="${i}" data-builder-uid="${uidAttr}" aria-label="Remove set ${i+1}">\u00d7</button></div>`;
+        const setTags=set.tags||[];
+        return `<div class="builder-set-row"><button class="builder-set-num log-set-number ${setTags.length?'has-tags':''}" type="button" data-builder-tag-set="${escapeHtml(set.uid||'')}" data-builder-tag-exercise="${uidAttr}" aria-label="Choose tags for set ${i+1}" aria-haspopup="dialog">${i+1}</button><input class="log-input" type="number" inputmode="numeric" min="1" value="${escapeHtml(String(val))}" placeholder="${escapeHtml(rangeSummary||'Target')}" data-builder-set="${i}" data-builder-uid="${uidAttr}" aria-label="Set ${i+1} target ${unit}"><button class="builder-x" type="button" data-builder-del-set="${i}" data-builder-uid="${uidAttr}" aria-label="Remove set ${i+1}">\u00d7</button></div>`;
       }).join('');
       return `<details class="exercise-accordion workout-exercise" data-builder-exercise="${uidAttr}" ${item.cardOpen===false?'':'open'}>
             <button class="exercise-info-button corner-icon" type="button" data-exercise-info="${escapeHtml(item.exerciseId)}" aria-label="About ${escapeHtml(ex?.name||'exercise')}">i</button>
@@ -362,7 +384,7 @@
             <div class="log-sets">${setRows||'<div class="history-empty">No sets yet.</div>'}</div>
             <div class="set-utility-row"><button class="add-set" type="button" data-builder-add-set="${uidAttr}">+ Add set</button>${list.length>1?`<button class="superset-button ${grouped?'active':''}" type="button" data-builder-superset="${uidAttr}">${grouped?'Edit superset':'Create superset'}</button>`:''}</div>
             <div class="exercise-note">${item.noteOpen||item.note?`<textarea id="note-${uidAttr}" data-builder-note="${uidAttr}" aria-label="Exercise notes" placeholder="Cues, setup, pain, or anything to remember">${escapeHtml(item.note||'')}</textarea>`:`<button class="add-note-toggle" type="button" data-builder-add-note="${uidAttr}">Add notes</button>`}</div>
-            <details class="advanced-options" ${item.optionsOpen?'open':''}><summary>Exercise options</summary><div class="advanced-options-body"><div class="exercise-tools"><div class="tracking-segment" role="group" aria-label="Track reps or seconds"><button type="button" data-builder-tracking="reps" data-builder-uid="${uidAttr}" aria-pressed="${time?'false':'true'}">Reps</button><button type="button" data-builder-tracking="seconds" data-builder-uid="${uidAttr}" aria-pressed="${time?'true':'false'}">Seconds</button></div></div><div class="builder-targets-row"><span class="range-summary">Targets${rangeSummary?`: ${escapeHtml(rangeSummary)}`:''}</span><button class="small-button" type="button" data-builder-configure="${uidAttr}">Configure</button></div>${progressionSummaryForOptions(item)}<div class="exercise-tag-row">${(item.exerciseTags||[]).map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}<button class="exercise-tag-button" type="button" data-builder-exercise-tags="${uidAttr}">${item.exerciseTags?.length?'Edit exercise tags':'+ Exercise tags'}</button></div><div class="options-apply-row"><button class="copy-first-set" type="button" data-builder-copy-first="${uidAttr}" ${item.sets.length<2?'disabled':''}>Apply set 1 to all</button><span class="inline-feedback" data-builder-copy-feedback="${uidAttr}" aria-live="polite"></span></div><div class="remove-exercise-separator"></div><button class="remove-workout-exercise text-danger-button" type="button" data-builder-del-ex="${uidAttr}" aria-label="Remove ${escapeHtml(ex?.name||'exercise')} from this workout">Remove exercise</button></div></details>
+            <details class="advanced-options" ${item.optionsOpen?'open':''}><summary>Exercise options</summary><div class="advanced-options-body"><div class="exercise-tools"><div class="tracking-segment" role="group" aria-label="Track reps or seconds"><button type="button" data-builder-tracking="reps" data-builder-uid="${uidAttr}" aria-pressed="${time?'false':'true'}">Reps</button><button type="button" data-builder-tracking="seconds" data-builder-uid="${uidAttr}" aria-pressed="${time?'true':'false'}">Seconds</button></div></div><div class="builder-targets-row"><span class="range-summary">Targets${rangeSummary?`: ${escapeHtml(rangeSummary)}`:''}</span><button class="small-button" type="button" data-builder-configure="${uidAttr}">Configure</button></div>${progressionSummaryForOptions(item)}<div class="exercise-tag-row">${(item.exerciseTags||[]).map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}<button class="exercise-tag-button" type="button" data-builder-exercise-tags="${uidAttr}">${item.exerciseTags?.length?'Edit exercise tags':'+ Exercise tags'}</button></div><div class="options-apply-row"><button class="copy-first-set" type="button" data-builder-copy-first="${uidAttr}" ${item.sets.length<2?'disabled':''}>Apply set 1 to all</button><span class="inline-feedback" data-builder-copy-feedback="${uidAttr}" aria-live="polite"></span></div><div class="remove-exercise-separator"></div><button class="swap-workout-exercise" type="button" data-builder-swap-ex="${uidAttr}" aria-label="Swap ${escapeHtml(ex?.name||'exercise')} for a different exercise">Swap exercise</button><button class="remove-workout-exercise text-danger-button" type="button" data-builder-del-ex="${uidAttr}" aria-label="Remove ${escapeHtml(ex?.name||'exercise')} from this workout">Remove exercise</button></div></details>
             </div>
           </details>`;
     }    /* #99 B4: renderSavedBuilder decomposed by pure code motion. The page HTML
@@ -377,7 +399,7 @@
       <div class="workout-focus-open">
       <span class="workout-focus-label" id="builderFocusLabel">Workout focus</span>
       <div class="rep-preset-row" role="group" aria-labelledby="builderFocusLabel"><button class="rep-preset" type="button" data-builder-focus="strength">Strength \u00b7 1\u20135</button><button class="rep-preset" type="button" data-builder-focus="hypertrophy">Hypertrophy \u00b7 6\u201312</button><button class="rep-preset" type="button" data-builder-focus="endurance">Endurance \u00b7 12\u201320</button><button class="rep-preset" type="button" data-builder-focus="open">15+</button><button class="rep-preset" type="button" data-builder-focus="amrap">AMRAP</button></div>
-      <p class="field-help">Applies the rep range to every reps-tracked exercise in this workout, replacing any per-exercise ranges you set.</p>
+      <p class="field-help">Replaces per-exercise ranges on every reps-tracked exercise.</p>
       </div>
       </div>
       <div class="workout-toolbar"><h2>Exercises</h2><div class="workout-toolbar-actions"><button class="exercise-info-button plain-glyph" id="builderReorderExercises" type="button" aria-label="Reorder exercises"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3v18M8 3 4 7m4-4 4 4M16 21V3m0 18 4-4m-4 4-4-4"/></svg></button><button class="exercise-info-button plain-glyph" id="builderAddExercise" type="button" aria-label="Add exercises"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div></div>
@@ -406,6 +428,8 @@
     }
     function wireBuilderDeleteExercise(host,b){
       host.querySelectorAll('[data-builder-del-ex]').forEach(btn=>btn.addEventListener('click',()=>{b.exercises=b.exercises.filter(x=>x.uid!==btn.dataset.builderDelEx);schedulePersist();renderSavedBuilder();}));
+      /* #142: swap an exercise while its set structure carries over. */
+      host.querySelectorAll('[data-builder-swap-ex]').forEach(btn=>btn.addEventListener('click',()=>startExerciseSwap(btn.dataset.builderSwapEx,'template')));
     }
     function wireBuilderAddSet(host,findItem){
       host.querySelectorAll('[data-builder-add-set]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -466,6 +490,11 @@
     function wireBuilderExerciseTags(host){
       host.querySelectorAll('[data-builder-exercise-tags]').forEach(btn=>btn.addEventListener('click',()=>openExerciseTagDialog({mode:'builder',exerciseUid:btn.dataset.builderExerciseTags})));
     }
+    /* #210 (user 2026-09-12): per-set tags in the saved-workout builder reuse
+       the live workout's tag dialog, routed to the builder's sets. */
+    function wireBuilderSetTags(host){
+      host.querySelectorAll('[data-builder-tag-set]').forEach(btn=>btn.addEventListener('click',()=>openTagDialog(btn.dataset.builderTagExercise,btn.dataset.builderTagSet,'builder')));
+    }
     function wireBuilderCopyFirst(host,findItem){
       host.querySelectorAll('[data-builder-copy-first]').forEach(btn=>btn.addEventListener('click',()=>{
         const item=findItem(btn.dataset.builderCopyFirst);if(!item||(item.sets||[]).length<2)return;
@@ -510,8 +539,11 @@
       wireBuilderAddNote(host,findItem);
       wireBuilderNoteInputs(host,findItem);
       wireBuilderConfigure(host);
+      /* %1RM per-exercise inputs (#54, v1.001): % override + training max. */
+      wireOnermOptionInputs(host, findItem, () => { schedulePersist(); renderSavedBuilder(); });
       wireBuilderSuperset(host);
       wireBuilderExerciseTags(host);
+      wireBuilderSetTags(host);
       wireBuilderCopyFirst(host,findItem);
       wireBuilderReorder(host,b);
       wireBuilderFooter(b);

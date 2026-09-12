@@ -1,6 +1,7 @@
 
 /* ===== module: navigation.js ===== */
     /** Coordinates view routing, bottom navigation state, and per-view scroll restoration. */
+    /* Module map (v1.006) — Key: goTab(), showDashboard()/showWorkouts()/showProgram()/showStats()/showLibrary()/showSettings(), hideAllViews(), makeReturnRoute(). Depends on: the render functions of the feature modules it routes to; state.scroll for scroll restoration. */
     function hideAllViews() {
       /* iOS Safari fires an unpredictable scroll when the focused element's
          view is hidden mid-session (user 2026-09-12: "crazy weird jump"
@@ -193,13 +194,15 @@
       nav.classList.toggle('has-live-draft', live);
       nav.setAttribute('aria-label', live ? 'Workout — session in progress' : 'Workout');
       /* Live-workout chip (user 2026-09-11): top-right header shortcut, visible
-         whenever a session is live and we're not on the live editor page. */
+         whenever a session is live and we're not on the live editor page.
+         #187: the logs list opens over a draft, so the chip stays visible
+         there — it's the way back to the editor. */
       const chip = $('#liveWorkoutChip');
-      if (chip) chip.hidden = !live || (state.activeView === 'workout' && state.workoutEditorOpen);
+      if (chip) chip.hidden = !live || (state.activeView === 'workout' && state.workoutEditorOpen && !state.workoutHistoryOpen);
       /* On the live editor the pill is gone; its dot lives next to the
          "Workout" title instead (user 2026-09-12). */
       const titleDot = $('#liveTitleDot');
-      if (titleDot) titleDot.hidden = !live || !(state.activeView === 'workout' && state.workoutEditorOpen);
+      if (titleDot) titleDot.hidden = !live || !(state.activeView === 'workout' && state.workoutEditorOpen && !state.workoutHistoryOpen);
     }
 
     

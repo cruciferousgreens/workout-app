@@ -4,6 +4,7 @@
      *  The superset + reorder dialogs work on whichever exercise list is open —
      *  the live draft or the saved-workout builder (user 2026-09-12) — through
      *  the small context helpers below instead of duplicated per-screen logic. */
+     /* Module map (v1.006) — Key: openSupersetDialog(), normalizeSupersets(), exerciseListContext(), contextRerender(). Depends on: draft/exercise items (workout-editor), state (draft or builder). */
     function exerciseListContext() {
       /* The builder is an overlay on the workout tab; while it's open, its
          exercise list is the one the user is editing. */

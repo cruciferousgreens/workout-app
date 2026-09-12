@@ -12,6 +12,7 @@
      *    session's user_metadata — it no longer resets the profile, so the
      *    display name and account type persist in memory across auth changes.
      */
+     /* Module map (v1.006) — Key: initSync(), sendSignInLink(), verifySignInCode(), signOutAccount(), adoptOrUploadOnSignIn(), handleAuthChange(). Depends on: sync-adapter (session/client), sync-engine (merge/push), persistence (syncable keys). */
     var Sync = window.Sync = window.Sync || {};
     (function(){
       'use strict';
@@ -41,53 +42,69 @@
         Sync.lastAuthEmail=email||'';
         try{window.lastAuthUid=uid;}catch(_){} /* global shim for share.js */
       }
-      /* ===== sign-in code ===== */
-      async function sendSignInLink(){
-        const input=$('#accountEmail');
-        const email=(input&&input.value||'').trim();
-        if(!email||email.indexOf('@')<0){Sync.setAccountStatus('Enter a valid email address.',true);return;}
+      /* ===== sign-in code =====
+         #215: the Supabase sign-in actions, parameterized so the Settings
+         account card and the share sign-in modal reuse the same logic with
+         their own inputs and status writers. Both return true on success. */
+      async function requestSignInCode(opts){
+        const email=(opts&&opts.email||'').trim();
+        const setStatus=(opts&&opts.setStatus)||Sync.setAccountStatus;
+        if(!email||email.indexOf('@')<0){setStatus('Enter a valid email address.',true);return false;}
         const left=Sync.magicLinkCooldownRemaining();
-        if(left>0){Sync.setAccountStatus('Wait '+Math.ceil(left/1000)+'s before requesting another link.',true);return;}
+        if(left>0){setStatus('Wait '+Math.ceil(left/1000)+'s before requesting another link.',true);return false;}
         const sb=await Sync.getSupabase();
-        if(!sb){Sync.setAccountStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.',true);return;}
-        Sync.setAccountStatus('Sending code\u2026');
+        if(!sb){setStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.',true);return false;}
+        setStatus('Sending code\u2026');
         try{
           const {error}=await sb.auth.signInWithOtp({email:email,options:{emailRedirectTo:location.origin+location.pathname}});
           /* Cooldown starts on any completed attempt — even a rate-limited one —
              so rapid taps can't burn the Supabase email quota. */
           Sync.startMagicLinkCooldown();
-          if(error){Sync.setAccountStatus(sendLinkErrorText(error),true);return;}
-          /* #75: progressive disclosure — reveal the code step once the email is sent. */
-          const otpStep=$('#otpStep');
-          if(otpStep)otpStep.hidden=false;
-          /* #124 (user 2026-09-11): after sending, the status says only this — the
-             OTP field sits directly above the status line, and the code-first
-             flow is primary (#75). */
-          Sync.setAccountStatus('Code sent, enter it above.');
-        }catch(err){Sync.setAccountStatus(requestErrorText(err,'Could not send the code.'),true);}
+          if(error){setStatus(sendLinkErrorText(error),true);return false;}
+          return true;
+        }catch(err){setStatus(requestErrorText(err,'Could not send the code.'),true);return false;}
+      }
+      async function sendSignInLink(){
+        /* Settings wrapper: same logic, plus the card's progressive disclosure. */
+        const input=$('#accountEmail');
+        const ok=await requestSignInCode({email:(input&&input.value||''),setStatus:Sync.setAccountStatus});
+        if(!ok)return;
+        /* #75: progressive disclosure — reveal the code step once the email is sent. */
+        const otpStep=$('#otpStep');
+        if(otpStep)otpStep.hidden=false;
+        /* #124 (user 2026-09-11): after sending, the status says only this — the
+           OTP field sits directly above the status line, and the code-first
+           flow is primary (#75). */
+        Sync.setAccountStatus('Code sent, enter it above.');
       }
       /* ===== 6-digit sign-in code (2026-09-11) =====
          verifyOtp needs no PKCE code verifier, so it completes wherever the
          email is read — including the iPhone home-screen app, whose storage
          is isolated from Safari and which never sees a tapped magic link. */
-      async function verifySignInCode(){
-        const emailInput=$('#accountEmail');
-        const email=(emailInput&&emailInput.value||'').trim();
-        const input=$('#accountOtp');
-        const token=((input&&input.value)||'').trim().replace(/[\s-]+/g,'');
-        if(!email||email.indexOf('@')<0){Sync.setAccountStatus('Enter your email address above first.',true);return;}
-        if(!token){Sync.setAccountStatus('Enter the code from the email.',true);return;}
+      async function confirmSignInCode(opts){
+        const email=(opts&&opts.email||'').trim();
+        const token=(opts&&opts.token||'').trim().replace(/[\s-]+/g,'');
+        const setStatus=(opts&&opts.setStatus)||Sync.setAccountStatus;
+        if(!email||email.indexOf('@')<0){setStatus('Enter your email address above first.',true);return false;}
+        if(!token){setStatus('Enter the code from the email.',true);return false;}
         const sb=await Sync.getSupabase();
-        if(!sb){Sync.setAccountStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.',true);return;}
-        Sync.setAccountStatus('Verifying code\u2026');
+        if(!sb){setStatus('Can\u2019t reach the network \u2014 try again when you\u2019re online.',true);return false;}
+        setStatus('Verifying code\u2026');
         try{
           const {error}=await sb.auth.verifyOtp({email:email,token:token,type:'email'});
-          if(error){Sync.setAccountStatus(otpErrorText(error),true);return;}
-          if(input)input.value='';
+          if(error){setStatus(otpErrorText(error),true);return false;}
           /* onAuthStateChange -> handleAuthChange picks up the session and
              runs the first sync cycle. */
-          Sync.setAccountStatus('');
-        }catch(err){Sync.setAccountStatus(requestErrorText(err,'Could not verify the code.'),true);}
+          setStatus('');
+          return true;
+        }catch(err){setStatus(requestErrorText(err,'Could not verify the code.'),true);return false;}
+      }
+      async function verifySignInCode(){
+        /* Settings wrapper: same logic, reading the card's inputs. */
+        const emailInput=$('#accountEmail');
+        const input=$('#accountOtp');
+        const ok=await confirmSignInCode({email:(emailInput&&emailInput.value||''),token:(input&&input.value||''),setStatus:Sync.setAccountStatus});
+        if(ok&&input)input.value='';
       }
       /* Friendlier wording for "Email me a code" send failures (#70). */
       function sendLinkErrorText(error){
@@ -289,6 +306,8 @@
       Sync.clearAdoptedUid=clearAdoptedUid;
       Sync.sendSignInLink=sendSignInLink;
       Sync.verifySignInCode=verifySignInCode;
+      Sync.requestSignInCode=requestSignInCode;
+      Sync.confirmSignInCode=confirmSignInCode;
       Sync.saveDisplayName=saveDisplayName;
       Sync.signOutAccount=signOutAccount;
       Sync.syncNowManual=syncNowManual;

@@ -1,6 +1,14 @@
 
 /* ===== module: utilities.js ===== */
     /** Shared DOM, formatting, ID, and date helpers used by the feature modules below. */
+    /* Module map (v1.006) — Key: $, escapeHtml(), uid/new*Id(), localIsoDate(), displayWeight(), cloneSetFields()/cloneExerciseSets(), setVolume(), detectExercisePRs(). Depends on: none (loads right after catalog; everything below builds on it). */
+    /* #161 (user 2026-09-12): freeze rule — once a set is checked complete its
+       form inputs are read-only until the set is un-checked; the only actions
+       on a completed set are un-complete and delete. Single source of truth:
+       the live set-row renderer (workout-editor.js liveExerciseCardHtml) and
+       the checkbox toggle (wireLiveCompleteSet) both derive the frozen state
+       from this helper, so render and toggle can never disagree. */
+    function setIsFrozen(set){return !!set&&set.complete===true;}
     const $ = (s) => document.querySelector(s);
     const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const tokenize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().split(/\s+/).filter(Boolean);
@@ -22,7 +30,9 @@
        uses yet (user 2026-09-12: "upper back" as an option). Unioned into
        every muscle picker so it's always selectable, e.g. for custom
        exercises. */
-    const EXTRA_MUSCLES=['upper back'];
+    /* #136: rhomboids + the three delt heads are selectable vocabulary (custom
+       exercises, filters) even though no stock exercise names them. */
+    const EXTRA_MUSCLES=['upper back','rhomboids','front delts','side delts','rear delts'];
     function allMuscleOptions(){
       /* A8 (#99): soft-deleted customs stay in the store but leave the filter UI. */
       return [...new Set([...exercises.filter(x=>!exerciseDeleted(x)).flatMap(x=>[...(x.primary||[]),...(x.secondary||[])]),...EXTRA_MUSCLES])].filter(Boolean).sort();
@@ -239,10 +249,21 @@
        toast host is missing (the sync UI falls back to its account status
        line); otherwise a missing host is a silent no-op, as before. */
     let toastTimer=null,toastFadeTimer=null;
+    /* #226: a native <dialog> shown with showModal() paints in the top layer,
+       above the fixed-position #appToast — "Share link copied." was invisible
+       under the share modal. While any dialog is open the toast is reparented
+       into the topmost one so it joins the top layer too (position:fixed keeps
+       its viewport placement); with no dialog open it lives in <body>. */
+    function toastTopLayerHost(){
+      const open=document.querySelectorAll('dialog[open]');
+      return open.length?open[open.length-1]:document.body;
+    }
     function toastService(message,opts={}){
       const el=document.getElementById('appToast');
       if(!el){if(typeof opts.onAbsent==='function')opts.onAbsent();return;}
       try{
+        const host=toastTopLayerHost();
+        if(el.parentNode!==host)host.appendChild(el);
         el.textContent=message;
         el.className=`app-toast ${opts.kind||''}`.trim();
         el.hidden=false;
@@ -250,7 +271,12 @@
         requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')));
         toastTimer=setTimeout(()=>{
           el.classList.remove('show');
-          toastFadeTimer=setTimeout(()=>{if(!el.classList.contains('show'))el.hidden=true;},300);
+          toastFadeTimer=setTimeout(()=>{
+            if(!el.classList.contains('show')){
+              el.hidden=true;
+              if(!document.querySelector('dialog[open]')&&el.parentNode!==document.body)document.body.appendChild(el);
+            }
+          },300);
         },opts.durationMs||3600);
       }catch(_){}
     }
@@ -324,11 +350,12 @@
         // Settings is its own page, not a breadcrumb (user 2026-09-10).
         titleText.textContent = 'Settings';
       } else if (view === 'workout' && (state.workoutSubScreen === 'history' || state.workoutSubScreen === 'complete')) {
-        /* User 2026-09-12: the log list and a completed workout are "Log",
+        /* User 2026-09-12: the log list and a completed workout are "Logs",
            not "Workout" — these are completed sessions. The title is a hidden
            button (looks identical to other pages) that jumps to the full
-           log list. */
-        const logLabel = customTitle || 'Log';
+           log list. The chevron was removed per user feedback: it doesn't
+           fit the design and the title tap is a shortcut, not navigation. */
+        const logLabel = customTitle || 'Logs';
         titleText.innerHTML = `<button type="button" class="title-tap" id="topBarTitleTap" aria-label="View all workout logs">${escapeHtml(logLabel)}</button>`;
         const titleTap = $('#topBarTitleTap');
         if (titleTap) titleTap.addEventListener('click', () => {
@@ -493,12 +520,41 @@
       if(min)return {text:String(min),value:String(min)};
       return {text:'',value:''};
     }
+    /* Effective progression scheme for an exercise item (#54, v1.001): the
+       item's own stamped scheme first, then the program context (program
+       drafts stamp scheme at start; the builder's program-workout editor
+       reads the active program), then the global default. */
+    function resolvedExerciseScheme(item){
+      const prof = item?.progression || {};
+      if(prof.scheme) return prof.scheme;
+      const d = workoutState.draft;
+      if(d?.programId && workoutState.activeProgram?.id === d.programId){
+        const s = workoutState.activeProgram.progression?.scheme;
+        if(s) return s;
+      }
+      const b = state.savedBuilder;
+      if(b?.editTarget?.kind === 'program'){
+        const s = workoutState.activeProgram?.progression?.scheme;
+        if(s) return s;
+      }
+      return progressionSetup.scheme || 'rpe';
+    }
+    /* #205 (user 2026-09-12): one-paragraph description per progression mode
+       for the Settings → Progression defaults picker. Tapping a pill shows
+       only that mode's copy — the old combined block described all three at
+       once. Wording is the existing copy, split per mode. */
+    const SCHEME_DESCRIPTIONS={
+      rpe:'RPE-based adds reps first, then weight, gated by the RPE trigger.',
+      linear:'Linear adds the increment every session, no RPE needed.',
+      onerm:'%1RM prescribes each exercise\'s load as a percentage of its estimated 1RM.'
+    };
+    function schemeDescription(scheme){return SCHEME_DESCRIPTIONS[scheme]||SCHEME_DESCRIPTIONS.rpe;}
     function progressionSummaryForOptions(item) {
       // user 2026-09-11: show the exercise's progression setup under Exercise
       // options so the suggestion basis is visible during the workout.
       const prof = item.progression || {};
-      const scheme = prof.scheme || 'rpe';
-      const schemeLabel = scheme === 'linear' ? 'Linear' : 'RPE-based';
+      const scheme = resolvedExerciseScheme(item);
+      const schemeLabel = scheme === 'onerm' ? '%1RM' : scheme === 'linear' ? 'Linear' : 'RPE-based';
       const time = prof.mode === 'time' || exerciseTracking(item, exercises.find(e=>e.id===item.exerciseId)) === 'time';
       let target;
       if (time) {
@@ -510,25 +566,69 @@
       } else {
         target = `${prof.min || 5}–${prof.max || 8} reps`;
       }
+      // Include the live suggestion reason if one exists for this exercise
+      const sugg = (workoutState.draft?.progressionSuggestions || []).find(x => x.exerciseId === item.exerciseId);
       let detail = '';
-      {
+      let onermInputs = '';
+      if(scheme === 'onerm'){
+        // Provenance display line (#54, v1.001): "75% of TM 225 lb (you set)"
+        // or "75% of auto TM ~ 240 lb from e1RM".
+        const rawPct = Number(prof.percentOf1RM);
+        const pctEff = sugg?.pct ?? (Number.isFinite(rawPct) && rawPct > 0 ? clampPct1RM(rawPct) : 75);
+        const tm = Number(prof.trainingMax ?? prof.manual1RM) || 0;
+        if(sugg && sugg.kind === 'onerm'){
+          detail = sugg.tmSource === 'manual'
+            ? `${sugg.pct}% of TM ${displayWeight(sugg.estimated1RM)} ${weightUnit()} (you set)`
+            : `${sugg.pct}% of auto TM ~ ${displayWeight(Math.round(sugg.estimated1RM))} ${weightUnit()} from e1RM`;
+        }else if(tm > 0){
+          detail = `${pctEff}% of TM ${displayWeight(tm)} ${weightUnit()} (you set)`;
+        }else{
+          detail = `${pctEff}% of estimated 1RM`;
+        }
+        onermInputs = `<div class="prog-onerm-fields"><label class="prog-onerm-field"><span>% of 1RM</span><span class="prog-onerm-input"><input type="number" inputmode="numeric" min="1" max="100" step="1" value="${prof.percentOf1RM ?? ''}" placeholder="${pctEff}" data-onerm-pct="${escapeHtml(item.uid)}" aria-label="Percent of 1RM override, blank for program default"><em class="unit">%</em></span></label><label class="prog-onerm-field"><span>Training max</span><span class="prog-onerm-input"><input type="number" inputmode="decimal" min="1" step="0.5" value="${tm > 0 ? displayWeight(tm) : ''}" placeholder="Auto" data-onerm-tm="${escapeHtml(item.uid)}" aria-label="Training max, blank for automatic"><em class="unit">${weightUnit()}</em></span></label></div>`;
+      }else{
         const incType = prof.incrementType || 'lb';
         const incVal = prof.incrementValue ?? 5;
         detail = prof.repsOnly ? 'reps only, no load progression' : `+${incVal} ${incType === 'percent' ? '%' : weightUnit()} per jump`;
       }
-      // Include the live suggestion reason if one exists for this exercise
-      const sugg = (workoutState.draft?.progressionSuggestions || []).find(x => x.exerciseId === item.exerciseId);
       let basis = sugg?.reason ? `<span class="prog-basis">${escapeHtml(sugg.reason)}</span>` : '';
-      if(!basis){
+      if(!basis && !workoutState.draft?.editingId){
         /* #166: the engine returned no suggestion for this exercise — say why,
            grounded in the engine's own null cases (progressionForExercise
            returns null only when there is no history, or history with no
            valid latest top set / a suppressed no-change). Holds already
-           arrive as suggestions with their own reason above. */
+           arrive as suggestions with their own reason above. #148: skip the
+           why-copy while editing a completed workout — suggestions don't
+           apply to history. */
         const hasHistory=getExerciseLogs(item.exerciseId).length>0;
         basis=`<span class="prog-basis">${hasHistory?'History exists, but there is not enough valid data for a suggestion.':'No completed history for this exercise yet.'}</span>`;
       }
-      return `<div class="prog-summary"><span class="prog-scheme">${escapeHtml(schemeLabel)}</span><span class="prog-target">${escapeHtml(target)}</span><span class="prog-detail">${escapeHtml(detail)}</span>${basis}</div>`;
+      return `<div class="prog-summary"><span class="prog-scheme">${escapeHtml(schemeLabel)}</span><span class="prog-target">${escapeHtml(target)}</span><span class="prog-detail">${escapeHtml(detail)}</span>${onermInputs}${basis}</div>`;
+    }
+    /* %1RM per-exercise inputs (#54, v1.001): % override + training max,
+       rendered by progressionSummaryForOptions in both the live editor and
+       the saved-workout builder. 'change' (not 'input') so typing isn't
+       interrupted; afterChange lets each host recompute its suggestions. */
+    function wireOnermOptionInputs(scope, findItem, afterChange){
+      if(!scope || typeof findItem !== 'function') return;
+      scope.querySelectorAll('[data-onerm-pct]').forEach(input => input.addEventListener('change', () => {
+        const item = findItem(input.dataset.onermPct); if(!item) return;
+        const p = item.progression || (item.progression = {});
+        const v = Number(input.value);
+        if(input.value.trim() === '' || !Number.isFinite(v) || v <= 0) delete p.percentOf1RM;
+        else p.percentOf1RM = clampPct1RM(v);
+        if(afterChange) afterChange(item);
+        schedulePersist();
+      }));
+      scope.querySelectorAll('[data-onerm-tm]').forEach(input => input.addEventListener('change', () => {
+        const item = findItem(input.dataset.onermTm); if(!item) return;
+        const p = item.progression || (item.progression = {});
+        const v = Number(input.value);
+        if(input.value.trim() === '' || !Number.isFinite(v) || v <= 0){ delete p.trainingMax; delete p.tmSource; }
+        else{ p.trainingMax = Math.max(1, Math.round(Number(storageWeight(input.value)) * 10) / 10); p.tmSource = 'manual'; }
+        if(afterChange) afterChange(item);
+        schedulePersist();
+      }));
     }
     /* One canonical tracking-mode switch (efficiency pass 2026-09-12): maps
        the toggle's "seconds" to canonical 'time', no-ops when already set (no

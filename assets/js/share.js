@@ -7,7 +7,11 @@
        same card as a modal over the current screen (user 2026-09-12). Start
        workout (primary for signed-out) and Add to my library act over it.
        Accepting copies the workout/program into the recipient's library (any
-       custom exercises it references come along too). */
+       custom exercises it references come along too).
+       #215 (user 2026-09-12): the signed-out sign-in prompt is a self-contained
+       modal flow — intro → inline sign-in → share info — reusing the Settings
+       card's magic-link/OTP logic (sync-auth.js) with modal-scoped inputs. */
+       /* Module map (v1.006) — Key: renderSharePreview(), importShareCustomExercises(), addSharedTemplateToLibrary()/addSharedProgramToLibrary(), startSharedWorkout(). Depends on: share-codec (loads just before), workout-editor factories, state, persistence. */
     async function parseShareHash(){
       const m=/^#share=(.+)$/.exec(location.hash||'');
       if(!m)return null;
@@ -19,15 +23,19 @@
     }
 
     /* ---- Link building + delivery (UI entry points) ---- */
-    async function shareLink(payload){
+    async function shareCode(payload){
       /* v2 (short) when the platform can deflate; v1 otherwise — either
-         way the recipient's decoder handles both. */
+         way the recipient's decoder handles both. Returns the bare code
+         (no origin); callers wrap it in the long or short URL. */
       let code=null;
       if(typeof CompressionStream!=='undefined'){
         try{code=await shareEncodeV2(payload);}catch(e){code=null;}
       }
-      if(!code)code=shareEncodeV1({...payload,v:SHARE_LEGACY_VERSION});
-      return location.origin+location.pathname+'#share='+code;
+      if(!code)code=shareEncodeV1({...payload,v:1}); /* v1 legacy version, inline:
+         SHARE_LEGACY_VERSION is a module-scoped const in share-codec.js and
+         is not visible here (#207: this ReferenceError broke the no-deflate
+         fallback on older browsers). */
+      return code;
     }
     /* Delivering a share link (user 2026-09-12): the link itself must be
        visible. The old flow went straight to the system sheet, which
@@ -36,12 +44,21 @@
        link with a copy button; the native sheet — sharing the link ONLY,
        no prepended name — is one tap away inside the dialog. */
     async function deliverShareLink(payload){
+      /* #207: sharing requires an account. A signed-out tap shows the
+         sign-in prompt — no link is generated, short or long. #215: the
+         payload is stashed so the prompt can mint it after sign-in. */
+      if(!shareSignedIn()){openShareSignInPrompt(payload);return;}
       const field=$('#shareLinkField');
       if(field){field.value='Building link…';}
       const dlg=$('#shareLinkDialog');
       if(dlg&&!dlg.open)dlg.showModal();
       try{
-        openShareLinkDialog(await shareLink(payload));
+        const code=await shareCode(payload);
+        /* #177: signed-in shares mint a server short link (/s/<slug>);
+           anything else — signed out, offline, insert failure — keeps the
+           existing long link. Sharing never breaks. */
+        const short=(typeof tryShortShareLink==='function')?await tryShortShareLink(payload,code):null;
+        openShareLinkDialog(short||(location.origin+location.pathname+'#share='+code));
       }catch(e){
         if(field){field.value='';}
         showToast('Could not build a share link for this workout.');
@@ -80,17 +97,125 @@
       history.replaceState(null,'',location.pathname+location.search);
     }
     function shareSignedIn(){
-      try{return typeof lastAuthUid!=='undefined'&&!!lastAuthUid;}catch(_){return false;}
+      /* #207: auth can live on the Sync namespace or the window shim
+         (sync-auth.js); either one counts. */
+      try{if(typeof lastAuthUid!=='undefined'&&lastAuthUid)return true;}catch(_){}
+      try{return !!((typeof Sync!=='undefined'&&Sync&&Sync.lastAuthUid)||(typeof window!=='undefined'&&window.Sync&&window.Sync.lastAuthUid));}catch(_){return false;}
+    }
+    /* #215: the sign-in prompt is a self-contained 3-step flow inside one
+       modal — intro → inline sign-in → share info. The share payload is
+       stashed when the prompt opens and is minted only after a successful
+       sign-in; dismissing at any point before that mints nothing. */
+    let pendingSharePayload=null;
+    let shareSignInCooldownTimer=null;
+    function shareSignInShowStep(n){
+      for(let i=1;i<=3;i++){const el=$('#shareSignInStep'+i);if(el)el.hidden=(i!==n);}
+    }
+    function setShareSignInStatus(msg,isError){
+      const el=$('#shareSignInStatus');
+      if(el){el.textContent=msg||'';el.classList.toggle('is-error',!!isError);}
+    }
+    function openShareSignInPrompt(payload){
+      pendingSharePayload=payload||null;
+      const otp=$('#shareSignInOtp');
+      if(otp)otp.value='';
+      const otpStep=$('#shareSignInOtpStep');
+      if(otpStep)otpStep.hidden=true;
+      setShareSignInStatus('');
+      shareSignInShowStep(1);
+      const dlg=$('#shareSignInDialog');
+      if(dlg&&!dlg.open)dlg.showModal();
+      else showToast('Sign in to share workouts.');
+    }
+    /* Step 1 → step 2: the sign-in form lives in the modal — no trip to
+       Settings. */
+    function goShareSignInInline(){
+      setShareSignInStatus('');
+      shareSignInShowStep(2);
+      if(shareSignInCooldownTimer)clearInterval(shareSignInCooldownTimer);
+      shareSignInTickCooldown();
+      shareSignInCooldownTimer=setInterval(shareSignInTickCooldown,1000);
+      const email=$('#shareSignInEmail');
+      if(email&&typeof email.focus==='function')email.focus();
+    }
+    /* The resend cooldown is shared with Settings (same localStorage key via
+       Sync.magicLinkCooldownRemaining); this only repaints the modal button. */
+    function shareSignInTickCooldown(){
+      const btn=$('#shareSignInSendCode');if(!btn)return;
+      let left=0;
+      try{left=(typeof Sync!=='undefined'&&Sync&&typeof Sync.magicLinkCooldownRemaining==='function')?Sync.magicLinkCooldownRemaining():0;}catch(_){}
+      if(left<=0){btn.disabled=false;btn.textContent='Email me a code';}
+      else{btn.disabled=true;const s=Math.ceil(left/1000);btn.textContent='Resend in '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+    }
+    function stopShareSignInCooldown(){
+      if(shareSignInCooldownTimer){clearInterval(shareSignInCooldownTimer);shareSignInCooldownTimer=null;}
+    }
+    async function shareSignInSendCode(){
+      const syncNS=(typeof Sync!=='undefined')?Sync:null;
+      const email=(($('#shareSignInEmail')||{}).value||'');
+      if(!syncNS||typeof syncNS.requestSignInCode!=='function'){setShareSignInStatus('Sign-in is unavailable right now.',true);return;}
+      const ok=await syncNS.requestSignInCode({email:email,setStatus:setShareSignInStatus});
+      if(!ok)return;
+      const otpStep=$('#shareSignInOtpStep');
+      if(otpStep)otpStep.hidden=false;
+      setShareSignInStatus('Code sent, enter it above.');
+      shareSignInTickCooldown();
+      const otp=$('#shareSignInOtp');
+      if(otp&&typeof otp.focus==='function')otp.focus();
+    }
+    async function shareSignInVerifyCode(){
+      const syncNS=(typeof Sync!=='undefined')?Sync:null;
+      const email=(($('#shareSignInEmail')||{}).value||'');
+      const otpEl=$('#shareSignInOtp');
+      const token=((otpEl&&otpEl.value)||'');
+      if(!syncNS||typeof syncNS.confirmSignInCode!=='function'){setShareSignInStatus('Sign-in is unavailable right now.',true);return;}
+      const ok=await syncNS.confirmSignInCode({email:email,token:token,setStatus:setShareSignInStatus});
+      if(!ok)return;
+      if(otpEl)otpEl.value='';
+      /* verifyOtp resolves before onAuthStateChange lands — wait for the
+         session to arrive (bounded), then mint the share. */
+      const t0=Date.now();
+      while(!shareSignedIn()&&Date.now()-t0<8000){
+        await new Promise(r=>setTimeout(r,100));
+      }
+      const dlg=$('#shareSignInDialog');
+      if(!dlg||!dlg.open)return; /* dismissed mid-verify — mint nothing */
+      if(!shareSignedIn()){setShareSignInStatus('Signed in, but the session didn\u2019t arrive \u2014 try again.',true);return;}
+      await shareSignInMintShare();
+    }
+    async function shareSignInMintShare(){
+      /* Step 3: the same build path as the signed-in flow — short link
+         first, long-link fallback — displayed inside this modal. */
+      const field=$('#shareSignInLinkField');
+      if(field)field.value='Building link\u2026';
+      shareSignInShowStep(3);
+      try{
+        const code=await shareCode(pendingSharePayload);
+        const short=(typeof tryShortShareLink==='function')?await tryShortShareLink(pendingSharePayload,code):null;
+        const url=short||(location.origin+location.pathname+'#share='+code);
+        if(field)field.value=url;
+        const note=$('#shareSignInLinkNote');
+        if(note)note.textContent='Send this link to a friend. Opening it shows the full workout \u2014 they can start it right away or save it.';
+        const sysBtn=$('#shareSignInNativeBtn');
+        if(sysBtn)sysBtn.hidden=!(typeof navigator!=='undefined'&&navigator&&navigator.share);
+      }catch(e){
+        if(field)field.value='';
+        showToast('Could not build a share link for this workout.');
+      }
     }
     /* Full-screen share landing (user 2026-09-12): opening a share link
        renders the shared workout/program as its own screen — the recipient
        sees what was shared, with the actions over it. Start workout is the
        primary action for signed-out recipients; Add to my library leads for
        signed-in ones, with Start one tap away either way. There is no
-       "Not now": the × backs out to the workout start screen. */
+       "Not now": the × backs out to the workout start screen.
+       #214: the landing opens OVER a live draft without disturbing it —
+       workoutEditorOpen is left alone and the pane selector yields to the
+       share preview while it's set; dismissing restores whatever was
+       underneath (same principle as #187's logs-over-draft). */
     function openSharePreview(payload){
       state.sharePreview=payload;
-      state.savedWorkoutId=null;state.workoutEditorOpen=false;state.builderOpen=false;
+      state.savedWorkoutId=null;state.builderOpen=false;
       state.workoutHistoryOpen=false;$('#workoutComplete').hidden=true;
       showWorkouts(false,true);
       window.scrollTo(0,0);
@@ -98,9 +223,8 @@
     function dismissSharePreview(){
       state.sharePreview=null;
       clearShareHash();
-      /* Also drop the incoming-share modal if it was the one open. */
-      const dlg=$('#shareIncomingDialog');
-      if(dlg&&dlg.open)dlg.close();
+      /* #177: also drop a /s/<slug> path so a reload doesn't re-offer it. */
+      try{if(typeof clearShortSharePath==='function')clearShortSharePath();}catch(_){}
     }
     /* Exercise names resolve against the payload's own custom exercises
        first — they aren't in the recipient's library until imported. */
@@ -119,10 +243,15 @@
         return [...(ex?.primary||[]),...(ex?.secondary||[])];
       }))];
     }
-    /* The share card markup is shared by the full-screen preview (cold boot
-       from a share link) and the incoming-share modal (link tapped while the
-       app is already open — user 2026-09-12). Same card, same actions; only
-       the dismiss target differs. */
+    /* The share card renders as its own full-screen page (#214, user
+       2026-09-12: the old modal variant is gone — a share link always lands
+       on the full page, opening over a live draft without disturbing it).
+       Header: compact icon buttons (bookmark = add to library, play = start)
+       next to the ×, so the actions are one tap away without scrolling.
+       Footer: the full descriptive buttons in the approved pattern —
+       full-width primary pill + green text link + quiet grey note.
+       #213: every version uses the same pattern and the #180 order per
+       account state (signed-in: Add leads; signed-out: Start leads). */
     function sharePreviewCardHtml(payload){
       const isTemplate=payload.kind==='template';
       const rows=isTemplate?(payload.template?.exercises||[]):[];
@@ -136,26 +265,40 @@
       const body=isTemplate
         ?(rows.map(item=>{const s=shareExerciseSummary(item,payload);return `<div class="picker-item saved-editor-row"><span><strong>${escapeHtml(s.name)}</strong><span>${escapeHtml(s.meta)}</span></span></div>`;}).join('')||'<p class="section-note">No exercises in this workout.</p>')
         :((payload.program?.workouts||[]).map(w=>{const n=(w.template?.exercises||[]).length;return `<div class="picker-item saved-editor-row"><span><strong>${escapeHtml(w.name||'Workout')}</strong><span>${n} exercise${n===1?'':'s'}</span></span></div>`;}).join('')||'<p class="section-note">No workouts in this program.</p>');
-      /* Primary action follows the account state (user 2026-09-12): Start
-         workout leads for signed-out recipients; Add to my library leads for
-         signed-in ones. Programs can't start as one workout — they save. */
+      /* #180: primary action follows the account state (user 2026-09-12):
+         Start workout leads for signed-out recipients; Add to my library
+         leads for signed-in ones. Programs can't start as one workout. */
       const signedIn=shareSignedIn();
-      const startBtn=`<button class="${signedIn?'secondary-button':'primary-button'}" data-share-act="start" type="button">Start workout</button>`;
-      const addBtn=`<button class="${signedIn||!isTemplate?'primary-button':'secondary-button'}" data-share-act="add" type="button">Add to my library</button>`;
-      const actions=isTemplate?(signedIn?addBtn+startBtn:startBtn+addBtn):addBtn;
+      /* #179: the old two-button row read as redundant (starting already
+         saves). One primary per the account state; the other path stays one
+         tap away as a quiet text action. */
+      const bookmarkBtn=`<button class="share-icon-button" data-share-act="add" type="button" aria-label="Add to my library"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg></button>`;
+      const playBtn=`<button class="share-icon-button" data-share-act="start" type="button" aria-label="Start workout"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></button>`;
+      /* Header icon order follows the #180 action order per state. */
+      const headerBtns=isTemplate
+        ?(signedIn?bookmarkBtn+playBtn:playBtn+bookmarkBtn)
+        :bookmarkBtn;
+      const primaryBtn=isTemplate
+        ?(signedIn
+          ?`<button class="primary-button" data-share-act="add" type="button">Add to my library</button><button class="share-alt-action" data-share-act="start" type="button">or start the workout</button>`
+          :`<button class="primary-button" data-share-act="start" type="button">Start workout</button><button class="share-alt-action" data-share-act="add" type="button">or just save it to my library</button>`)
+        :`<button class="primary-button" data-share-act="add" type="button">Add to my library</button>`;
+      const actions=`<div class="share-actions">${primaryBtn}</div>`;
       const note=isTemplate
-        ?`<p class="section-note">${signedIn?'Starting also saves it to your library.':'No account needed — starting also saves it to your library on this device.'}</p>`
+        ?`<p class="section-note">Starting also saves it to your library.</p>`
         :'<p class="section-note">Programs save to your library — open one of its workouts to train it.</p>';
-      return `<div class="completed-card"><span class="continue-kicker">${isTemplate?'Shared workout':'Shared program'}</span><div class="detail-title-row"><h2>${escapeHtml(payload.name||'Shared')}</h2><button class="dialog-close" data-share-act="dismiss" type="button" aria-label="Dismiss">×</button></div><p class="completed-meta">${escapeHtml(meta)}</p>
+      const context=`You opened a shared ${isTemplate?'workout':'program'} link.`; /* #179: landing context */
+      return `<div class="completed-card"><span class="continue-kicker">${isTemplate?'Shared workout':'Shared program'}</span><div class="detail-title-row"><h2>${escapeHtml(payload.name||'Shared')}</h2><div class="share-header-actions">${headerBtns}<button class="dialog-close" data-share-act="dismiss" type="button" aria-label="Dismiss">×</button></div></div><p class="share-context">${context}</p><p class="completed-meta">${escapeHtml(meta)}</p>
       ${muscles.length?`<div class="section-head"><h3>Muscles worked</h3></div>${workoutBodyMapMarkup(muscles)}<div class="workout-muscles">${muscles.map(m=>musclePill(m)).join('')}</div>`:''}
       <div class="section-head"><h3>${isTemplate?'Exercises':'Workouts'}</h3></div>${body}
-      <div class="detail-action-buttons"><div class="detail-action-row">${actions}</div>${note}</div></div>`;
+      <div class="share-footer-actions">${actions}${note}</div></div>`;
     }
     function wireSharePreviewButtons(root,payload,onDismiss){
       const isTemplate=payload.kind==='template';
-      root.querySelector('[data-share-act="dismiss"]')?.addEventListener('click',onDismiss);
-      root.querySelector('[data-share-act="start"]')?.addEventListener('click',startSharedWorkout);
-      root.querySelector('[data-share-act="add"]')?.addEventListener('click',()=>{isTemplate?saveSharedWorkout():saveSharedProgram();});
+      /* Header icons and footer buttons share the same actions — wire all. */
+      root.querySelectorAll('[data-share-act="dismiss"]').forEach(b=>b.addEventListener('click',onDismiss));
+      root.querySelectorAll('[data-share-act="start"]').forEach(b=>b.addEventListener('click',startSharedWorkout));
+      root.querySelectorAll('[data-share-act="add"]').forEach(b=>b.addEventListener('click',()=>{isTemplate?saveSharedWorkout():saveSharedProgram();}));
     }
     function renderSharePreview(){
       const host=$('#sharePreviewBody');if(!host)return;
@@ -164,24 +307,6 @@
       host.innerHTML=sharePreviewCardHtml(payload);
       hydrateBodyMaps();
       wireSharePreviewButtons(host,payload,()=>{collapseWorkoutSubScreen();});
-    }
-    /* Incoming share modal (user 2026-09-12): a share link tapped while the
-       app is already open must not yank the user away from what they're
-       doing — it pops the same share card as a modal over the current
-       screen. × returns them exactly where they were. */
-    function openShareModal(payload){
-      state.sharePreview=payload;
-      renderShareModal();
-      const dlg=$('#shareIncomingDialog');
-      if(dlg&&!dlg.open)dlg.showModal();
-    }
-    function renderShareModal(){
-      const host=$('#shareIncomingBody');if(!host)return;
-      const payload=state.sharePreview;
-      if(!payload){host.innerHTML='';return;}
-      host.innerHTML=sharePreviewCardHtml(payload);
-      hydrateBodyMaps();
-      wireSharePreviewButtons(host,payload,()=>{dismissSharePreview();});
     }
     /* Custom exercises the recipient lacks come along with the share. */
     function importShareCustomExercises(payload){
@@ -256,16 +381,11 @@
        first) — re-render so the primary action matches the account state. */
     function noteShareAuthChanged(){
       if(!state.sharePreview)return;
-      const dlg=$('#shareIncomingDialog');
-      if(dlg&&dlg.open)renderShareModal();
-      else renderSharePreview();
+      renderSharePreview();
     }
     /* One-time wiring for the share-link dialog (user 2026-09-12, #32). */
     (function wireShareLink(){
       const closeShareDlg=()=>$('#shareLinkDialog').close();
-      /* Escaping out of the incoming-share modal (Esc key / backdrop) is a
-         dismiss: clear the payload and hash so a reload doesn't re-offer it. */
-      $('#shareIncomingDialog')?.addEventListener('close',()=>{dismissSharePreview();});
       $('#closeShareLinkDialog')?.addEventListener('click',closeShareDlg);
       $('#closeShareLinkDone')?.addEventListener('click',closeShareDlg);
       $('#copyShareLinkBtn')?.addEventListener('click',async()=>{
@@ -281,4 +401,32 @@
         try{await navigator.share({url});}
         catch(e){/* dismiss = abort, dialog stays open */}
       });
+      /* #215: the sign-in prompt is now a self-contained 3-step flow —
+         Sign in (primary, first) reveals the sign-in form inline in the
+         modal; on success the modal mints the share and shows the link.
+         Nothing routes to Settings anymore. */
+      const closeSignInPrompt=()=>{stopShareSignInCooldown();const d=$('#shareSignInDialog');if(d)d.close();};
+      $('#closeShareSignInDialog')?.addEventListener('click',closeSignInPrompt);
+      $('#cancelShareSignIn')?.addEventListener('click',closeSignInPrompt);
+      $('#cancelShareSignIn2')?.addEventListener('click',closeSignInPrompt);
+      $('#goShareSignIn')?.addEventListener('click',goShareSignInInline);
+      $('#shareSignInSendCode')?.addEventListener('click',()=>{shareSignInSendCode().catch(()=>{});});
+      $('#shareSignInVerify')?.addEventListener('click',()=>{shareSignInVerifyCode().catch(()=>{});});
+      $('#shareSignInDone')?.addEventListener('click',closeSignInPrompt);
+      $('#shareSignInCopyBtn')?.addEventListener('click',async()=>{
+        const field=$('#shareSignInLinkField');
+        try{await navigator.clipboard.writeText(field?field.value:'');showToast('Share link copied.');}
+        catch(e){field?.select?.();showToast('Copy the link above.');}
+      });
+      /* Native sheet from inside the modal: the link ONLY, no prepended
+         workout name (same as the share-link dialog). */
+      $('#shareSignInNativeBtn')?.addEventListener('click',async()=>{
+        const url=$('#shareSignInLinkField')?.value||'';
+        if(!url||!navigator.share)return;
+        try{await navigator.share({url});}
+        catch(e){/* dismiss = abort, modal stays open */}
+      });
+      /* Enter submits the inline form, mirroring the Settings card. */
+      $('#shareSignInEmail')?.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();shareSignInSendCode().catch(()=>{});}});
+      $('#shareSignInOtp')?.addEventListener('keydown',(e)=>{if(e.key==='Enter'){e.preventDefault();shareSignInVerifyCode().catch(()=>{});}});
     })();

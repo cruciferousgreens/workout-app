@@ -1,5 +1,6 @@
 /* ===== module: persistence.js ===== */
 /** Durable localStorage persistence for app data: workouts, drafts, templates, programs, settings. */
+/* Module map (v1.006) — Key: PERSIST_KEY, collectPersistable(), schedulePersist()/persistNow(), restorePersisted(), exportWorkoutData(), wipeLocalUserData(). Depends on: state.js field shapes; SYNCABLE_KEYS mirrors the sync engine's merge list. */
 const PERSIST_KEY='workout-app:v1';
 let persistTimer=null;
 function collectPersistable(){
@@ -58,6 +59,8 @@ function persistNow(){
   }
   return ok;
 }
+/* Debounced save: coalesces rapid writes (every keystroke) into one localStorage write
+   250ms later. */
 function schedulePersist(){
   clearTimeout(persistTimer);
   persistTimer=setTimeout(persistNow,250);
@@ -68,7 +71,7 @@ function schedulePersist(){
    keeps its own remote-wipe / sign-out / reload sequencing. */
 function wipeLocalUserData({removeSyncKeys=false}={}){
   workoutState.completed=[];workoutState.templates=[];workoutState.tags=[];workoutState.exerciseTagPresets=[];workoutState.draft=null;workoutState.activeProgram=null;workoutState.archivedPrograms=[];
-  workoutState.tagTarget=null;workoutState.exerciseTagTarget=null;workoutState.supersetTarget=null;workoutState.pickerMode='draft';workoutState.programWorkoutTarget=null;
+  workoutState.tagTarget=null;workoutState.exerciseTagTarget=null;workoutState.supersetTarget=null;workoutState.pickerMode='draft';workoutState.programWorkoutTarget=null;workoutState.pickerSwapUid=null;
   /* The saved-workout builder draft is persisted too — leaving it would
      resurrect a builder session through a pre-reload pagehide persist. */
   state.savedBuilder=null;state.builderReturn=null;state.builderOpen=false;
@@ -155,6 +158,8 @@ function quarantineCorruptBlob(raw){
   const dlg=typeof $==='function'?$('#corruptDataDialog'):null;
   if(dlg&&!dlg.open){try{dlg.showModal();}catch(_){}}
 }
+/* Boot: reads PERSIST_KEY, quarantines corrupt blobs for user download, runs
+   migrations, then hydrates state + workoutState. */
 function restorePersisted(){
   let raw=null;
   try{raw=localStorage.getItem(PERSIST_KEY);}catch(_){return;}

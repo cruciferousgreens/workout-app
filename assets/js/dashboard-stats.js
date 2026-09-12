@@ -1,6 +1,7 @@
 
 /* ===== module: dashboard-stats.js ===== */
     /** Produces dashboard calendars, charts, and muscle-volume analysis from completed workouts. */
+    /* Module map (v1.006) — Key: renderDashboard(), renderStats(), workoutsForPeriod(), muscleVolumes(), dashboardWeekModel(). Depends on: workoutState.completed (state.js), date/format/volume helpers (utilities.js), navigation scroll restore. */
     /* #99 L12: isoForDate removed — use the canonical localIsoDate(date) from utilities.js. */
     function workoutsForPeriod(period) {
       const now=new Date(), today=localIsoDate(now); let start=null;
@@ -112,7 +113,7 @@
     }
     function renderRecentPRs(workouts){
       const prs=recentPRRows(workouts);
-      $('#recentPRs').innerHTML=prs.length?`<div class="action-list">${prs.map(pr=>`<button class="action-row" type="button" data-stat-exercise="${escapeHtml(pr.exerciseId)}"><span><strong>${escapeHtml(exercises.find(ex=>ex.id===pr.exerciseId)?.name||'Exercise')}</strong><span>${escapeHtml(pr.kind)} · ${escapeHtml(formatLogDate(pr.date))}</span></span><span class="action-row-value">${escapeHtml(pr.value)}</span></button>`).join('')}</div>`:'<p class="section-note">No new PRs in this period yet. Keep logging completed sets—your next one will show here.</p>';
+      $('#recentPRs').innerHTML=prs.length?`<div class="action-list">${prs.map(pr=>`<button class="action-row" type="button" data-stat-exercise="${escapeHtml(pr.exerciseId)}"><span><strong>${escapeHtml(exercises.find(ex=>ex.id===pr.exerciseId)?.name||'Exercise')}</strong><span>${escapeHtml(pr.kind)} · ${escapeHtml(formatLogDate(pr.date))}</span></span><span class="action-row-value">${escapeHtml(pr.value)}</span></button>`).join('')}</div>`:'<p class="section-note">No new PRs in this period yet.</p>';
     }
     function wireStatExerciseLinks(){
       document.querySelectorAll('[data-stat-exercise]').forEach(button=>button.addEventListener('click',()=>openExercise(button.dataset.statExercise)));
@@ -157,6 +158,20 @@
       }));
       return counts;
     }
+    /* #170 (user 2026-09-12): muscles with at least one completed set in the
+       period, primary or secondary — bodyweight sets count even though their
+       weighted volume is 0. Used only to light the muscle map; volume math
+       (muscleVolumes) is untouched. */
+    function workedMuscles(workouts) {
+      const worked=new Set();
+      workouts.forEach(workout=>workout.exercises.forEach(item=>{
+        const ex=exercises.find(x=>x.id===item.exerciseId); if(!ex)return;
+        if(!item.sets.length)return;
+        (ex.primary||[]).forEach(m=>worked.add(String(m).toLowerCase()));
+        (ex.secondary||[]).forEach(m=>worked.add(String(m).toLowerCase()));
+      }));
+      return worked;
+    }
     function formatVolume(value) {
       const n=displayVolume(value), unit=weightUnit(), rounded=Math.round(n);
       return rounded>=1000?`${(rounded/1000).toFixed(rounded>=10000?0:1)}k ${unit}`:`${rounded.toLocaleString()} ${unit}`;
@@ -171,10 +186,19 @@
     /* Region -> muscle names it represents. A region may cover several of the
        user's muscle names (e.g. the traps region also lights for "upper
        back", user 2026-09-12), so values are arrays. */
+    /* #136: the three delt heads + rhomboids light their regions (common
+       aliases included). Rhomboids have no dedicated region — the traps
+       region is the closest visual proxy.
+       #194 (user 2026-09-12): adductors, abductors, middle back and neck
+       have no dedicated SVG region either, so they light the closest one —
+       a bodyweight adductor session must fill the map, not vanish. */
     const bodyMapMuscleAliases={
-      'upper-chest':['chest'],'lower-chest':['chest'],'front-delts':['shoulders'],'rear-delts':['shoulders'],'side-delts':['shoulders'],
-      'quads':['quadriceps'],'hamstrings':['hamstrings'],'glutes':['glutes'],'forearms':['forearms'],'abs':['abdominals'],
-      'lats':['lats'],'lower-back':['lower back'],'traps':['traps','upper back'],'triceps':['triceps'],'biceps':['biceps'],'calves':['calves'],'obliques':['abdominals']
+      'upper-chest':['chest'],'lower-chest':['chest'],
+      'front-delts':['shoulders','front delts','front delt','front deltoid','anterior delts','anterior deltoid'],
+      'rear-delts':['shoulders','rear delts','rear delt','rear deltoid','posterior delts','posterior deltoid'],
+      'side-delts':['shoulders','side delts','side delt','lateral delts','lateral deltoid','middle delts'],
+      'quads':['quadriceps','adductors'],'hamstrings':['hamstrings'],'glutes':['glutes','abductors'],'forearms':['forearms'],'abs':['abdominals'],
+      'lats':['lats'],'lower-back':['lower back'],'traps':['traps','upper back','rhomboids','rhomboid','middle back','neck'],'triceps':['triceps'],'biceps':['biceps'],'calves':['calves'],'obliques':['abdominals']
     };
     /* Sum a per-muscle map across every muscle name a region represents. */
     function regionMuscleTotal(map,region){
@@ -214,7 +238,37 @@
           host.innerHTML=template;
           host.querySelectorAll('svg').forEach(svgNode=>{svgNode.setAttribute('aria-hidden','true');svgNode.setAttribute('focusable','false');});
           const regions=[...host.querySelectorAll('[data-muscle]')];
-          if(host.dataset.worked!==undefined){
+          /* #170: a volume map may ALSO carry data-worked (comma-separated
+             lowercase muscle names with >=1 completed set). Zero-volume but
+             worked regions — bodyweight work — get the flat heat-worked
+             highlight instead of staying dark. */
+          if(host.dataset.primary!==undefined){
+            const primary=new Set(host.dataset.primary.split(',').filter(Boolean));
+            const secondary=new Set(host.dataset.secondary.split(',').filter(Boolean));
+            regions.forEach(region=>{
+              const candidates=bodyMapMuscleAliases[region.dataset.muscle]||[];
+              const kind=candidates.some(m=>primary.has(m))?'primary':candidates.some(m=>secondary.has(m))?'secondary':null;
+              paintBodyRegion(region,kind==='primary'?5:kind==='secondary'?2:0,`${titleCase(candidates[0]||region.dataset.muscle)}${kind?` · ${kind}`:' · not targeted'}`);
+            });
+          }else if(host.dataset.volumes!==undefined){
+            const volumes=JSON.parse(decodeURIComponent(host.dataset.volumes));
+            const worked=new Set((host.dataset.worked||'').split(',').filter(Boolean));
+            const regionValue=region=>regionMuscleTotal(volumes,region);
+            const max=Math.max(1,...regions.map(regionValue));
+            regions.forEach(region=>{
+              const value=regionValue(region);
+              if(value>0){
+                paintBodyRegion(region,heatLevel(value,max),`${titleCase((bodyMapMuscleAliases[region.dataset.muscle]||[])[0]||region.dataset.muscle)} · ${formatVolume(value)}`);
+              }else{
+                const hit=(bodyMapMuscleAliases[region.dataset.muscle]||[]).find(m=>worked.has(m));
+                if(hit){
+                  region.classList.add('heat-worked');
+                  const title=document.createElementNS('http://www.w3.org/2000/svg','title');
+                  title.textContent=titleCase(hit);region.prepend(title);
+                }
+              }
+            });
+          }else if(host.dataset.worked!==undefined){
             const worked=new Set(host.dataset.worked.split(',').filter(Boolean));
             regions.forEach(region=>{
               const hit=(bodyMapMuscleAliases[region.dataset.muscle]||[]).find(m=>worked.has(m));
@@ -224,39 +278,30 @@
                 title.textContent=titleCase(hit);region.prepend(title);
               }
             });
-          }else if(host.dataset.primary!==undefined){
-            const primary=new Set(host.dataset.primary.split(',').filter(Boolean));
-            const secondary=new Set(host.dataset.secondary.split(',').filter(Boolean));
-            regions.forEach(region=>{
-              const candidates=bodyMapMuscleAliases[region.dataset.muscle]||[];
-              const kind=candidates.some(m=>primary.has(m))?'primary':candidates.some(m=>secondary.has(m))?'secondary':null;
-              paintBodyRegion(region,kind==='primary'?5:kind==='secondary'?2:0,`${titleCase(candidates[0]||region.dataset.muscle)}${kind?` · ${kind}`:' · not targeted'}`);
-            });
-          }else{
-            const volumes=JSON.parse(decodeURIComponent(host.dataset.volumes));
-            const regionValue=region=>regionMuscleTotal(volumes,region);
-            const max=Math.max(1,...regions.map(regionValue));
-            regions.forEach(region=>{
-              const value=regionValue(region);
-              paintBodyRegion(region,heatLevel(value,max),`${titleCase((bodyMapMuscleAliases[region.dataset.muscle]||[])[0]||region.dataset.muscle)} · ${formatVolume(value)}`);
-            });
           }
           host.dataset.hydrated='true';
         });
       });
     }
-    function muscleHeatmapMarkup(volumes,compact=false) {
+    function muscleHeatmapMarkup(volumes,worked,compact=false) {
       /* Anatomical muscle map, always the worked view (user 2026-09-11:
-         the #72 Worked/Unworked toggle was removed). */
+         the #72 Worked/Unworked toggle was removed).
+         #170: `worked` is the Set of lowercase muscle names with at least one
+         completed set in the period (workedMuscles) — bodyweight work has
+         volume 0 but must still light its regions (flat heat-worked, no
+         volume ranking). */
       const rows=Object.entries(volumes).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-      if(!rows.length)return '<div class="chart-empty">No weighted training volume in this period.</div>';
+      const workedList=[...(worked||[])];
+      if(!rows.length&&!workedList.length)return '<div class="chart-empty">No weighted training volume in this period.</div>';
       const max=Math.max(1,...rows.map(([,v])=>v));
       const shown=compact?rows.slice(0,4):rows;
       const encoded=encodeURIComponent(JSON.stringify(volumes));
-      const map=`<div class="anatomy-map" data-volumes="${encoded}"><div class="chart-empty">Loading anatomical map\u2026</div></div>`;
+      const workedAttr=workedList.map(m=>String(m).toLowerCase()).join(',');
+      const map=`<div class="anatomy-map" data-volumes="${encoded}" data-worked="${escapeHtml(workedAttr)}"><div class="chart-empty">Loading anatomical map\u2026</div></div>`;
       const list=shown.map(([muscle,value])=>`<div class="heatmap-row"><i class="heatmap-swatch heat-${heatLevel(value,max)}"></i><span>${escapeHtml(titleCase(muscle))}</span><strong>${formatVolume(value)}</strong></div>`).join('');
-      const legend=compact?'':`<div class="heatmap-legend"><span>Less</span><i class="heatmap-gradient"></i><span>More volume</span></div>`;
-      return `<div class="heatmap-shell">${map}<div><div class="heatmap-list">${list}</div>${legend}</div></div>`;
+      const note=!rows.length?'<p class="section-note">Bodyweight work only — no weighted volume this period.</p>':'';
+      const legend=(compact||!rows.length)?'':`<div class="heatmap-legend"><span>Less</span><i class="heatmap-gradient"></i><span>More volume</span></div>`;
+      return `<div class="heatmap-shell">${map}<div><div class="heatmap-list">${list}</div>${note}${legend}</div></div>`;
     }
     /* Completed-workout body map (user phone QA 2026-09-12): data-worked holds
        comma-separated library muscle names; every worked region gets ONE flat
@@ -364,7 +409,7 @@
       strip.onpointerup=event=>{if(!weekSwipeStart||event.pointerId!==weekSwipeStart.id)return;const dx=event.clientX-weekSwipeStart.x,dy=event.clientY-weekSwipeStart.y;weekSwipeStart=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)){if(dx>0)$('#previousWeek').click();else $('#nextWeek').click();}};
     }
     function renderDashboardSummary(selectedWorkouts,selectedIsFuture){
-      if(state.selectedDashboardDate){const label=formatLogDate(state.selectedDashboardDate);$('#calendarSummary').textContent=selectedIsFuture?`${label} · Upcoming program`:`${label} · ${selectedWorkouts.length?`${selectedWorkouts.length} workout${selectedWorkouts.length===1?'':'s'}`:'No workouts'}`;$('#dashRecentTitle').textContent=selectedIsFuture?'Upcoming':label;}else{const summary=$('#calendarSummary');if(state.calendarWeekOffset===0){summary.textContent='This week.';}else{summary.innerHTML='<button type="button" class="link-button" id="gotoThisWeek">Go to this week.</button>';const go=$('#gotoThisWeek');if(go)go.addEventListener('click',()=>{state.calendarWeekOffset=0;state.selectedDashboardDate=null;renderDashboard();});}$('#dashRecentTitle').textContent='Recent workouts';}
+      if(state.selectedDashboardDate){const label=formatLogDate(state.selectedDashboardDate);$('#calendarSummary').textContent=selectedIsFuture?`${label} · Upcoming program`:`${label} · ${selectedWorkouts.length?`${selectedWorkouts.length} workout${selectedWorkouts.length===1?'':'s'}`:'No workouts'}`;$('#dashRecentTitle').textContent=selectedIsFuture?'Upcoming':label;}else{const summary=$('#calendarSummary');if(state.calendarWeekOffset===0){summary.textContent='';}else{summary.innerHTML='<button type="button" class="link-button" id="gotoThisWeek">Go to this week.</button>';const go=$('#gotoThisWeek');if(go)go.addEventListener('click',()=>{state.calendarWeekOffset=0;state.selectedDashboardDate=null;renderDashboard();});}$('#dashRecentTitle').textContent='Recent workouts';}
     }
     function renderDashboardProgram(){
       const p=workoutState.activeProgram; $('#dashboardProgram').innerHTML=p?`<p><strong>${escapeHtml(p.name)}</strong><br>Week ${programWeek(p)} of ${p.length} · ${p.workouts.length} workouts in rotation</p><button class="secondary-button" id="openDashboardProgram" type="button">Open program</button>`:'<p>No active program yet. Build a training block when you’re ready.</p><button class="secondary-button" id="openDashboardProgram" type="button">Create program</button>';
@@ -387,14 +432,23 @@
         document.querySelector('[data-dash-period="'+state.dashboardPeriod+'"]')?.focus({preventScroll:true});
       }));
     }
+    /* #195 (user 2026-09-12): the At-a-glance Workouts card opens the logs
+       list filtered to the dashboard's selected period. */
+    function openLogsForDashboardPeriod(){
+      state.logPeriod=state.dashboardPeriod||'week';
+      schedulePersist();
+      showWorkouts(false);showWorkoutHistory();
+    }
     function renderDashboardStats(){
       const periodWorkouts=workoutsForPeriod(state.dashboardPeriod), periodSets=periodWorkouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=periodSets.reduce((n,set)=>n+setVolume(set),0);
-      $('#dashboardStats').innerHTML=`<div class="stats-panel"><strong>${periodWorkouts.length}</strong><span>Workouts</span></div>${statValuePanel(periodSets.length,SETS_TIERS,'Sets')}${statValuePanel(displayVolume(volume),VOLUME_TIERS,`Volume (${weightUnit()})`)}`;
+      const periodLabel=PERIOD_LABELS[state.dashboardPeriod]||'';
+      $('#dashboardStats').innerHTML=`<button class="stats-panel stats-panel-link" id="dashWorkoutsCard" type="button" aria-label="View workout logs for ${escapeHtml(periodLabel)}"><strong>${periodWorkouts.length}</strong><span>${periodWorkouts.length===1?'Workout':'Workouts'}</span></button>${statValuePanel(periodSets.length,SETS_TIERS,periodSets.length===1?'Set':'Sets')}${statValuePanel(displayVolume(volume),VOLUME_TIERS,`Volume (${weightUnit()})`)}`;
+      $('#dashWorkoutsCard').onclick=openLogsForDashboardPeriod;
       wireStatToggles($('#dashboardStats'));
       const muscles=muscleCounts(periodWorkouts),volumes=muscleVolumes(periodWorkouts);$('#dashboardMuscles').innerHTML=Object.keys(muscles).length?Object.entries(muscles).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([m,n])=>musclePill(m,` · ${n}`)).join(''):'<span class="section-note">No muscles logged in this period.</span>';
-      $('#dashboardHeatmap').innerHTML=muscleHeatmapMarkup(volumes,true);
+      $('#dashboardHeatmap').innerHTML=muscleHeatmapMarkup(volumes,workedMuscles(periodWorkouts),true);
       const dashHydration=hydrateBodyMaps();
-      renderBlindspots(volumes,'#dashBlindspots');
+      renderBlindspots(volumes,workedMuscles(periodWorkouts),'#dashBlindspots');
       return dashHydration;
     }
     function renderDashboardRecent(selectedWorkouts,selectedIsFuture){
@@ -403,7 +457,7 @@
          upcomingProgramMarkup) instead of the dead "nothing logged" note. */
       const futureDateCopy=selectedIsFuture?upcomingProgramMarkup(selDate):'';
       const emptyDateCopy=futureDateCopy||(selDate===todayIso?'<p>No workout logged yet today. <button class="filter-clear" id="startSelectedDateWorkout" type="button">Start workout</button></p>':'<p>No workout logged for this date. <button class="filter-clear" id="startSelectedDateWorkout" type="button">Log a workout</button></p>');
-      $('#dashboardRecent').innerHTML=selectedWorkouts.length?selectedWorkouts.map(w=>{const setCount=w.exercises.flatMap(e=>e.sets).length;const detail=state.selectedDashboardDate?`${w.exercises.length} exercise${w.exercises.length===1?'':'s'} · ${setCount} set${setCount===1?'':'s'}`:null;return recentWorkoutButton(w,'data-workout-id',detail);}).join(''):state.selectedDashboardDate?emptyDateCopy:'<p>No completed workouts yet. Your first session will appear here. <button class="filter-clear" id="startFirstWorkout" type="button">Start a workout</button></p>';
+      $('#dashboardRecent').innerHTML=selectedWorkouts.length?selectedWorkouts.map(w=>{const setCount=w.exercises.flatMap(e=>e.sets).length;const detail=state.selectedDashboardDate?`${w.exercises.length} exercise${w.exercises.length===1?'':'s'} · ${setCount} set${setCount===1?'':'s'}`:null;return recentWorkoutButton(w,'data-workout-id',detail);}).join(''):state.selectedDashboardDate?emptyDateCopy:'<p>No completed workouts yet. <button class="filter-clear" id="startFirstWorkout" type="button">Start a workout</button></p>';
       document.querySelectorAll('[data-workout-id]').forEach(b=>b.addEventListener('click',()=>{state.workoutDetailReturn=ROUTES.DETAIL_RETURN.DASHBOARD;showWorkouts(false);renderCompletedWorkout(workoutState.completed.find(w=>w.id===b.dataset.workoutId),{push:true});}));
       $('#startSelectedDateWorkout')?.addEventListener('click',()=>{const date=state.selectedDashboardDate;showWorkouts();startBlankWorkout();workoutState.draft.date=date;renderWorkoutScreen();});
       /* #154: the no-workouts empty state gets the same one-tap start as the
@@ -435,10 +489,16 @@
        #13 (user 2026-09-11): sectioned out — a horizontal divider, then a
        "Blind spots" label, then the pills. Shared by the Stats muscle map
        and the Home At-a-glance card. */
-    function renderBlindspots(volumes,wrapSelector){
-      const wrap=$(wrapSelector||'#blindspotWrap');if(!wrap)return;
+    /* #194 (user 2026-09-12): blind spots are muscles with NO work at all in
+       the period — bodyweight sets count as work even though their volume
+       is 0. Pure so tests can pin it. */
+    function blindspotMuscles(volumes,worked){
       const allMuscles=[...new Set(exercises.flatMap(ex=>[...(ex.primary||[]),...(ex.secondary||[])].map(m=>String(m).toLowerCase())))].sort();
-      const missing=allMuscles.filter(m=>!volumes[m]);
+      return allMuscles.filter(m=>!volumes[m]&&!(worked&&worked.has(m)));
+    }
+    function renderBlindspots(volumes,worked,wrapSelector){
+      const wrap=$(wrapSelector||'#blindspotWrap');if(!wrap)return;
+      const missing=blindspotMuscles(volumes,worked);
       if(!missing.length){wrap.innerHTML='';return;}
       wrap.innerHTML=`<div class="blindspot-section"><hr class="blindspot-rule"><p class="blindspot-label">Blind spots</p><div class="tag-row blindspot-list">${missing.map(m=>`<span class="tag blindspot-tag">${escapeHtml(titleCase(m))}</span>`).join('')}</div></div>`;
     }
@@ -453,13 +513,13 @@
       const workouts=workoutsForPeriod(state.statsPeriod), sets=workouts.flatMap(w=>w.exercises.flatMap(e=>e.sets)), volume=sets.reduce((n,set)=>n+setVolume(set),0);
       /* User 2026-09-12 (#128): the Completed-workouts stat is the Stats-tab
          door to the workout logs — tapping it jumps to the full list. */
-      $('#statsGrid').innerHTML=`<button class="stats-panel stats-panel-link" id="statsCompletedWorkouts" type="button"><strong>${workouts.length}</strong><span>Workouts</span></button>${statValuePanel(sets.length,SETS_TIERS,'Sets')}${statValuePanel(displayVolume(volume),VOLUME_TIERS,`Volume (${weightUnit()})`)}`;
+      $('#statsGrid').innerHTML=`<button class="stats-panel stats-panel-link" id="statsCompletedWorkouts" type="button"><strong>${workouts.length}</strong><span>${workouts.length===1?'Workout':'Workouts'}</span></button>${statValuePanel(sets.length,SETS_TIERS,sets.length===1?'Set':'Sets')}${statValuePanel(displayVolume(volume),VOLUME_TIERS,`Volume (${weightUnit()})`)}`;
       $('#statsCompletedWorkouts').onclick=()=>{showWorkouts(false);showWorkoutHistory();};
       wireStatToggles($('#statsGrid'));
       const muscles=muscleCounts(workouts), volumes=muscleVolumes(workouts);
-      $('#muscleHeatmap').innerHTML=muscleHeatmapMarkup(volumes,false);hydrateBodyMaps();
+      $('#muscleHeatmap').innerHTML=muscleHeatmapMarkup(volumes,workedMuscles(workouts),false);hydrateBodyMaps();
       $('#muscleStats').innerHTML=Object.keys(muscles).length?`<div class="tag-row">${Object.entries(muscles).sort((a,b)=>b[1]-a[1]).map(([m,n])=>musclePill(m,` · ${n} sets`)).join('')}</div>`:'<p class="section-note">Complete a workout to start building muscle-level stats.</p>';
-      renderBlindspots(volumes);
+      renderBlindspots(volumes,workedMuscles(workouts));
       renderMuscleAnalysis(workouts,state.statsPeriod);
       /* #126 (user 2026-09-11): Weekly volume chart removed from Stats. */
     }

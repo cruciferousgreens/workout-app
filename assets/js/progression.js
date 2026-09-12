@@ -1,6 +1,7 @@
 
 /* ===== module: progression.js ===== */
     /** Computes RPE-gated rep, time, and load suggestions from real completed history. */
+    /* Module map (v1.006) — Key: progressionForExercise(), prepareDraftProgression(), applyProgressionSuggestion(), suggestionCardMarkup(), roundedIncrement(). Depends on: exercise-detail (estimate1RM), workoutState.completed history, state.progressionSetup, utilities. */
     function topSetForSession(session) {
       if (!session?.sets?.length) return null;
       const mode=session.tracking==='time'||session.sets.some(set=>set.seconds!=null)?'time':'reps';
@@ -21,14 +22,33 @@
       return Math.round((weight+Number(value))*2)/2;
     }
 
+    /* Plate snapping for %1RM loads (user 2026-09-11): 5 lb plates imperial,
+       2.5 kg plates metric. B3-fixed: the metric path converts lb→kg BEFORE
+       snapping and back to lb after — the original had ×/÷ swapped. */
+    function snapPlateLoad(rawLb){
+      return isMetric()?Math.round(rawLb*LB_TO_KG/2.5)*2.5/LB_TO_KG:Math.round(rawLb/5)*5;
+    }
+    /* % of 1RM clamps to 1–100 (v0.99994 behavior); unset/invalid → 75. */
+    function clampPct1RM(v){const n=Number(v);return Number.isFinite(n)&&n>0?Math.min(100,Math.max(1,Math.round(n))):75;}
+    /* Deload load clamps to 40–80%; unset/invalid → 60. */
+    function clampDeloadPct(v){const n=Number(v);return Number.isFinite(n)&&n>0?Math.min(80,Math.max(40,Math.round(n))):60;}
+
+    /* The suggestion engine's entry point: from one exercise's real completed history +
+       its progression profile, returns the next-session target (weight/reps/seconds) or
+       a hold. Suggestions are hints only — see applyProgressionSuggestion. */
     function progressionForExercise(exerciseId, profile, config=null, hasStoredZone=false) {
       const programConfig=config || workoutState.activeProgram?.progression || progressionSetup;
       // Progression scheme: 'rpe' is the default double progression; 'linear'
       // adds the increment every session with no RPE gate (per-program setting,
-      // stamped onto each exercise at program start so repeats stay linear).
+      // stamped onto each exercise at program start so repeats stay linear);
+      // 'onerm' prescribes load as a percentage of the training max (#54).
       const scheme=profile?.scheme||programConfig?.scheme||'rpe';
       const logs=getExerciseLogs(exerciseId).sort(sortByRecencyDesc); /* #99 A13: completedAt first, isoDate fallback */
-      if(!logs.length)return null;
+      // %1RM with an entered training max needs no history at all.
+      // trainingMax is the v1.001 rename of manual1RM — read the old key as a
+      // fallback for one cycle so legacy profiles keep working.
+      const trainingMax=Number(profile?.trainingMax ?? profile?.manual1RM)||0;
+      if(!logs.length&&!(scheme==='onerm'&&trainingMax>0))return null;
       const targetMode=profile?.mode || 'reps';
       const threshold=Number(programConfig.threshold ?? 8);
       // AMRAP has no upper rep bound: a blank max means "as many as possible" from an
@@ -97,15 +117,85 @@
       const incrementLabel=incrementType==='percent'?`${incrementValue}%`:`${incrementValue} ${weightUnit()}`;
       const repsOnly=!!profile?.repsOnly;
       // Progression scheme: 'rpe' is the default double progression; 'linear'
-      // adds the increment every session with no RPE gate (per-program setting,
-      // stamped onto each exercise at program start so repeats stay linear).
+      // adds the increment every session with no RPE gate; 'onerm' prescribes
+      // load as a percentage of the training max (#54, restored v1.001).
       const previousProfile=latestLog?.progression;
       const previousMin=normMin(previousProfile),previousMax=normMax(previousProfile);
       const hasStoredRange=Number.isFinite(Number(previousProfile?.min))&&(!!previousProfile?.amrap||Number.isFinite(Number(previousProfile?.max))),outsideNewRange=!!latest&&(latest.reps<min||(!profile?.openTop&&!profile?.amrap&&latest.reps>max));
       const repRangeChanged=!!latest&&mode==='reps'&&previousProfile?.mode!=='time'&&((hasStoredRange&&(previousMin!==min||previousMax!==max))||(!hasStoredRange&&outsideNewRange));
       let nextWeight=latest?.weight??0,nextReps=latest?.reps??min,nextSeconds=latest?.seconds??timeMin,kind='hold',reason='Top-set RPE is above the progression trigger.',estimated1RM=0;
+      const week=Number(programConfig.currentWeek)||null;
+      /* B8 fix: the %1RM basis is the BEST same-zone top set's e1RM, not the
+         heaviest set's. Reuses the same-zone selection above, extended to the
+         max e1RM over the whole zone window. */
+      const bestZoneE1RM=()=>{
+        let best=0;
+        for(const log of logs){
+          if(!(inStoredZone(log)||inLoggedZone(log)))continue;
+          const top=topSetForSession(log);
+          if(!top||!(top.weight>0)||!(top.reps>0))continue;
+          const e=estimate1RM({w:top.weight,r:top.reps,rpe:top.rpe});
+          if(e>best)best=e;
+        }
+        return best;
+      };
+      /* %1RM prescription (#54, restored v1.001): the target load is a fixed
+         percentage of the training max — no RPE gate, no rep ladder.
+         Percent: per-exercise override → weekly % wave → program default → 75.
+         Basis is TM-first: an entered training max wins; otherwise the best
+         same-zone estimated 1RM. Time-based exercises fall through to the
+         standard path — %1RM is a load prescription for rep work. */
+      const onermRx=()=>{
+        if(mode==='time')return null;
+        const pct=clampPct1RM(Number(profile?.percentOf1RM)||programPctForWeek(programConfig,week)||Number(programConfig?.percentOf1RM)||75);
+        let basis=0,basisNote='',tmSource=null;
+        if(trainingMax>0){
+          basis=trainingMax;tmSource='manual';
+          basisNote=`your training max of ${displayWeight(trainingMax)} ${weightUnit()}`;
+        }else{
+          const auto=bestZoneE1RM();
+          if(auto>0){basis=auto;tmSource='auto';basisNote=`an auto training max of ≈${displayWeight(Math.round(auto))} ${weightUnit()} from your best same-zone top set`;}
+        }
+        if(basis<=0)return null;
+        return {weight:snapPlateLoad(basis*(pct/100)),pct,basis,basisNote,tmSource};
+      };
+      /* Scheduled deloads (#54, v1.001): this override runs BEFORE the scheme
+         branches. A week is a deload week only when the user scheduled it
+         (every-N-weeks, or flagged in the % wave panel) — deloads are never
+         inferred, so the "engine never auto-deloads" rule stands. On a deload
+         week the load is reduced and the linear +increment is skipped. */
+      const deloadPct=clampDeloadPct(Number(programConfig.deloadPct ?? progressionSetup.deloadPct ?? 60));
+      const deloadWeek=!!week&&isDeloadWeek(programConfig,week);
+      let onermInfo=null;
+      /* The %1RM prescription resolves before the deload branch: a manually
+         entered training max is a valid basis with no history, so a scheduled
+         deload still reduces it. No basis at all means no card, even on a
+         deload week. */
+      const rx=(scheme==='onerm'&&mode!=='time')?onermRx():null;
+      if(scheme==='onerm'&&mode!=='time'&&!rx)return null;
+      if(deloadWeek&&((latest&&latest.weight>0)||rx)){
+        let normal=0,normalNote='';
+        if(rx){onermInfo=rx;normal=rx.weight;normalNote=`the ${rx.pct}% prescription`;}
+        else if(repRangeChanged&&latest.weight>0&&!followLifter){
+          /* Deload wins on load, but the week-range rebase still applies to
+             the normal prescription the deload % is taken from. */
+          const e1=estimate1RM({w:latest.weight,r:latest.reps,rpe:latest.rpe});
+          const targetReps=profile?.openTop?min:Math.max(min,max);
+          normal=Math.max(0,Math.round(e1/(1+targetReps/30)*10)/10);normalNote='the rebased prescription';estimated1RM=e1;
+        }
+        else{normal=latest.weight;normalNote='your latest top set';}
+        nextWeight=snapPlateLoad(normal*(deloadPct/100));
+        if(rx)nextReps=min; // %1RM deload: the reduced load still targets the range minimum.
+        kind='deload';
+        reason=`Week ${week} is a scheduled deload — ${deloadPct}% of ${normalNote}; suggesting ${displayWeight(nextWeight)} ${weightUnit()}.`;
+      }
+      else if(rx){
+        onermInfo=rx;
+        nextWeight=rx.weight;nextReps=min;kind='onerm';estimated1RM=rx.basis;
+        reason=`${rx.pct}% of ${rx.basisNote}; suggesting ${displayWeight(nextWeight)} ${weightUnit()}${profile?.amrap?' at AMRAP':` at ${min} rep${min===1?'':'s'}`}.`;
+      }
       // The standard path needs real history.
-      if(!latest)return null;
+      else if(!latest)return null;
       else if(scheme==='linear'){
         // Linear progression (user's call 2026-09-11): the increment applies
         // every session, even when reps were missed. Reps and seconds carry
@@ -119,8 +209,17 @@
         estimated1RM=estimate1RM({w:latest.weight,r:latest.reps,rpe:latest.rpe});
         const targetReps=profile?.openTop?min:Math.max(min,max),rawTarget=estimated1RM/(1+targetReps/30);
         nextWeight=Math.max(0,Math.round(rawTarget*10)/10);nextReps=min;kind='range';
-        const week=Number(programConfig.currentWeek)||null,weekPrefix=config?.freeform?'This session is ':week?`Week ${week} is `:'This block is ';
+        const weekPrefix=config?.freeform?'This session is ':week?`Week ${week} is `:'This block is ';
         reason=`${weekPrefix}${programRangeLabel(profile)}; suggesting ${displayWeight(nextWeight)} ${weightUnit()} from your estimated 1RM of ${displayWeight(Math.round(estimated1RM))} ${weightUnit()} so the new rep target starts at a sensible load.`;
+        /* #250: a rebased target must never regress below the lifter's current
+           top set. When the computed load would drop (e.g. a high-RPE top set
+           rebased into a lower-rep range), hold the top set instead — the #79
+           no-change check below then suppresses the card, which is the honest
+           outcome: a top set above the RPE trigger earns no progression. */
+        if(nextWeight<latest.weight){
+          nextWeight=latest.weight;nextReps=latest.reps;kind='hold';
+          reason=`${weekPrefix}${programRangeLabel(profile)}, but the rebased load would drop below your ${displayWeight(latest.weight)} ${weightUnit()} top set — holding steady.`;
+        }
       } else if(latest.rpe!=null && latest.rpe<=threshold){
         if(mode==='time'){
           if(latest.seconds<timeMax){nextSeconds=Math.min(timeMax,Math.max(timeMin,latest.seconds+timeStep));kind='time';reason=`Top set was at or below RPE ${threshold}; add ${timeStep} seconds inside the ${timeMin}–${timeMax}s range.`;}
@@ -144,7 +243,7 @@
           : profile?.amrap ? weightSame : weightSame&&nextReps===latest.reps;
         if(noChange)return null;
       }
-      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog?.isoDate,sourceWorkout:latestLog?.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,freeform:!!config?.freeform,scheme,amrap:!!profile?.amrap};
+      return {exerciseId,latest,mode,nextWeight,nextReps,nextSeconds,kind,reason,estimated1RM,sourceDate:latestLog?.isoDate,sourceWorkout:latestLog?.name,range:mode==='time'?[timeMin,timeMax]:[min,max],timeStep,repsOnly,freeform:!!config?.freeform,scheme,amrap:!!profile?.amrap,pct:onermInfo?.pct??null,tmSource:onermInfo?.tmSource??null};
     }
 
     function suggestionCardMarkup(suggestion,index,interactive=true) {
@@ -152,18 +251,10 @@
       const formatTarget=(weight,performance)=>`${weight ? `${displayWeight(weight)} ${weightUnit()} · ` : ''}${performance} ${suggestion.mode==='time'?'sec':'reps'}`;
       const oldTarget=suggestion.latest?formatTarget(suggestion.latest.weight,suggestion.mode==='time'?suggestion.latest.seconds:suggestion.latest.reps):`1RM ${displayWeight(suggestion.estimated1RM)} ${weightUnit()}`;
       const nextTarget=suggestion.amrap&&suggestion.mode!=='time'?`${suggestion.nextWeight?`${displayWeight(suggestion.nextWeight)} ${weightUnit()} · `:''}AMRAP`:formatTarget(suggestion.nextWeight,suggestion.mode==='time'?suggestion.nextSeconds:suggestion.nextReps);
-      const label=suggestion.applied?'Applied ✓':suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='range'?(suggestion.freeform?'New range':'Week range'):suggestion.kind==='time'?'Time +':'Rep +';
+      const label=suggestion.applied?'Applied ✓':suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='onerm'?'%1RM':suggestion.kind==='deload'?'Deload':suggestion.kind==='range'?(suggestion.freeform?'New range':'Week range'):suggestion.kind==='time'?'Time +':'Rep +';
       // user 2026-09-11 (#44): cards stay lean — name, kind, and the target
       // change only. The reason/basis sentences were gratuitous.
-      return `<${interactive?'button':'div'} class="suggestion-card ${suggestion.applied?'applied':''}" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name">${escapeHtml(ex?.name||'Exercise')}<span>${label}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div></${interactive?'button':'div'}>`;
-    }
-
-    function renderProgressionPreview() {
-      const host=$('#progressionPreview'); if(!host)return;
-      const ids=[...new Set(workoutState.completed.flatMap(workout=>workout.exercises.map(item=>item.exerciseId)))];
-      const suggestions=ids.map(id=>progressionForExercise(id,progressionProfileForDraftItem({exerciseId:id}),{...progressionSetup})).filter(Boolean).slice(0,4);
-      const fallback='<div class="chart-empty">Complete workouts to generate progression targets.</div>';
-      host.innerHTML=`<div class="progression-preview-head"><div><h2 id="progressionPreviewTitle">Next-session suggestions</h2><p>Based on your completed history. Rep- and time-range progression use the same RPE trigger.</p></div></div>${suggestions.length?`<div class="suggestion-list">${suggestions.map((item,i)=>suggestionCardMarkup(item,i,false)).join('')}</div>`:fallback}<p class="progression-footnote">The engine never schedules a deload automatically.</p>`;
+      return `<${interactive?'button':'div'} class="suggestion-card ${suggestion.applied?'applied':''}" ${interactive?`type="button" data-demo-suggestion="${index}"`:''}><div class="suggestion-name"><span class="suggestion-exercise">${escapeHtml(ex?.name||'Exercise')}</span><span>${label}</span></div><div class="suggestion-change"><span>${oldTarget}</span><span>→</span><strong>${nextTarget}</strong></div></${interactive?'button':'div'}>`;
     }
 
     function progressionProfileForDraftItem(item) {
@@ -182,6 +273,10 @@
 
     function prepareDraftProgression(draft,programConfig) {
       if(!draft)return;
+      /* #148: editing a previously completed workout is history, not a plan —
+         no suggestion cards and no ghosted targets. Clear any stale
+         suggestions so nothing session-planning leaks into the edit. */
+      if(draft.editingId){draft.progressionSuggestions=[];draft.exercises.forEach(item=>{delete item.suggestedTarget;});return;}
       draft.progressionSuggestions=draft.exercises.map(item=>{
         // #48: the draft item carries a prescribed zone when it was copied from
         // a real workout (repeat) or a zoned template — the freestyle
@@ -207,6 +302,8 @@
 
     function renderWorkoutProgression() {
       const draft=workoutState.draft, box=$('#workoutProgression'), context=$('#workoutContext');
+      /* #148: never render suggestion cards while editing a completed workout. */
+      if(draft?.editingId){box.hidden=true;return;}
       const program=workoutState.activeProgram && draft?.programId===workoutState.activeProgram.id?workoutState.activeProgram:null;
       /* #68: the pill duplicates the workout name field when they match. The pill
          carries program context; the name field carries the name. Only show the

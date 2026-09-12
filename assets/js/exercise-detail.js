@@ -1,6 +1,7 @@
 
 /* ===== module: exercise-detail.js ===== */
     /** Calculates exercise PRs, history, similarity, and detail-view presentation. */
+    /* Module map (v1.006) — Key: openExercise(), renderHistory(), statsFor(), estimate1RM(), similarTo(). Depends on: catalog `exercises`, workoutState.completed, utilities (format/date/PR/chart helpers). */
     function estimate1RM(set) {
       // Use the logged load as-is; dumbbell entries are the combined total, not a per-hand value.
       const weight = Number(set.w);
@@ -19,10 +20,16 @@
        in place when a point is tapped — nothing is inserted or removed, so
        the chart can never jump around. */
     const CHART_W=360, CHART_H=210, CHART_L=8, CHART_R=12, CHART_T=12, CHART_B=30;
-    /* Progress metric toggle (user 2026-09-12): the exercise Progress headline
-       flips between Estimated 1RM and Heaviest weight, chart follows. Kept
-       across exercises for the session. */
+    /* Progress metric toggle (user 2026-09-12; #200 made it an explicit
+       segmented control): the exercise Progress chart flips between
+       Estimated 1RM and Heaviest weight. The headline keeps its tap/keyboard
+       toggle; the segmented control drives the same state. Kept across
+       exercises for the session. */
     let progressMetric='e1rm';
+    /* #200: tiny state contract for the toggle — pinning the mode mapping so
+       the control can never display a mode the chart isn't in. */
+    function isProgressMetric(m){return m==='e1rm'||m==='heaviest';}
+    function flipProgressMetric(m){return m==='heaviest'?'e1rm':'heaviest';}
     /* Nice-number ticks covering [min,max] for the gridlines — replaces the
        old max/min-only axis (which duplicated labels on flat data and left
        intermediate gridlines bare). */
@@ -62,21 +69,41 @@
       const aria=points.map(p=>`${p.label}: ${valueLabel(p.value)}`).join(', ');
       return `<svg viewBox="0 0 ${CHART_W} ${CHART_H}" role="img" aria-label="${escapeHtml(aria)}">${chartGrid(ticks,Y)}${bars}${hits}${chartXLabels(coords)}</svg>`;
     }
+    /* #165: same-day sessions share a date label — annotate each log with its
+       chronological ordinal for the day so charts and history read "Sep 12",
+       "Sep 12 (2)". Numbered oldest-first within each date, independent of
+       the caller's input order (ties keep input order; the sort is stable). */
+    function annotateSessionOrdinals(logs){
+      const counts={};
+      logs.slice().sort((a,b)=>{
+        if(a.isoDate!==b.isoDate)return a.isoDate<b.isoDate?-1:1;
+        const x=a.completedAt||'',y=b.completedAt||'';
+        return x<y?-1:x>y?1:0;
+      }).forEach(s=>{s.dayOrdinal=(counts[s.isoDate]=(counts[s.isoDate]||0)+1);});
+      return logs;
+    }
+    function ordinalDateLabel(session){
+      return session.dayOrdinal>1?`${session.date} (${session.dayOrdinal})`:session.date;
+    }
+    function ordinalShortLabel(session){
+      const short=String(session.date).replace(/, \d{4}/,'');
+      return session.dayOrdinal>1?`${short} (${session.dayOrdinal})`:short;
+    }
     /* #8: per-session e1RM + heaviest set + volume for one exercise, oldest session first. */
     function exerciseTrendData(exerciseId) {
-      const logs=getExerciseLogs(exerciseId).slice().reverse();
+      const logs=annotateSessionOrdinals(getExerciseLogs(exerciseId)).reverse();
       const e1rm=[], volume=[], heaviest=[];
       logs.forEach(session=>{
-        const shortLabel=String(session.date).replace(/, \d{4}/,'');
+        const label=ordinalDateLabel(session), shortLabel=ordinalShortLabel(session);
         const sets=session.sets.filter(s=>Number(s.w)>0&&Number(s.r)>0);
         if(sets.length){
-          e1rm.push({label:session.date,shortLabel,value:Math.round(Math.max(...sets.map(estimate1RM)))});
+          e1rm.push({label,shortLabel,value:Math.round(Math.max(...sets.map(estimate1RM)))});
           /* Heaviest set per session (user 2026-09-12): the Progress headline
              toggles between this and e1RM, so both series share sessions. */
-          heaviest.push({label:session.date,shortLabel,value:Math.max(...sets.map(s=>Number(s.w)))});
+          heaviest.push({label,shortLabel,value:Math.max(...sets.map(s=>Number(s.w)))});
         }
         const vol=session.sets.reduce((sum,s)=>sum+setVolume(s),0);
-        if(vol>0)volume.push({label:session.date,shortLabel,value:vol});
+        if(vol>0)volume.push({label,shortLabel,value:vol});
       });
       return {e1rm,volume,heaviest};
     }
@@ -162,20 +189,20 @@
     }
 
     function renderHistory(id) {
-      const logs = getExerciseLogs(id);
+      const logs = annotateSessionOrdinals(getExerciseLogs(id));
       $('#historyCount').textContent = logs.length ? `${logs.length} completed workout${logs.length===1?'':'s'}` : '';
       const toggle=$('#historyToggle'),list=$('#historyList'),label=$('#historyToggleLabel');
       /* Auto-collapsed (user 2026-09-12): a long set-by-set history dominated
          the page — it now starts collapsed behind a toggle. */
       if(toggle)toggle.hidden=!logs.length;
-      if(label)label.textContent=logs.length?`Show all ${logs.length} session${logs.length===1?'':'s'} · latest ${logs[0].date}`:'';
+      if(label)label.textContent=logs.length?`Show all ${logs.length} session${logs.length===1?'':'s'} · latest ${ordinalDateLabel(logs[0])}`:'';
       if(toggle)toggle.setAttribute('aria-expanded','false');
       if(list)list.hidden=logs.length>0;
       if(toggle)toggle.onclick=()=>{
         const open=list.hidden;
         list.hidden=!open;
         toggle.setAttribute('aria-expanded',String(open));
-        if(label)label.textContent=open?'Hide history':`Show all ${logs.length} session${logs.length===1?'':'s'} · latest ${logs[0].date}`;
+        if(label)label.textContent=open?'Hide history':`Show all ${logs.length} session${logs.length===1?'':'s'} · latest ${ordinalDateLabel(logs[0])}`;
       };
       $('#historyList').classList.toggle('is-empty', !logs.length);
       /* Prettier set rows (user 2026-09-12): one compact line per set —
@@ -193,7 +220,7 @@
       $('#historyList').innerHTML = logs.length ? logs.map(session => {
         const top = Math.round(Math.max(...session.sets.map(estimate1RM)));
         return `<div class="history-session">
-          <div class="session-head"><span class="session-date">${escapeHtml(session.date)}</span><span class="session-est">Best estimate ${displayWeight(top)} ${weightUnit()} · <button class="filter-clear" type="button" data-history-workout="${escapeHtml(session.workoutId)}">View workout</button></span></div>
+          <div class="session-head"><span class="session-date">${escapeHtml(ordinalDateLabel(session))}</span><span class="session-est">Best estimate ${displayWeight(top)} ${weightUnit()} · <button class="filter-clear" type="button" data-history-workout="${escapeHtml(session.workoutId)}">View workout</button></span></div>
           ${session.exerciseTags?.length?`<div class="exercise-tag-row">${session.exerciseTags.map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}</div>`:''}
           <div class="sets">${session.sets.map((s,i) => setRow(s,i,session)).join('')}</div>
         </div>`;
@@ -256,8 +283,8 @@
         <div class="stat"><span class="stat-label">PROJECTED 1RM</span><span class="stat-value">—</span><span class="stat-sub">Complete a weighted set to calculate it</span></div>
         <div class="stat"><span class="stat-label">HEAVIEST SET PR</span><span class="stat-value">—</span><span class="stat-sub">No completed sets yet</span></div>
         <div class="stat"><span class="stat-label">VOLUME LOGGED</span><span class="stat-value">0 sets</span><span class="stat-sub">No completed sets yet</span></div>`;
-      /* Phone QA 2026-09-11: exercise images removed from this page for now —
-         exerciseImageMap stays in the codebase for a future return. */
+      /* Phone QA 2026-09-11: exercise images removed from this page for now
+         (v1.007 deleted the ~120KB exerciseImageMap base64 data). */
       /* #125: exercise trends live here now (moved off Stats) — e1RM line
          plus volume-per-session bars. */
       const trendData=exerciseTrendData(id);
@@ -269,6 +296,20 @@
          the metric AND the line chart between Estimated 1RM and Heaviest
          weight. Dot-tap inspection keeps working — it listens on the svg,
          the toggle listens on the headline, so they never fight. */
+      /* #200 (user 2026-09-12): explicit 1RM | Heaviest segmented toggle — the
+         headline-tap flip was undiscoverable. Hidden when there is no metric
+         to switch (bodyweight exercises, or no completed sessions yet). */
+      const metricToggle=$('#progressMetricToggle');
+      function syncMetricToggle(){
+        if(!metricToggle)return;
+        metricToggle.style.display=(!isBodyweight&&trendData.e1rm.length)?'':'none';
+        metricToggle.querySelectorAll('[data-progress-metric]').forEach(btn=>{
+          btn.setAttribute('aria-pressed',String(btn.dataset.progressMetric===progressMetric));
+        });
+      }
+      if(metricToggle)metricToggle.querySelectorAll('[data-progress-metric]').forEach(btn=>{
+        btn.onclick=()=>{const mode=btn.dataset.progressMetric;if(isProgressMetric(mode)&&mode!==progressMetric){progressMetric=mode;paintProgressMetric();}};
+      });
       function paintProgressMetric(){
         const heavy=progressMetric==='heaviest';
         const points=heavy?trendData.heaviest:trendData.e1rm;
@@ -279,14 +320,16 @@
         head.setAttribute('role','button');
         head.setAttribute('tabindex','0');
         head.setAttribute('aria-label',heavy?'Show estimated 1RM':'Show heaviest weight');
-        const flip=()=>{progressMetric=heavy?'e1rm':'heaviest';paintProgressMetric();};
+        const flip=()=>{progressMetric=flipProgressMetric(progressMetric);paintProgressMetric();};
         head.addEventListener('click',flip);
         head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();flip();}});
-        if(progressNote)progressNote.textContent=`${heavy?'Heaviest weight':'Estimated 1RM'} and volume per session · tap the headline to switch metric · tap a point to inspect it`;
+        if(progressNote)progressNote.textContent=`${heavy?'Heaviest weight':'Estimated 1RM'} and volume per session · tap a point to inspect it`;
+        syncMetricToggle();
       }
       if(isBodyweight){
         progressHost.innerHTML='<div class="chart-empty">Bodyweight progress will use reps and added load from your workouts.</div>';
         if(progressNote)progressNote.textContent='Estimated 1RM and volume per session · tap a point to inspect it';
+        syncMetricToggle();
       }else if(trendData.e1rm.length){
         paintProgressMetric();
         /* #169: with exactly one session the chart is a single dot — the
@@ -296,6 +339,7 @@
       }else{
         progressHost.innerHTML='<div class="chart-empty">Complete a workout to start this chart.</div>';
         if(progressNote)progressNote.textContent='Estimated 1RM and volume per session · tap a point to inspect it';
+        syncMetricToggle();
       }
       const volumeHost=$('#exerciseVolumeChart');
       volumeHost.innerHTML=trendData.volume.length
@@ -303,7 +347,9 @@
         : '';
       wireChartTaps(volumeHost.querySelector('.chart-tappable'),trendData.volume,volLabel);
       renderHistory(id);
-      $('#noteCard').innerHTML = `No notes for this movement yet.<span class="note-meta">Exercise-specific note</span>`;
+      /* #202 (user 2026-09-12): the exercise-specific Notes card is removed
+         from this page for now (may return as a future feature). Per-exercise
+         notes inside workouts are untouched. */
       /* #125 (user 2026-09-11): the standalone Movement card is gone — its
          force/mechanic/primary/secondary info lives in the muscle-map modal
          (wired below). Custom-exercise Edit joins Delete in the bottom row. */

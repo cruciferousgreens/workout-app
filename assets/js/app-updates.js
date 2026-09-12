@@ -5,6 +5,7 @@
         a manual "Check for updates" button in Settings → About, plus a quiet
         auto-check whenever the app is foregrounded. Never force-reloads — the
         user confirms, and a live workout draft always defers the prompt. */
+        /* Module map (v1.006) — Key: armUpdateWatch(), maybeAutoUpdateCheck(), offerUpdateRefresh(), waitForWorkerState(). Depends on: navigator.serviceWorker only; no app-module deps. */
 
     const AUTO_UPDATE_CHECK_MS = 10 * 60 * 1000;
     const UPDATE_ACTIVATION_TIMEOUT_MS = 20000;

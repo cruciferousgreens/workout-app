@@ -44,6 +44,7 @@
      *  noteTombstone, tombstoneAllForSync, pushDeleteAllRemote, isTombstoned,
      *  liveItems).
      */
+     /* Module map (v1.006) — Key: scheduleSyncPush(), mergeCollectionKey()/mergeStamp(), stampChangedItems(), noteTombstone()/liveItems(), pushDeleteAllRemote(). Depends on: sync-adapter (Supabase client), persistence SYNCABLE_KEYS, state shapes. */
     var Sync = window.Sync = window.Sync || {};
     (function(){
       'use strict';

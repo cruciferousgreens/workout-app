@@ -7,6 +7,7 @@
      *  localStorage and magic-link redirects are detected by default.
      *  (The publishable key ships in the app by design.)
      */
+     /* Module map (v1.006) — Key: getSupabase(), signedInUser(), isNetworkError(), resetSupabaseUnavailable(). Depends on: the Supabase CDN build (dynamic import); degrades to local-only offline. */
     var Sync = window.Sync = window.Sync || {};
     (function(){
       'use strict';

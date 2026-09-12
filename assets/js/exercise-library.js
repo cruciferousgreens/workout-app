@@ -1,6 +1,7 @@
 
 /* ===== module: exercise-library.js ===== */
     /** Renders searchable exercise cards and the multi-muscle AND filter. */
+    /* Module map (v1.006) — Key: renderLibrary(), populateFilters(), filteredExercises(), exerciseCard(), toggleFavorite(). Depends on: catalog, custom-exercises, state (library filters), utilities. */
     /* #99 H2: favorites/custom toggles are persistent DOM nodes — bind their
        listeners exactly once. populateFilters() re-runs after every
        custom-exercise save/delete, and re-binding would stack N handlers

@@ -5,6 +5,7 @@
      *  Auth actions live in sync-auth.js; this file only presents them in the
      *  DOM and owns the account-related DOM ids.
      */
+     /* Module map (v1.006) — Key: renderAccount(), wireAccountUI(), tickMagicLinkCooldown(), showSyncError(), syncToast(). Depends on: sync-auth.js actions, sync-engine status, the Sync namespace. */
     var Sync = window.Sync = window.Sync || {};
     (function(){
       'use strict';

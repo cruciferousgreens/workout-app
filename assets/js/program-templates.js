@@ -1,6 +1,7 @@
 
 /* ===== module: program-templates.js ===== */
     /** Defines permanent built-in program templates and their reusable workout templates. */
+    /* Module map (v1.006) — Key: programTemplateExercise(), buildStrongLiftsWorkoutTemplates(), cloneWorkoutTemplates(). Depends on: workout-editor factories (newSet()/newExerciseItem() — runtime only; this file loads first), state.templates (populated at bootstrap). */
     function programTemplateExercise(exerciseId, setCount, reps, exerciseTags = ['Straight sets']) {
       return newExerciseItem({
         exerciseId,

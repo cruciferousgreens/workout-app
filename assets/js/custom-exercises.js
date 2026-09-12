@@ -1,6 +1,7 @@
 
 /* ===== module: custom-exercises.js ===== */
     /** Creates, edits, and deletes custom exercises (persisted to the library, synced across devices) with pill controls. */
+    /* Module map (v1.006) — Key: openCustomDialog(), closeCustomDialog(), deleteCustomExercise(), renderCustomPills(), customOptions(). Depends on: state.customExercises, exercise-library.populateFilters(), persistence (schedulePersist()). */
     function customOptions() {
       return {
         muscles:allMuscleOptions(),

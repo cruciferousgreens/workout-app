@@ -2,6 +2,270 @@
 
 Newest first. Only user-facing milestones.
 
+## v1.1 (2026-09-12)
+First minor release after v1.000. Highlights since v1.000: short share links for workouts (app.cruciferousgreens.com/s/…), in-modal sign-in to share, Rosé theme, the review-sets dialog (Finish anyway / Delete N unfinished sets / Keep editing), completed sets keep their other fields frozen while the checkbox stays tappable to uncheck, saving a completed workout as a template now offers Start, opaque PR toast, program sharing temporarily removed (returns with working short links), a progression guard so rep-range changes can't recommend less than the current top-set weight, the new app icon, and the home share card. Full detail in the v1.001–v1.026 entries below.
+
+## v1.026 (2026-09-12)
+- #242 (corrected): a completed set's checkbox is tappable again — tapping it un-checks (uncompletes) the set. The set's other fields (weight, reps, RPE) stay frozen while it is complete.
+
+## v1.025 (2026-09-12)
+- #240: after "Save as template" on a completed workout, the completed view's button now becomes "Start" — it launches the new template right away, and reopening the workout still offers Start instead of saving another copy.
+- #242: a completed set's checkbox is no longer tappable — it shows checked and disabled, and the set's inputs stay frozen. To deliberately edit a completed set, tap its set number: that un-checks the set and restores editing.
+- #241: the PR toast now uses an opaque gold-tinted background so it stays readable over the app.
+- #243: the "Sign in to share" helper note renders in muted text (it was picking up a red accent under the Rosé theme).
+- Review sets (follow-up to #199; corrected per phone QA): the dialog always shows three actions when sets need review — primary "Finish anyway", secondary "Delete N unfinished sets" (with the count; deletes the unfinished sets and finishes in one tap), and "Keep editing" as the quiet text link last. The explanation copy is short and plain ("14 sets are missing reps, seconds, or weight.") with no dropped-sets lecture.
+- #256: program sharing is temporarily removed — no Share action on the active program or program workouts (programs still can't mint short links). Workout sharing is unchanged.
+
+## v1.024 (2026-09-12)
+- #250: progression targets can no longer regress. When a rep-range change rebases the target from estimated 1RM, the suggested weight is floored at the lifter's current top set — a top set above the RPE trigger now yields no card instead of a lighter "New range" suggestion (e.g. 245x1 @ RPE 9 no longer suggests 224 lb).
+- Settings → About: removed the "Release notes" link (user direction); version and Last-updated text stay.
+
+## v1.023 (2026-09-12)
+- #199: the "Review sets" dialog now explains the situation in a plain sentence ("8 sets are missing reps, seconds, or weight. Finish without them — they'll be dropped, nothing is saved half-filled — or keep editing.") and gives the actions a clear visual hierarchy: exactly one primary button (the recommended finish — the one that destroys nothing entered), the other finishing action as a secondary button, and "Keep editing" as a quiet text link. "Finish anyway" is flagged with danger styling whenever it would drop sets with user-entered values, and its label stays honest when empty sets are mixed in ("drop 3 sets", not "3 incomplete").
+- #198: confirmed fixed — deleting a live-workout set no longer flashes, jumps the scroll, or changes exercise expansion (the v1.015 surgical-delete replaced the old full list rebuild; the user's report predated that fix). Added a regression test pinning the delete path so a full re-render can't sneak back in.
+- #145 (live-workout variant): tapping "+ Add set" in a live workout no longer jumps the scroll. It was the same full-rebuild mechanism as the old #198 — the new set's row is now appended in place with identical markup and only the new row's listeners wired.
+
+## v1.022 (2026-09-12)
+- #211: link-preview metadata, static tier. Shared links now preview with the headline "Cruciferous Greens Workout — 800+ exercises, free forever" (matching the approved share-card copy) and the approved home share card image at an absolute prod URL; a `<meta name="description">` was added in sync with og:description. Per-share workout/program names still need a server piece — tracked separately for after prod.
+
+## v1.021 (2026-09-12)
+- #222: the Rosé theme works again. A leftover stray `}` from an earlier cleanup was silently killing the whole rose palette — tapping Rosé now turns the app's accents rose as intended.
+- #218: live-workout set inputs now render their values bold in the exercise-name shade, and the blinking text caret is gone from the numeric weight/reps/RPE fields. Placeholders stay light.
+- #224: the inline sign-in form in the "Sign in to share" modal has breathing room — the "Email me a code" / "Sign in" pills no longer sit jammed against the fields above them.
+- #225: the share-info step now leads with "Copy link" (primary), then "Share…" with the share icon, then "Done" as a quiet single-line text link.
+- #226: the "Share link copied." toast now appears above the share modal instead of hiding underneath it.
+
+## v1.020 (2026-09-12)
+- #215: the "Sign in to share" prompt is now a self-contained flow inside one modal — no more trip to Settings. "Sign in" is the first, primary button; tapping it reveals the sign-in form right in the modal (email field + "Email me a code", reusing the Settings card's magic-link/OTP logic), including the code step. Once signed in, the modal mints the share (server short link first, long-link fallback) and shows the link with Copy link / Share… / Done — all without leaving the modal. Dismissing early mints nothing; sign-in errors show inline with a retry.
+
+## v1.019 (2026-09-12)
+- #210: saved workouts can now tag sets. In the saved-workout editor, tapping a set number opens the tag popup (warmup, dropset, custom tags, etc.), tagged sets get the same accent as live workouts, tags persist with the template, and starting the workout carries them into the live sets. Deleting a global tag also removes it from saved templates.
+- #211: link-preview metadata fixed (static). Homepage shares now preview with the "Cruciferous Greens" headline, the approved share card image, and a proper description on iMessage/X/etc. Dynamic per-share workout/program names still need a server piece — tracked separately.
+- #212/#213/#214: share landings always open as a full page (no modal), even while a live workout draft is open — the draft stays intact underneath and is restored on dismiss. New layout per user feedback: compact bookmark (save) + play (start) icon buttons sit in the header next to the ×, one tap away without scrolling; the full descriptive buttons live at the bottom of the landing in the approved pattern — big primary pill + green text link + quiet grey note. Signed-in workout landing: "Add to my library" leads, "or start the workout" secondary; signed-out: "Start workout" leads, "or just save it to my library" secondary; program landing: "Add to my library" only, with a note that programs open per-workout. The corner primary pill is gone.
+- #209 follow-up: the delete × on each set row in the saved-workout editor is now danger red (the actual control uses `.builder-x`, not the `.rule-remove` class pinned in v1.018).
+
+## v1.018 (2026-09-12)
+- #209: the delete × on each exercise in the saved-workout editor now renders in danger red (color + ring), matching the app's destructive-control convention. Visual only — behavior unchanged.
+
+## v1.017 (2026-09-12)
+- #206: the %1RM progression-defaults block in Settings no longer renders garbled — the notched-label CSS was catching every span inside a field, floating the inputs over truncated labels ("LT", "TY DEFAULT", "0 = NO SCHEDULED DELOADS."). The % of 1RM / deload rows now use the same clean label-above-input pattern as the other settings fields, and the notch rule only targets the label. The program-builder's %1RM rows got the same treatment.
+- #206 follow-up: "Deload every N weeks" now explains itself — the help reads "E.g. 4 = every 4th week is a deload. 0 = off." (in Settings and the program builder).
+- #207: sharing now requires an account. Tapping Share while signed out shows a short "Sign in to share" prompt (Sign in / Not now) instead of minting a link; the Sign in button lands on Settings → Account with the email field focused. Signed-in sharing is unchanged — server short link first, long link fallback. Recipient-side link opening is untouched.
+- #207 drive-by: fixed a ReferenceError in the no-deflate share fallback — `SHARE_LEGACY_VERSION` is module-scoped inside share-codec.js and invisible to share.js, so the v1 path broke on browsers without CompressionStream. The version is now inline with a comment.
+- Filed, not in this batch: #201 (hide the progress chart until 2+ sessions), #204 (exercise-history layout polish pass).
+
+## v1.016 (2026-09-12)
+- #205: in Settings → Progression defaults, tapping a Progression mode pill now shows only that mode's one-paragraph description (the old combined block described all three at once), and swapping descriptions no longer nudges the scroll position.
+
+## v1.015 (2026-09-12)
+- #197: saved-workout exercise rows are full-width and uniform — the detail rows no longer shrink-wrap to ragged widths.
+- #198: deleting a set mid-workout no longer flashes, jumps the scroll, or changes exercise expansion — only the deleted row is removed; surviving sets are renumbered in place and everything else on the page is untouched.
+- #199: the Review-sets dialog now always offers a way out — "Finish anyway" appears whenever any set is invalid (not just when all are empty) and says exactly what it drops; "Delete N empty sets" still only touches fully-empty sets, and exactly one dialog is ever shown. Partial values are dropped, never saved half-filled.
+- #200: the exercise Progress card now shows an explicit "1RM | Heaviest" segmented toggle — the headline tap still flips the metric, but the control makes the toggle discoverable.
+- #202: removed the "Notes" card from the exercise detail page (per-exercise notes inside workouts are untouched; it may return as a future feature).
+- #203: "Similar exercises" now sits below "How to" on the exercise detail page.
+- #177 follow-up: any `/s/<segment>` route — malformed, unknown, or corrupt — now shows the friendly invalid-link message instead of silently opening Home.
+- Filed, not in this batch: #201 (hide the progress chart until 2+ sessions), #204 (exercise-history layout polish pass).
+
+## v1.014 (2026-09-12)
+- Server short links for shares (#177): when signed in, sharing a workout or program now mints a short `https://app.cruciferousgreens.com/s/<slug>` link backed by a new `share_links` table (the SQL migration ships in `supabase/migrations/` and is run separately); signed-out sharing — and any failure — keeps the existing long links, so sharing never breaks. Opening a short link decodes through the same v2 path and lands on the same share preview, and a `404.html` fallback makes `/s/<slug>` work on static hosting.
+
+## v1.013 (2026-09-12)
+- New app icon (user-approved): the Ballpark-style icon — diagonal mowed-grass stripes, white banner, cream medallion with the leafy-green mark and a BETA ribbon — now serves as the app icon, apple-touch-icon, and browser favicon (192/512/180 px generated from the approved artwork).
+- New home link share card (user-approved): shared links now preview with the branded home card — "Cruciferous Greens · Workout Tracker" with the 800+ exercises / FREE-forever tiles and the anatomical muscle heat map — via absolute prod URLs.
+
+## v1.012 (2026-09-12)
+- #187: the logs list now opens over a live workout — the draft keeps running untouched underneath, and backing out (chevron or the Live chip) returns to the editor with the draft intact. Bottom-tab taps still land on the start screen with the Continue card.
+- #192: adding an exercise mid-workout no longer snaps the viewport to the new card — the picker restores the exact scroll position from when it opened.
+- #194: bodyweight work now lights the muscle map — muscles with no dedicated SVG region (adductors, abductors, middle back, neck) map to the closest region, and blind spots no longer list muscles that got bodyweight sets.
+- #195: the At-a-glance Workouts card is now tappable and opens the logs list filtered to the selected period.
+- #196: workout home with no program — the "Next in program" card is gone; the blank-workout card becomes the highlighted hero card at the top, a "Create a program" card (›) takes its old slot, and the Repeat last card only appears once there's a completed workout.
+
+
+## v1.011 (2026-09-12)
+- Removed the chevron from the "Logs" top-bar title (user feedback: didn't fit the design and the title-tap is a shortcut, not navigation).
+
+
+## v1.010
+
+- **Deleting a workout from the logs list keeps you on the logs list** (#188).
+  The delete confirmation used to drop you on the workout home screen no
+  matter where you started; now it returns to the logs when you came from
+  there. Deleting from anywhere else behaves as before.
+- **One confirmation when finishing with empty sets** (#189). Tapping Finish
+  with empty sets showed the Review-sets dialog, and choosing "Finish and
+  delete empty sets" could pop the same dialog up a second time for the sets
+  that were left. Now deleting the empties finishes directly when everything
+  remaining has valid values — the dialog only reappears if a set still has
+  genuinely missing values that need your eyes.
+
+## v1.009
+
+- **Completed sets freeze** — checking a set now locks its weight, reps,
+  seconds, RPE, and tags. To change a value, un-check the set first; the
+  checkbox and delete stay available. Applying set 1 to all no longer touches
+  completed sets.
+
+## v1.008
+
+- **Account buttons fixed** — a build regression had left every account
+  control (Email me a code, verify code, sign out, sync now) unwired; boot
+  now starts sync again.
+- **Cleaner Logs page** — the top header reads "Logs" and the duplicate
+  "Workout logs" subheader is gone.
+- **Shared links for new users** — opening a shared workout link without an
+  account now shows a Start workout action in the corner instead of a dead-end
+  ×; already-open links still pop the modal with the open-or-save choice.
+- **Smarter workout imports** — generic names like Deadlift, Squat, Bench,
+  and OHP map straight to their barbell exercises, and ambiguous names like
+  Lateral Raise pick the first database variant instead of asking.
+- **Linear progression confirmed** — it stays selectable per program and in
+  Settings defaults; RPE double progression remains the default.
+- **Quieter empty states** — shorter, friendlier placeholder text across
+  Home, the library, saved workouts, exercise history, and programs.
+
+## v1.007
+
+- **Harmonized delete color** — the swipe-to-delete red is now mixed toward
+  each theme's accent instead of a flat danger red, so it reads destructive
+  without clashing with the theme.
+- **Consistent buttons and labels** — buttons now follow three sanctioned
+  styles (pill CTAs, 14px rounded dialog/tool buttons, toggles), and tiny
+  labels across the app use exactly two sizes, so nothing looks off-scale.
+- **Toasts sit higher** — success, error, and PR toasts now float clearly
+  above the bottom tab bar instead of hugging it.
+- **Bodyweight work lights the muscle map** — sets with no added weight now
+  highlight their muscles on the Home and Stats maps (volume totals are
+  unchanged; bodyweight volume stays out of the lb counts).
+- **Share cards** — shared workout links now show a branded preview card when
+  pasted into messages.
+- **No more double dot** — tapping the "Live" chip no longer flashes two
+  dots while the dot moves to the title.
+- **Under-the-hood cleanup** — deleted ~120KB of unused exercise-image data
+  and other dead code, shrinking the app.
+
+## v1.006
+
+- **Under-the-hood: code documentation** — every module in the app now carries
+  a header describing what it owns and what it depends on, and the tricky
+  parts (progression engine, sync merging, share links, imports) got inline
+  explanations. There's also a new `docs/ARCHITECTURE.md` one-pager covering
+  how the app is layered, how sync merging works, and how builds ship. Nothing
+  looks different; this is for the humans who maintain the app.
+
+## v1.005
+
+- **Under-the-hood: automated tests** — the app now carries its own test
+  suite (119 checks) covering workout math, progression suggestions, sync
+  merging, share links, and data imports. Nothing looks different; it just
+  means regressions get caught by the build before they can reach your phone.
+
+## v1.004
+
+- **Tighter copy everywhere** — helper text across the app says the same thing
+  in fewer words: rep-range scope, PR empty states, import, share notes, set
+  prompts, program session notes, and the delete-all confirm (now one sentence).
+- **Error toasts are visible** — error messages now get the red treatment
+  instead of looking like a regular toast.
+- **Stat cards pluralize correctly** — "1 Workout" and "1 Set" instead of
+  "1 Workouts" / "1 Sets".
+- **Workout focus options match the RPE style** — square option boxes instead
+  of pills, consistent with the RPE threshold picker.
+- **The Log title shows it's tappable** — a chevron now marks the title button
+  that jumps to the full workout log list.
+- **Set rows can't overlap on phone** (#183) — the check + delete buttons get
+  a full-width action column when swipe-delete is off, so they never collide.
+- **Long exercise names stay on their card** — suggestion cards ellipsize the
+  name instead of pushing the kind pill off-screen.
+- **Dialog buttons in a consistent order** — safe action first, destructive
+  action last (update prompt, focus confirm, review-sets).
+- **Program cover shows the real session count** — no more hardcoded "three
+  sessions per week".
+
+## v1.003
+
+- **Swap an exercise without losing your sets** (#142) — Exercise options now
+  has "Swap exercise": pick a replacement from the library and the set
+  structure (counts, entered values, tags) carries over. The new movement
+  gets a fresh prescription and its progression suggestions re-run.
+- **Finish anyway** (#178) — when every unfinished set is completely blank,
+  the review dialog offers "Finish anyway": it drops the empty sets, finishes
+  the workout, and marks the log "Finished with unlogged sets." It never
+  appears when a set has partial values — those still need a fix, so nothing
+  you typed can silently become empty.
+- **Add past sessions to a program** (#64) — the add-workout dialog on a
+  program now has Saved / Past sessions tabs. Pulling in a past session
+  copies its exercises, set counts, rep/time ranges, and progression rules
+  (last session's numbers become targets, the way "save as template" already
+  worked).
+- **Same-day sessions are distinguishable** (#165) — two sessions in one day
+  now read "Sep 12" and "Sep 12 (2)" across charts, tooltips, and history.
+- **Clearer dumbbell logging** (#146) — dumbbell exercises label the weight
+  column TOTAL and show a live "per-hand × 2 = total" readout, so it's
+  obvious the number is both dumbbells combined. Entered values are untouched.
+- **Tapping exercises takes you somewhere** (#181) — exercise rows in saved
+  workouts and program workouts now open the exercise detail page, and Back
+  returns you to exactly where you were.
+- **New muscles to pick** (#136) — rhomboids and front/side/rear delts (plus
+  common aliases) are now selectable muscles for custom exercises, and the
+  body heatmap lights up for them.
+- **Favorites first in the exercise picker** (#144) — favorites lead the
+  browse list, then recents, then everything else; search still ranks by
+  relevance.
+- **The picker tells you what to do** (#167) — a live hint under the picker
+  title reads "Tap to add · N selected", or "Tap an exercise to swap it in"
+  when swapping.
+- **New exercises don't lose your place** (#143) — adding exercises
+  mid-workout now lands you on the newly added card, expanded.
+- **Saved workouts open in the right place** (#135) — opening a saved
+  workout always lands on the Workout tab first, so the header and tab can
+  never disagree about where you are.
+- **Program save is explicit** (#173) — program setup says plainly that
+  nothing saves until you tap save; the edit heading reads "Edit your active
+  program."
+- **No ghost suggestions while editing history** (#148) — progression
+  suggestions and their explanations stay hidden while you're editing a past
+  workout.
+- **Share landing cleanup** (#179) — opening a shared link now says what
+  happened, with one clear primary action instead of two competing buttons,
+  and no dead space under the card.
+- **Heatmap hugs its content** (#182) — the muscle heatmap no longer leaves
+  a big empty gap before the legend.
+- **Bigger delete targets on sets** (#94) — the inline set-delete button is
+  now a real 44px tap target that can't overlap the complete checkbox.
+- **Calmer card animation** (#88) — exercise cards still expand smoothly but
+  collapse instantly; reduced-motion users get the instant toggle both ways.
+- **Overflow fix** (#145) — action button rows now wrap instead of spilling
+  off the phone screen.
+
+## v1.002
+
+- **Smarter workout imports** — when you import a spreadsheet of workouts,
+  the app now recognizes more exercise names on its own (things like
+  "Bicep curl" or "Deadlift" map to the right library exercise instead of
+  asking you). Anything it isn't sure about, it still asks — and now you
+  can point an unmatched exercise at an existing one from your library
+  instead of only creating a new custom entry.
+- **Skip really skips** — choosing "Skip" for an exercise during import now
+  actually leaves it out, even when that exercise shows up in more than one
+  workout in the file.
+
+## v1.001
+
+- **%1RM programming is back** — programs and exercises can run on percent
+  of 1RM again: set a default percent per program (or per week with the
+  optional weekly % wave), a training max per exercise, and each session's
+  load is computed from the percent, snapped to plates. When no training
+  max is entered, the engine uses your best estimated 1RM from same-zone
+  top sets and says so.
+- **Scheduled deloads** — programs can schedule a deload every N weeks at
+  a chosen intensity, or flag individual weeks in the % wave panel. Deload
+  weeks are marked on the program cover and the engine reduces the
+  prescription instead of progressing it. The engine still never deloads
+  on its own — only weeks you schedule.
+- Share links now carry the %1RM settings (scheme, percent, training max)
+  so a shared program keeps its programming.
+
 ## v1.000
 
 - **Your numbers are right now** — a full pass over wrong-number bugs:

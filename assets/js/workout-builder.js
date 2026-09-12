@@ -1,6 +1,7 @@
 
 /* ===== module: workout-builder.js ===== */
     /** Builds reusable workouts from the library and keeps exercise-level configuration intact. */
+    /* Module map (v1.006) — Key: renderExercisePicker(), openTemplateBuilder(), startExerciseSwap()/performExerciseSwap(), cloneTemplateExercises(). Depends on: catalog, workout-editor factories, progression defaults, state picker state. */
     /* Picker-scoped filters: the add-exercise dialog carries the Exercises tab's
        search + filter interface (user 2026-09-10). Separate from the library's
        filters; reset every time the dialog opens. */
@@ -20,7 +21,12 @@
        top only shows these, never exercises already in the workout (user
        2026-09-11). Reset every time the dialog opens. */
     let pickerSessionAdded=new Set();
-    function resetPickerSession(){pickerSessionAdded=new Set();}
+    function resetPickerSession(){pickerSessionAdded=new Set();workoutState.pickerSwapUid=null;}
+    /* #192 (user 2026-09-12): where the viewport goes when the exercise
+       picker closes after adding exercises — the exact scroll position from
+       when the picker opened, never a snap to the new card. Pure so tests
+       can pin the rule. */
+    function exercisePickerCloseScrollY(){return workoutState.pickerScrollY||0;}
     function populatePickerFilters(){
       const muscles=allMuscleOptions();
       const equipment=[...new Set(exercises.map(x=>x.equipment).filter(Boolean))].sort();
@@ -41,6 +47,9 @@
       const panel=$('#pickerFilterPanel');panel.classList.remove('open');
       $('#pickerFilterToggle').setAttribute('aria-expanded','false');
     }
+    /* Deep copy of template exercises for a new live session: carries targets over,
+       drops logged values and completion marks (see cloneSetFields modes in
+       utilities.js). */
     function cloneTemplateExercises(rows){return (rows||[]).map(item=>cloneExerciseItem(item,'fromTemplate',{trackingFallback:null,emptyDefault:true}));}
     /* #74: edit a saved template in the builder. Live-mutates the template's
        exercises directly (no draft involved). */
@@ -58,6 +67,50 @@
       requestAnimationFrame(()=>$('#exercisePickerSearch').focus());
     }
     function pickerCollection(){const mode=workoutState.pickerMode;if(mode==='template')return pickerTemplate()?.exercises||[];return workoutState.draft?.exercises||[];}
+    /* #142: swap one exercise for another inside a workout (live log or
+       saved-workout builder). The picker opens in swap mode; the chosen
+       replacement keeps the original's set structure (counts + entered
+       values + tags) while its prescription resets to the new movement's
+       defaults and progression suggestions re-run for the replacement. */
+    function startExerciseSwap(uid,mode){
+      workoutState.pickerMode=mode;
+      if(mode==='template'&&state.savedBuilder)workoutState.templateEditTarget=state.savedBuilder.id;
+      const item=pickerCollection().find(x=>x.uid===uid);if(!item)return;
+      const ex=exercises.find(e=>e.id===item.exerciseId);
+      $('#exercisePickerTitle').textContent='Swap exercise';
+      $('#exercisePickerTitle').nextElementSibling.textContent=`Choose a replacement for ${ex?.name||'this exercise'} \u2014 its sets carry over.`;
+      $('#exercisePickerSearch').value='';preparePickerFilters();resetPickerSession();
+      workoutState.pickerSwapUid=uid;
+      renderExercisePicker();$('#exercisePickerDialog').showModal();
+      requestAnimationFrame(()=>$('#exercisePickerSearch').focus());
+    }
+    function performExerciseSwap(newExerciseId){
+      const uid=workoutState.pickerSwapUid;workoutState.pickerSwapUid=null;
+      const templateMode=workoutState.pickerMode==='template';
+      const item=pickerCollection().find(x=>x.uid===uid);
+      const ex=exercises.find(e=>e.id===newExerciseId);
+      let swapped=false;
+      if(item&&ex&&item.exerciseId!==newExerciseId){
+        const range=templateMode?builderPickerDefaultRange():progressionSetup.defaultRange;
+        item.exerciseId=newExerciseId;
+        /* Sets carry over untouched. The prescription resets to the new
+           movement's defaults — a stale range/tracking would show the wrong
+           inputs (e.g. rep ranges kept for a time-based exercise). */
+        item.tracking=ex.tracking||'reps';
+        item.progression=Object.assign(defaultExerciseProgression({mode:ex.tracking||'reps',min:range.min,max:range.max,openTop:range.openTop,amrap:range.amrap,custom:range.custom}),range.preset?{preset:range.preset}:null);
+        item.suggestedTarget=null;
+        if(templateMode)schedulePersist();
+        else{
+          prepareDraftProgression(workoutState.draft, workoutState.activeProgram?.id===workoutState.draft.programId?workoutState.activeProgram.progression:freeformProgressionConfig());
+          markDraftSaved();
+        }
+        swapped=true;
+      }
+      $('#exercisePickerDialog').close();
+      if(templateMode)renderPickerRules();
+      else{renderWorkoutExercises();renderWorkoutProgression();}
+      if(swapped)showToast(`Swapped to ${ex.name} \u2014 sets carried over.`);
+    }
     /* Builder edit mode for a program workout (user 2026-09-12): exercises
        added here default to the program's rep range for the current week, not
        the global default — the program's prescription wins until configured. */
@@ -216,16 +269,32 @@
       const q=normalize($('#exercisePickerSearch').value);
       const collection=pickerCollection();
       const chosen=new Set(collection.map(item=>item.exerciseId));
+      /* #142: in swap mode the row being replaced reads as the current one. */
+      const swapMode=!!workoutState.pickerSwapUid;
+      const swapFromId=swapMode?((collection.find(x=>x.uid===workoutState.pickerSwapUid)||{}).exerciseId||null):null;
       const matches = q ? rankedExerciseMatches($('#exercisePickerSearch').value,exercises.length).filter(pickerFilterMatch).slice(0,80) : exercises.filter(pickerFilterMatch).slice(0,80);
-      /* Recents first, favorites pinned to the top of recents (user 2026-09-10). Skipped while searching or filtering. */
-      const recentIds = (q||pickerFilterActive()) ? [] : recentExerciseIds().filter(id => matches.some(ex => ex.id === id))
-        .sort((a, b) => Number(state.favorites.has(b)) - Number(state.favorites.has(a))).slice(0,5);
+      /* #144: favorites sort first in the picker. Search already floats favorites
+         within each relevance tier (#155 — a favorite never outranks an
+         exact/prefix match); in browse and filtered browse, favorites pin to
+         the very top, ahead of the recents row. Recents are skipped while
+         searching or filtering. */
+      const favRows = q ? [] : matches.filter(ex => state.favorites.has(ex.id));
+      const favSet = new Set(favRows.map(ex => ex.id));
+      const recentIds = (q||pickerFilterActive()) ? [] : recentExerciseIds().filter(id => !favSet.has(id) && matches.some(ex => ex.id === id)).slice(0,5);
       const recentSet = new Set(recentIds);
-      const rows = [...recentIds.map(id => matches.find(ex => ex.id === id)), ...matches.filter(ex => !recentSet.has(ex.id))].filter(Boolean);
+      const rows = [...favRows, ...recentIds.map(id => matches.find(ex => ex.id === id)), ...matches.filter(ex => !favSet.has(ex.id) && !recentSet.has(ex.id))].filter(Boolean);
       const clockIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
-      list.innerHTML = rows.length ? rows.map((ex,index) => `${index === 0 && recentIds.length ? `<div class="picker-section-label">${clockIcon}<span>RECENT</span></div>` : ''}${index === recentIds.length && recentIds.length && rows.length > recentIds.length ? '<div class="picker-section-label">ALL EXERCISES</div>' : ''}<button class="picker-item" type="button" data-id="${escapeHtml(ex.id)}" aria-pressed="${chosen.has(ex.id)}"><span><strong>${escapeHtml(ex.name)}</strong><span>${escapeHtml(ex.primary.join(', ') || 'Unspecified muscle')} · ${escapeHtml(ex.equipment || 'No equipment')}</span></span><span class="picker-state">${chosen.has(ex.id) ? '✓' : '+'}</span></button>`).join('') : '<div class="dialog-empty">No matching exercises.</div>';
+      const starIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9z"/></svg>';
+      const sectionBreaks = [];
+      if (favRows.length) sectionBreaks.push([0, `${starIcon}<span>FAVORITES</span>`]);
+      if (recentIds.length) sectionBreaks.push([favRows.length, `${clockIcon}<span>RECENT</span>`]);
+      if ((favRows.length || recentIds.length) && rows.length > favRows.length + recentIds.length) sectionBreaks.push([favRows.length + recentIds.length, '<span>ALL EXERCISES</span>']);
+      list.innerHTML = rows.length ? rows.map((ex,index) => {const brk = sectionBreaks.find(([at]) => at === index);return `${brk ? `<div class="picker-section-label">${brk[1]}</div>` : ''}<button class="picker-item" type="button" data-id="${escapeHtml(ex.id)}" aria-pressed="${swapMode?String(ex.id===swapFromId):chosen.has(ex.id)}"><span><strong>${escapeHtml(ex.name)}</strong><span>${escapeHtml(ex.primary.join(', ') || 'Unspecified muscle')} · ${escapeHtml(ex.equipment || 'No equipment')}</span></span><span class="picker-state">${swapMode?(ex.id===swapFromId?'✓':'→'):(chosen.has(ex.id) ? '✓' : '+')}</span></button>`;}).join('') : '<div class="dialog-empty">No matching exercises.</div>';
       if(list)list.scrollTop=prevScroll;
+      updatePickerHint();
       document.querySelectorAll('#exercisePickerList .picker-item').forEach(button => button.addEventListener('click', () => {
+        /* #142: swap mode — one tap replaces the exercise, no add/remove toggle. */
+        if(workoutState.pickerSwapUid){performExerciseSwap(button.dataset.id);return;}
         let nowChosen;
         if(templateMode){
           /* #74: add/remove exercises on the template being edited. */
@@ -248,9 +317,22 @@
         // flashing back to the top on every tap.
         button.setAttribute('aria-pressed',String(nowChosen));
         const stateEl=button.querySelector('.picker-state');if(stateEl)stateEl.textContent=nowChosen?'✓':'+';
+        updatePickerHint();
         renderPickerRules();
       }));
     }
     function renderExercisePicker(){renderPickerRules();renderPickerList();}
+    /* #167: selection-count hint under the picker title (aria-live so the
+       count announces). Kept in a helper because row taps update in place
+       without a full list re-render. */
+    function updatePickerHint(){
+      const hint=$('#exercisePickerHint');
+      /* #142: swap mode is single-choice — the hint names the action instead
+         of implying multi-select. */
+      if(workoutState.pickerSwapUid){if(hint)hint.textContent='Tap an exercise to swap it in';return;}
+      const templateMode=workoutState.pickerMode==='template',editTemplate=pickerTemplate();
+      const n=(templateMode?editTemplate?.exercises:workoutState.draft.exercises)?.length||0;
+      if(hint)hint.innerHTML=`Tap to add \u00b7 <strong>${n}</strong> selected`;
+    }
 
     
