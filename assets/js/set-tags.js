@@ -4,8 +4,9 @@
     function exerciseTagTargetItem() {
       const target=workoutState.exerciseTagTarget;
       if(!target)return null;
-      if(target.mode==='program')return pickerProgramWorkout()?.template?.exercises.find(item=>item.exerciseId===target.exerciseId)||null;
       if(target.mode==='template')return pickerTemplate()?.exercises.find(item=>item.exerciseId===target.exerciseId)||null;
+      /* The saved-workout builder reuses this dialog (user 2026-09-12). */
+      if(target.mode==='builder')return state.savedBuilder?.exercises.find(item=>item.uid===target.exerciseUid)||null;
       return workoutState.draft?.exercises.find(item=>item.uid===target.exerciseUid)||null;
     }
     function openExerciseTagDialog(target) {
@@ -19,11 +20,17 @@
       item.exerciseTags=item.exerciseTags||[];
       const options=[...new Set([...workoutState.exerciseTagPresets,...item.exerciseTags])];
       $('#exerciseTagPickerOptions').innerHTML=options.map(tag=>`<button class="form-pill" type="button" data-exercise-tag="${escapeHtml(tag)}" aria-pressed="${item.exerciseTags.includes(tag)}">${escapeHtml(tag)}</button>`).join('');
-      document.querySelectorAll('[data-exercise-tag]').forEach(button=>button.addEventListener('click',()=>{
+      /* #99: scoped to the exercise-tag dialog (not document-wide). */
+      document.querySelectorAll('#exerciseTagPickerOptions [data-exercise-tag]').forEach(button=>button.addEventListener('click',()=>{
         const tag=button.dataset.exerciseTag;
         item.exerciseTags=item.exerciseTags.includes(tag)?item.exerciseTags.filter(value=>value!==tag):[...item.exerciseTags,tag];
         renderExerciseTagDialog();
-        if(workoutState.exerciseTagTarget?.mode==='program'||workoutState.exerciseTagTarget?.mode==='template'){schedulePersist();renderPickerRules();}else{renderWorkoutExercises();markDraftSaved();}
+        /* The tag target lives on workoutState, so route the re-render to the
+           screen that owns the item: template picker, saved builder,
+           or the live draft. */
+        if(workoutState.exerciseTagTarget?.mode==='template'){schedulePersist();renderPickerRules();}
+        else if(workoutState.exerciseTagTarget?.mode==='builder'){schedulePersist();renderSavedBuilder();}
+        else{renderWorkoutExercises();markDraftSaved();}
       }));
     }
     function addExerciseTag() {
@@ -35,7 +42,9 @@
       if(!item.exerciseTags.includes(selected))item.exerciseTags.push(selected);
       $('#newExerciseTagInput').value='';
       renderExerciseTagDialog();
-      if(workoutState.exerciseTagTarget?.mode==='program'||workoutState.exerciseTagTarget?.mode==='template'){schedulePersist();renderPickerRules();}else{renderWorkoutExercises();markDraftSaved();}
+      if(workoutState.exerciseTagTarget?.mode==='template'){schedulePersist();renderPickerRules();}
+      else if(workoutState.exerciseTagTarget?.mode==='builder'){schedulePersist();renderSavedBuilder();}
+      else{renderWorkoutExercises();markDraftSaved();}
     }
 
     function findDraftSet(exerciseUid, setUid) {
@@ -62,7 +71,9 @@
         renderWorkoutExercises();
         markDraftSaved();
       }));
-      document.querySelectorAll('[data-delete-tag]').forEach(button => button.addEventListener('click', () => {
+      /* #99: scoped to the tag dialog's editable list (not document-wide) so a
+         future [data-delete-tag] elsewhere can never be hijacked. */
+      document.querySelectorAll('#editableTagList [data-delete-tag]').forEach(button => button.addEventListener('click', () => {
         const tag = button.dataset.deleteTag;
         workoutState.tags = workoutState.tags.filter(item => item !== tag);
         workoutState.draft?.exercises.forEach(item => item.sets.forEach(row => { row.tags = row.tags.filter(value => value !== tag); }));

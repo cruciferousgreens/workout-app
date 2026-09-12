@@ -3,7 +3,7 @@
     /** Creates, edits, and deletes custom exercises (persisted to the library, synced across devices) with pill controls. */
     function customOptions() {
       return {
-        muscles:[...new Set(exercises.flatMap(x => [...x.primary, ...x.secondary]))].filter(Boolean).sort(),
+        muscles:allMuscleOptions(),
         equipment:[...new Set(exercises.map(x => x.equipment).filter(Boolean))].sort(),
         force:['push','pull','static'],
         mechanic:['compound','isolation'],
@@ -75,13 +75,39 @@
       $('#equipmentFilter').value = state.equipment;
     }
 
+    /* A8 (#99): soft-delete. The record keeps its id in the store with a
+       deletedAt timestamp (the sync-tombstone shape a later phase uses), so
+       history, stats, and PRs keep resolving. It is filtered out of the
+       library, picker, and filter UI. */
     function deleteCustomExercise(id) {
-      exercises = exercises.filter(ex => ex.id !== id);
-      state.customExercises = state.customExercises.filter(ex => ex.id !== id);
+      const stamp = Date.now();
+      [exercises, state.customExercises].forEach(list => {
+        const ex = list.find(x => x.id === id);
+        if (ex) ex.deletedAt = stamp;
+      });
       schedulePersist();
       refreshFilters();
       renderLibrary();
       showLibrary(false);
+    }
+
+    /* Delete confirmation: the copy explains the soft-delete — hidden from
+       the library, history kept. */
+    let pendingDeleteCustomId = null;
+    function requestDeleteCustomExercise(id) {
+      const ex = exercises.find(x => x.id === id);
+      $('#deleteCustomDesc').textContent = `Delete “${ex?.name || 'this exercise'}”? It will be hidden from the exercise library, but your workout history, stats, and PRs are kept.`;
+      pendingDeleteCustomId = id;
+      $('#deleteCustomDialog').showModal();
+    }
+    function wireCustomDeleteDialog() {
+      $('#cancelDeleteCustom')?.addEventListener('click', () => $('#deleteCustomDialog').close());
+      $('#keepCustom')?.addEventListener('click', () => $('#deleteCustomDialog').close());
+      $('#confirmDeleteCustom')?.addEventListener('click', () => {
+        $('#deleteCustomDialog').close();
+        if (pendingDeleteCustomId) deleteCustomExercise(pendingDeleteCustomId);
+        pendingDeleteCustomId = null;
+      });
     }
 
     

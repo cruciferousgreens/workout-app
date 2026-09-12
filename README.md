@@ -12,7 +12,6 @@ Log workouts, track RPE and progression. A mobile-first progressive web app (bet
 - `assets/styles.css` — all styling, organized in commented sections
 - `data/exercises-db.js` — bundled exercise database (from [free-exercise-db](https://github.com/yuhonas/free-exercise-db)), normalized by `assets/js/catalog.js`
 - `sw.js`, `manifest.webmanifest`, `icon-180.png`, `icon-512.png` — PWA support (copied from `overlay/`)
-- `CHANGELOG.md` — user-facing release notes, newest first
 
 ## Deploy
 

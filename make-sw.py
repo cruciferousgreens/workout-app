@@ -9,13 +9,14 @@ production-only); do not add one.
 """
 import datetime
 import os
+import re
 import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # User-facing app version shown in Settings → About ("Cruciferous Greens
 # Workout · vX"). Bump this whenever a build ships user-visible changes.
-APP_VERSION = "0.99b"
+APP_VERSION = "1.000"
 
 now = datetime.datetime.now(datetime.timezone.utc)
 # Seconds in the stamp (user 2026-09-11): two builds in the same minute
@@ -44,6 +45,28 @@ js_dir = os.path.join(ROOT, "assets", "js")
 for f in sorted(os.listdir(js_dir)):
     if f.endswith(".js"):
         assets.append(f"assets/js/{f}")
+
+# #99 B24: the SW cache auto-scans assets/js, but index.html hand-orders the
+# <script> tags (load order is load-bearing — do NOT let this generate the
+# tags). Validate that both lists name the SAME set of files, and fail loudly
+# on any mismatch instead of shipping cached-but-unloaded or
+# loaded-but-uncached JS. data/exercises-db.js is hand-listed above and out
+# of this check's scope.
+with open(os.path.join(ROOT, "index.html")) as f:
+    script_tags = re.findall(r'<script\s+src=["\']([^"\']+)["\']', f.read())
+tagged_js = {s[len("assets/js/"):] for s in script_tags if s.startswith("assets/js/")}
+scanned_js = {f for f in os.listdir(js_dir) if f.endswith(".js")}
+not_loaded = sorted(scanned_js - tagged_js)
+not_on_disk = sorted(tagged_js - scanned_js)
+if not_loaded or not_on_disk:
+    msg = ["make-sw.py: asset manifest mismatch with index.html script tags:"]
+    if not_loaded:
+        msg.append(f"  in assets/js but no <script> tag: {', '.join(not_loaded)}")
+    if not_on_disk:
+        msg.append(f"  <script> tag but not in assets/js: {', '.join(not_on_disk)}")
+    msg.append("Fix index.html's script tags (load order is hand-tuned), then re-run.")
+    sys.stderr.write("\n".join(msg) + "\n")
+    sys.exit(1)
 
 asset_lines = ",\n    ".join(f'"{a}"' for a in assets)
 

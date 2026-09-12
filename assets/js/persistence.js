@@ -13,24 +13,77 @@ function collectPersistable(){
     activeProgram:workoutState.activeProgram,
     archivedPrograms:workoutState.archivedPrograms,
     draft:workoutState.draft,
+    /* Saved-workout builder draft (user 2026-09-11): autosaved like the live
+       draft, local-only (not in SYNCABLE_KEYS). Backing out of the builder
+       never loses work; the Discard button deletes it explicitly. */
+    savedBuilder:state.savedBuilder,
     customExercises:state.customExercises,
     favorites:[...state.favorites],
     progressionSetup:progressionSetup,
     dashboardPeriod:state.dashboardPeriod,
     statsPeriod:state.statsPeriod,
+    logPeriod:state.logPeriod,
     topExercisesMode:state.topExercisesMode,
-    showBlindspots:state.showBlindspots
+    /* v0.99al: saved-workout list filter (muscle pills + "In a program").
+       Local-only UI state, like the draft — not synced. */
+    savedFilter:{muscles:[...((state.savedFilter&&state.savedFilter.muscles)||[])],inProgram:!!(state.savedFilter&&state.savedFilter.inProgram)}
   };
 }
+/* #99 A4: persist functions return success/failure — callers (and the user)
+   can tell saved from unsaved. A failed local write never marks sync-dirty
+   (there's nothing new to push) and surfaces a visible "couldn't save" state
+   instead of a silently broken autosave. Storage-blocked contexts (private
+   browsing, quota exhaustion) must never crash the app. */
+let persistFailStreak=0;
 function persistNow(){
-  try{localStorage.setItem(PERSIST_KEY,JSON.stringify(collectPersistable()));}catch(_){}
-  /* Accounts sync hook: flag changed keys for the debounced background push (sync.js).
-     Guarded so the local-only path never breaks if sync.js is absent. */
-  if(typeof markSyncDirty==='function'){try{markSyncDirty();}catch(_){}}
+  let ok=false;
+  try{localStorage.setItem(PERSIST_KEY,JSON.stringify(collectPersistable()));ok=true;}catch(_){}
+  if(ok){
+    persistFailStreak=0;
+    /* Accounts sync hook: flag changed keys for the debounced background push (sync-engine.js).
+       Guarded so the local-only path never breaks if the sync scripts are absent.
+       Only after a SUCCESSFUL local write — a failed write has no new state to push. */
+    if(typeof markSyncDirty==='function'){try{markSyncDirty();}catch(_){}}
+  }else{
+    persistFailStreak+=1;
+    /* First failure toasts immediately; repeats are throttled (~1/min on the
+       5s interval) so a broken-storage session isn't a toast firehose. */
+    if(persistFailStreak===1||persistFailStreak%12===0){
+      if(typeof showToast==='function'){
+        try{showToast(persistFailStreak===1
+          ?"Couldn't save — storage is unavailable. Your changes are not being saved."
+          :"Couldn't save — your changes still aren't being saved.");}catch(_){}
+      }
+    }
+  }
+  return ok;
 }
 function schedulePersist(){
   clearTimeout(persistTimer);
   persistTimer=setTimeout(persistNow,250);
+}
+/* Shared local wipe (efficiency pass 2026-09-12): "Delete all data" and
+   "Delete account" clear the same state — in-memory FIRST (so the 5s/pagehide
+   persist can't resurrect anything), then localStorage (#99 C1). Each caller
+   keeps its own remote-wipe / sign-out / reload sequencing. */
+function wipeLocalUserData({removeSyncKeys=false}={}){
+  workoutState.completed=[];workoutState.templates=[];workoutState.tags=[];workoutState.exerciseTagPresets=[];workoutState.draft=null;workoutState.activeProgram=null;workoutState.archivedPrograms=[];
+  workoutState.tagTarget=null;workoutState.exerciseTagTarget=null;workoutState.supersetTarget=null;workoutState.pickerMode='draft';workoutState.programWorkoutTarget=null;
+  /* The saved-workout builder draft is persisted too — leaving it would
+     resurrect a builder session through a pre-reload pagehide persist. */
+  state.savedBuilder=null;state.builderReturn=null;state.builderOpen=false;
+  state.workoutEditorOpen=false;state.savedWorkoutId=null;state.workoutHistoryOpen=false;state.programWorkoutUid=null;
+  state.customExercises=[];exercises=exercises.filter(ex=>!ex.custom);
+  /* Favorites are user data too: clear them in memory so a pre-reload persist
+     can't resurrect them. */
+  if(state.favorites&&typeof state.favorites.clear==='function')state.favorites.clear();
+  state.query='';state.muscles.clear();state.equipment='';state.onlyFavorites=false;state.onlyCustom=false;state.selected=null;
+  resetProgressionSetup();
+  try{localStorage.removeItem(PERSIST_KEY);}catch(_){}
+  if(removeSyncKeys){
+    try{localStorage.removeItem('workout-sync:v1');}catch(_){}
+    if(typeof ADOPTED_UID_KEY!=='undefined'){try{localStorage.removeItem(ADOPTED_UID_KEY);}catch(_){}}
+  }
 }
 function mergeCustomExercises(){
   if(!Array.isArray(state.customExercises)||!state.customExercises.length)return;
@@ -48,25 +101,82 @@ function mergeTagLists(defaults,saved){
   });
   return merged;
 }
+/* #99 B29: central migration pipeline. The persisted blob carries `version`;
+   every boot-time upgrade of that payload lives in MIGRATIONS as
+   {id, from, migrate}, applied in order inside restorePersisted BEFORE any
+   feature module hydrates. Read-time normalizations (uid backfill in the live
+   editor, 'seconds'→'time' in exerciseTracking) deliberately stay at their
+   read paths — they also cover share/sync payloads that never pass through
+   this pipeline. */
+const SCHEMA_VERSION=1;
+const MIGRATIONS=[
+  /* v0.99al: the saved-workout list filter shape was hardened after it
+     shipped — normalize it on the payload, not in the hydrate path. */
+  {id:'normalize-saved-filter',from:1,migrate(data){
+    if(data.savedFilter&&typeof data.savedFilter==='object'){
+      data.savedFilter={
+        muscles:Array.isArray(data.savedFilter.muscles)?data.savedFilter.muscles.filter(x=>typeof x==='string'):[],
+        inProgram:!!data.savedFilter.inProgram
+      };
+    }
+  }},
+];
+function runBlobMigrations(data){
+  MIGRATIONS.forEach(m=>{try{m.migrate(data);}catch(_){}});
+  return data;
+}
+/* Standalone localStorage keys (kept outside the blob for the pre-paint
+   head script): migrated once per boot, before the features that read them. */
+const LOCAL_KEY_MIGRATIONS=[
+  /* Early builds stored the Catppuccin/Rosé Pine working names. */
+  {id:'legacy-theme-names',migrate(){
+    try{
+      const n=localStorage.getItem('workout-theme-name');
+      if(n==='latte')localStorage.setItem('workout-theme-name','rosepine');
+      else if(n==='frappe')localStorage.setItem('workout-theme-name','macchiato');
+    }catch(_){}
+  }},
+];
+function runLocalKeyMigrations(){LOCAL_KEY_MIGRATIONS.forEach(m=>{try{m.migrate();}catch(_){}});}
+/* #99 A5: a corrupt/unparseable blob is QUARANTINED under its own key —
+   never silently dropped. Booting to defaults is safe because the 5s/pagehide
+   autosave only ever writes PERSIST_KEY, so the quarantined copy survives
+   until the user decides what to do with it. Nothing quarantined is ever
+   auto-adopted back into state. */
+let corruptQuarantineKey=null;
+function quarantineCorruptBlob(raw){
+  const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+  corruptQuarantineKey=PERSIST_KEY+':corrupt-'+stamp;
+  try{localStorage.setItem(corruptQuarantineKey,raw);}catch(_){corruptQuarantineKey=null;}
+  if(!corruptQuarantineKey)return; /* storage itself is broken — nothing more to do */
+  /* Recovery prompt, matching the app's dialog patterns. Export keeps the
+     quarantine (the user may export first, then decide); Discard removes the
+     quarantined copy; closing the dialog keeps it set aside safely. */
+  const dlg=typeof $==='function'?$('#corruptDataDialog'):null;
+  if(dlg&&!dlg.open){try{dlg.showModal();}catch(_){}}
+}
 function restorePersisted(){
   let raw=null;
   try{raw=localStorage.getItem(PERSIST_KEY);}catch(_){return;}
   if(!raw)return;
   let data=null;
-  try{data=JSON.parse(raw);}catch(_){return;}
-  if(!data||data.version!==1||typeof data!=='object')return;
+  try{data=JSON.parse(raw);}catch(_){quarantineCorruptBlob(raw);return;}
+  if(!data||data.version!==SCHEMA_VERSION||typeof data!=='object'){quarantineCorruptBlob(raw);return;}
+  runBlobMigrations(data);
   SYNCABLE_KEYS.forEach(key=>{if(key in data)setSyncableValue(key,data[key]);});
   if(data.draft&&typeof data.draft==='object'&&data.draft!==null)workoutState.draft=data.draft;
-  if(typeof data.showBlindspots==='boolean')state.showBlindspots=data.showBlindspots;
+  if(data.savedBuilder&&typeof data.savedBuilder==='object'&&data.savedBuilder!==null)state.savedBuilder=data.savedBuilder;
+  /* v0.99al: the saved-workout list filter (local-only); shape normalized by
+     the 'normalize-saved-filter' migration above. */
+  if(data.savedFilter&&typeof data.savedFilter==='object'&&data.savedFilter!==null)state.savedFilter=data.savedFilter;
   mergeCustomExercises();
 }
 /* ===== accounts sync support ===== */
 /** Keys mirrored to the Supabase user_data table. The live draft is deliberately
-    excluded: it is ephemeral, device-local, in-progress state (see sync.js).
-    showBlindspots stays local-only (now unused — blindspots are always visible).
+    excluded: it is ephemeral, device-local, in-progress state (see sync-engine.js).
     Appearance (theme) travels as one key so it follows the account; the
     standalone workout-theme* localStorage keys remain the local read path. */
-const SYNCABLE_KEYS=['completed','templates','tags','exerciseTagPresets','activeProgram','archivedPrograms','customExercises','favorites','progressionSetup','dashboardPeriod','statsPeriod','topExercisesMode','appearance'];
+const SYNCABLE_KEYS=['completed','templates','tags','exerciseTagPresets','activeProgram','archivedPrograms','customExercises','favorites','progressionSetup','dashboardPeriod','statsPeriod','logPeriod','topExercisesMode','appearance'];
 /** Read one syncable key from live in-memory state. */
 function getSyncableValue(key){
   switch(key){
@@ -81,6 +191,7 @@ function getSyncableValue(key){
     case 'progressionSetup':return progressionSetup;
     case 'dashboardPeriod':return state.dashboardPeriod;
     case 'statsPeriod':return state.statsPeriod;
+    case 'logPeriod':return state.logPeriod;
     case 'topExercisesMode':return state.topExercisesMode;
     case 'appearance':return (typeof getAppearanceState==='function')?getAppearanceState():undefined;
     default:return undefined;
@@ -117,6 +228,7 @@ function setSyncableValue(key,value){
       break;
     case 'dashboardPeriod':if(typeof value==='string')state.dashboardPeriod=value;break;
     case 'statsPeriod':if(typeof value==='string')state.statsPeriod=value;break;
+    case 'logPeriod':if(typeof value==='string')state.logPeriod=value;break;
     case 'topExercisesMode':if(value==='volume'||value==='sets')state.topExercisesMode=value;break;
     case 'appearance':if(value&&typeof value==='object'&&typeof setAppearanceState==='function')setAppearanceState(value);break;
   }
@@ -133,6 +245,33 @@ function downloadWorkoutBackup(){
   document.body.appendChild(link);link.click();link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
+/* #99 A5 recovery-prompt wiring (dialog markup lives in index.html, next to
+   the other custom-dialogs). Export downloads the raw quarantined string and
+   leaves the quarantine in place; Discard removes it. Closing via × keeps the
+   copy set aside — it survives until the user decides. */
+function corruptDataDownload(){
+  if(!corruptQuarantineKey)return;
+  let raw=null;
+  try{raw=localStorage.getItem(corruptQuarantineKey);}catch(_){}
+  const blob=new Blob([raw||''],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;link.download=`workout-app-corrupt-data-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+$('#corruptDataExport')?.addEventListener('click',()=>{
+  corruptDataDownload();
+  if(typeof showToast==='function'){try{showToast('Damaged copy exported.');}catch(_){}}
+  /* Stay open so "Discard it" is still one tap away after exporting. */
+});
+$('#corruptDataDiscard')?.addEventListener('click',()=>{
+  if(corruptQuarantineKey){try{localStorage.removeItem(corruptQuarantineKey);}catch(_){}}
+  corruptQuarantineKey=null;
+  $('#corruptDataDialog')?.close();
+  if(typeof showToast==='function'){try{showToast('Damaged copy discarded.');}catch(_){}}
+});
+$('#closeCorruptData')?.addEventListener('click',()=>$('#corruptDataDialog')?.close());
 /* Safety net: flush to localStorage every 5s and on page hide. Explicit schedulePersist()/persistNow() hooks remain the primary path. */
 setInterval(persistNow,5000);
 window.addEventListener('pagehide',persistNow);

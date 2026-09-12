@@ -12,7 +12,15 @@
   <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
   <title>Cruciferous Greens</title>
   <script>
-    try { document.documentElement.dataset.theme = localStorage.getItem('workout-theme') === 'dark' ? 'dark' : 'light'; } catch (_) { document.documentElement.dataset.theme = 'light'; }
+   /* #99 B20: write the EFFECTIVE theme pre-paint — the same vocabulary
+      applyTheme writes post-boot (light|macchiato|rosepine|mocha), so the
+      pre-paint value never changes when the app boots and the legacy
+      [data-theme="dark"] CSS branch is unreachable. */
+   try {
+     var _tn = localStorage.getItem('workout-theme-name') || 'cruciferous';
+     var _dk = localStorage.getItem('workout-theme') === 'dark';
+     document.documentElement.dataset.theme = _tn === 'cruciferous' ? (_dk ? 'macchiato' : 'light') : _tn;
+   } catch (_) { document.documentElement.dataset.theme = 'light'; }
   </script>
   <link rel="stylesheet" href="assets/styles.css">
   <link rel="manifest" href="manifest.webmanifest">
@@ -20,631 +28,731 @@
 <body class="has-top-bar">
   <div class="status-scrim" aria-hidden="true"></div>
   <div class="app">
-    <header class="top-bar">
-      <button class="top-bar-btn" id="topBarBack" type="button" aria-label="Back" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
-      </button>
-      <h1 class="top-bar-title" id="topBarTitle">Home</h1>
-      <button class="top-bar-btn" id="topBarSettings" type="button" aria-label="Settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-      </button>
-    </header>
-    <main class="shell">
-      <section id="dashboardView" class="dashboard-view active" aria-label="Home">
-        <div class="calendar-toolbar">
-          <button class="calendar-page" id="previousWeek" type="button" aria-label="Previous week">‹</button>
-          <div><strong id="calendarWeekLabel"></strong><p class="calendar-summary" id="calendarSummary">This week.</p><span>Swipe or use arrows to browse</span></div>
-          <button class="calendar-page" id="nextWeek" type="button" aria-label="Next week">›</button>
+   <header class="top-bar">
+    <div class="top-bar-left">
+    <button class="top-bar-btn" id="topBarBack" type="button" aria-label="Back" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+    </button>
+    </div>
+    <h1 class="top-bar-title" id="topBarTitle"><span id="topBarTitleText">Home</span><span class="live-title-dot" id="liveTitleDot" hidden aria-hidden="true"></span></h1>
+    <div class="top-bar-right">
+    <button class="live-chip" id="liveWorkoutChip" type="button" hidden aria-label="Return to live workout"><span class="live-dot" aria-hidden="true"></span>Live</button>
+    <button class="top-bar-btn" id="topBarSettings" type="button" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    </button>
+   </header>
+   <main class="shell">
+    <section id="dashboardView" class="dashboard-view active" aria-label="Home">
+      <div class="calendar-toolbar">
+       <button class="calendar-page" id="previousWeek" type="button" aria-label="Previous week">‹</button>
+       <div><strong id="calendarWeekLabel"></strong><p class="calendar-summary" id="calendarSummary">This week.</p><span>Swipe or use arrows to browse</span></div>
+       <button class="calendar-page" id="nextWeek" type="button" aria-label="Next week">›</button>
+      </div>
+      <div class="week-strip" id="weekStrip" aria-label="One-week training calendar."></div>
+      <div class="dashboard-grid">
+       <section class="dashboard-card" aria-labelledby="dashProgramTitle"><h2 id="dashProgramTitle">Active program</h2><div id="dashboardProgram"></div></section>
+       <section class="dashboard-card" aria-labelledby="dashStatsTitle">
+        <div class="dashboard-card-head"><h2 id="dashStatsTitle">At a glance</h2></div>
+        <div class="period-tabs dash-period-tabs" id="dashPeriodTabs" role="group" aria-label="At a glance period"></div>
+        <div class="mini-stats" id="dashboardStats"></div><div class="muscle-summary" id="dashboardMuscles"></div><div class="compact-heatmap" id="dashboardHeatmap"></div><div class="dash-blindspots" id="dashBlindspots"></div>
+       </section>
+       <section class="dashboard-card wide" aria-labelledby="dashRecentTitle"><div class="section-head"><h2 id="dashRecentTitle">Recent workouts</h2><button class="see-all-link" id="seeAllWorkouts" type="button">See all</button></div><div class="recent-workouts" id="dashboardRecent"></div></section>
+      </div>
+    </section>
+
+    <section id="libraryView" class="library hidden" aria-label="Exercises">
+      <div class="controls">
+       <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <label class="sr-only" for="searchInput">Search exercises</label>
+        <input class="search" id="searchInput" type="search" autocomplete="off" placeholder="Find lat pulldown…" />
+        <button class="clear-search" id="clearSearch" type="button" aria-label="Clear search">×</button>
+       </div>
+       <button class="filter-button" id="filterToggle" type="button" aria-expanded="false" aria-controls="filterPanel">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"></path></svg>
+        <span>Filters</span>
+       </button>
+      </div>
+
+      <div class="filter-panel" id="filterPanel">
+       <div class="filter-group">
+        <div class="filter-label-row"><span class="filter-label" id="showFilterLabel">SHOW</span></div>
+        <div class="muscle-options" role="group" aria-labelledby="showFilterLabel">
+          <button class="muscle-option" id="favoritesToggle" type="button" aria-pressed="false">★ Favorites</button>
+          <button class="muscle-option" id="customToggle" type="button" aria-pressed="false">Custom</button>
         </div>
-        <div class="week-strip" id="weekStrip" aria-label="One-week training calendar."></div>
-        <div class="dashboard-grid">
-          <section class="dashboard-card" aria-labelledby="dashProgramTitle"><h2 id="dashProgramTitle">Active program</h2><div id="dashboardProgram"></div></section>
-          <section class="dashboard-card" aria-labelledby="dashStatsTitle">
-            <div class="dashboard-card-head"><h2 id="dashStatsTitle">At a glance</h2></div>
-            <div class="period-tabs dash-period-tabs" id="dashPeriodTabs" role="group" aria-label="At a glance period"></div>
-            <div class="mini-stats" id="dashboardStats"></div><div class="muscle-summary" id="dashboardMuscles"></div><div class="compact-heatmap" id="dashboardHeatmap"></div><div class="dash-blindspots" id="dashBlindspots"></div>
-          </section>
-          <section class="dashboard-card wide" aria-labelledby="dashRecentTitle"><h2 id="dashRecentTitle">Recent workouts</h2><div class="recent-workouts" id="dashboardRecent"></div></section>
+       </div>
+       <div class="filter-group">
+        <div class="filter-label-row"><span class="filter-label" id="muscleFilterLabel">MUSCLES</span><button class="filter-clear" id="clearMuscles" type="button" hidden>Clear</button></div>
+        <div class="muscle-options" id="muscleOptions" role="group" aria-labelledby="muscleFilterLabel"></div>
+       </div>
+       <div class="filter-group"><label for="equipmentFilter">EQUIPMENT</label><select id="equipmentFilter"><option value="">All equipment</option></select></div>
+      </div>
+
+      <div class="summary-row"><p class="result-count" id="resultCount"></p></div>
+      <div id="exerciseResults"></div>
+      <div class="library-foot"><button class="add-exercise" id="addExerciseButton" type="button">+ Custom exercise</button></div>
+    </section>
+
+    <section id="workoutView" class="workout-view" aria-label="Workout">
+      <div id="workoutStart" class="training-home">
+       <div id="continueWorkoutWrap" hidden></div>
+      <div id="builderContinueWrap" hidden></div>
+       <section class="workout-start training-hero">
+        <div id="programStartSuggestion"></div>
+        <span class="training-kicker">Ready when you are</span>
+        <h2>Start training</h2>
+        <p>Build from scratch, use a saved workout, or pick up your last session.</p>
+        <div class="workout-start-options">
+          <button class="start-option primary" id="startBlankWorkout" type="button"><strong>Blank workout</strong><span>Add exercises and targets as you go.</span></button>
+          <button class="start-option" id="repeatLastWorkout" type="button"><strong>Repeat last</strong><span id="repeatLastWorkoutMeta">Copy your latest completed workout.</span></button>
         </div>
+       </section>
+       <section class="training-saved" aria-labelledby="savedWorkoutsTitle"><div class="section-head"><div><h2 id="savedWorkoutsTitle">Saved workouts</h2><p class="section-note">Tap one to view, edit, or start it</p></div><button class="filter-button saved-filter-btn" id="savedFilterBtn" type="button" aria-label="Filter saved workouts"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="filter-count" id="savedFilterCount" hidden></span></button></div><div class="history-search"><input id="savedSearch" type="search" placeholder="Search saved workouts…" autocomplete="off" aria-label="Search saved workouts by name or exercise"></div><div id="savedWorkoutList"></div></section>
+      </div>
+      <div id="workoutHistory" hidden>
+       <div class="section-head"><div><h2>Workout logs</h2><p class="section-note" id="historyCountNote">All completed sessions</p></div></div>
+       <div class="history-search"><input id="historySearch" type="search" placeholder="Search workouts…" autocomplete="off" aria-label="Search workouts by name"></div>
+       <div class="period-tabs log-period-tabs" id="logPeriodTabs" role="group" aria-label="Workout logs period"></div>
+       <div id="workoutHistoryList"></div>
+      </div>
+      <div id="savedBuilder" hidden>
+        <div id="savedBuilderBody"></div>
+      </div>
+      <div id="savedWorkout" hidden>
+       <div id="savedWorkoutBody"></div>
+      </div>
+      <div id="sharePreview" hidden>
+       <div id="sharePreviewBody"></div>
+      </div>
+      <div id="workoutEditor" hidden>
+       <div class="workout-context" id="workoutContext" hidden></div>
+       <div class="progression-banner" id="workoutProgression" hidden></div>
+       <div class="workout-meta">
+        <div class="field"><label for="workoutName">WORKOUT NAME</label><input id="workoutName" type="text" value="" placeholder="Workout" autocomplete="off" aria-label="Workout name" /></div>
+        <div class="workout-focus-open" id="workoutFocus">
+          <span class="workout-focus-label" id="workoutFocusLabel">Workout focus</span>
+          <div class="rep-preset-row" role="group" aria-labelledby="workoutFocusLabel"><button class="rep-preset" type="button" data-workout-focus="strength">Strength · 1–5</button><button class="rep-preset" type="button" data-workout-focus="hypertrophy">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-workout-focus="endurance">Endurance · 12–20</button><button class="rep-preset" type="button" data-workout-focus="open">15+</button><button class="rep-preset" type="button" data-workout-focus="amrap">AMRAP</button></div>
+          <p class="field-help">Applies the rep range to every reps-tracked exercise in this workout, replacing any per-exercise ranges you set.</p>
+        </div>
+        <div class="field date-field"><label for="workoutDate">DATE</label><span class="date-display" id="workoutDateDisplay" aria-hidden="true">Thu, Sep 10, 2026</span><input id="workoutDate" type="date" class="date-input-overlay" aria-label="Workout date" /></div>
+       </div>
+       <div class="workout-toolbar">
+        <h2>Exercises</h2>
+        <div class="workout-toolbar-actions">
+          <button class="exercise-info-button plain-glyph" id="reorderWorkoutExercises" type="button" aria-label="Reorder exercises"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3v18M8 3 4 7m4-4 4 4M16 21V3m0 18 4-4m-4 4-4-4"/></svg></button>
+          <button class="exercise-info-button plain-glyph" id="addWorkoutExercise" type="button" aria-label="Add exercises"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+       </div>
+       <!-- #130: static autosave note deleted (user 2026-09-12) — autosave is quiet now. -->
+       <div class="workout-exercises" id="workoutExercises"></div>
+       <button class="secondary-button add-exercise-bottom" id="addWorkoutExerciseBottom" type="button">+ Add exercise</button>
+       <div class="workout-footer">
+        <p class="workout-error" id="workoutError" role="alert"></p>
+        <div class="workout-actions">
+          <button class="secondary-button" id="cancelWorkout" type="button">Discard</button>
+          <button class="primary-button" id="finishWorkout" type="button">Finish workout</button>
+        </div>
+       </div>
+      </div>
+      <div id="workoutComplete" hidden></div>
+    </section>
+
+    <section id="programView" class="program-view" aria-label="Program">
+      <div id="programSetup" class="program-setup">
+       <h2>Create your active program.</h2>
+       <p>Give the block a name, length, and a short focus. You can add its workouts in order next.</p>
+       <div class="program-form">
+        <div class="field wide"><label for="programName">PROGRAM NAME</label><input id="programName" type="text" autocomplete="off" placeholder="e.g. Fall strength block" /></div>
+        <div class="field"><label for="programLength">LENGTH (WEEKS)</label><input id="programLength" type="number" inputmode="numeric" min="1" max="52" value="8" aria-label="Program length in weeks" /></div>
+        <div class="field"><label for="programStartWeek">START AT WEEK</label><input id="programStartWeek" type="number" inputmode="numeric" min="1" max="8" value="1" aria-label="Program start week" /></div>
+        <div class="field wide"><label for="programFocus">FOCUS / NOTES</label><textarea id="programFocus" placeholder="What this block is meant to build"></textarea></div>
+       </div>
+       <section class="program-progression" aria-labelledby="progressionSetupTitle">
+        <div class="section-head settings-head"><div class="settings-title-row"><h3 class="program-progression-title" id="progressionSetupTitle">Progression rules</h3><button class="exercise-info-button" id="programProgressionInfoButton" type="button" aria-label="About progression rules">i</button></div><p class="section-note">Defaults for this program. Exercise-level overrides remain editable inside each workout.</p></div>
+        <div class="settings-grid">
+          <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="programSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button></div><p class="field-help">Linear adds the increment every session, no RPE needed. RPE-based adds reps first, then weight, gated by the RPE trigger.</p></div>
+          <label class="rule-field"><span>Top-set RPE trigger</span><input id="progressionThreshold" type="number" inputmode="decimal" min="1" max="10" step="0.5" value="8"></label>
+          <div class="settings-pair">
+           <label class="rule-field"><span>Increment type</span><select id="progressionIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
+           <label class="rule-field"><span>Increment value</span><input id="progressionIncrementValue" type="number" inputmode="decimal" min="0.5" step="0.5" value="5"><em class="unit" id="programIncrementUnit">lb</em></label>
+          </div>
+          <div class="settings-subsection">
+           <span class="settings-subhead">Default rep range</span>
+           <div class="rep-preset-row" id="programRepPresets" role="group" aria-label="Default rep range"><button class="rep-preset" type="button" data-rep-preset="strength" aria-pressed="false">Strength · 1–5</button><button class="rep-preset" type="button" data-rep-preset="hypertrophy" aria-pressed="true">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-rep-preset="endurance" aria-pressed="false">Endurance · 12–20</button><button class="rep-preset" type="button" data-rep-preset="open" aria-pressed="false">15+</button><button class="rep-preset" type="button" data-rep-preset="amrap" aria-pressed="false">AMRAP</button></div>
+           <div class="settings-pair">
+            <label class="rule-field"><span>Min</span><input id="programRepMin" type="number" min="1" step="1" value="6"></label>
+            <label class="rule-field"><span>Max</span><input id="programRepMax" type="number" min="1" step="1" value="12"></label>
+           </div>
+          </div>
+          <div class="settings-subsection"><span class="settings-subhead">Time step</span><div class="step-pills" id="programTimeStepPills" role="group" aria-label="Default time step in seconds"></div></div>
+          <div class="settings-subsection"><span class="settings-subhead">Next-session suggestions</span><p class="field-help">Targets appear as cards you can tap to apply. Nothing changes until you choose a suggestion.</p></div>
+        </div>
+        <div class="switch-row"><span class="switch-copy"><strong>Vary rep ranges by week</strong><span>Optional undulating periodization. Each program week can inherit its own range.</span></span><button class="switch" id="undulatingToggle" type="button" role="switch" aria-pressed="false" aria-label="Vary rep ranges by week off"></button></div>
+        <div class="undulating-panel" id="undulatingPanel" hidden><span class="filter-label">WEEKLY REP RANGE</span><div class="week-range-list" id="weekRangeList"></div></div>
+       </section>
+       <p class="form-error" id="programError" role="alert"></p>
+       <button class="primary-button" id="createProgram" type="button">Create active program</button>
+       <p class="session-note">Program edits are saved automatically on this device.</p>
+      </div>
+      <div id="programCover" class="program-cover" hidden></div>
+      <section class="dashboard-card archived-programs" id="archivedPrograms" aria-labelledby="archivedProgramsTitle" hidden><h2 id="archivedProgramsTitle">Archived programs</h2><div id="archivedProgramList"></div></section>
+    </section>
+
+    <section id="statsView" class="stats-view" aria-label="Stats">
+      <div class="period-tabs" id="statsPeriodTabs" aria-label="Stats period"></div>
+      <div class="stats-grid" id="statsGrid"></div>
+      <section class="dashboard-card"><div class="section-head"><h2>Muscle map</h2></div><div id="muscleHeatmap"></div><div id="muscleStats"></div><div id="blindspotWrap"></div></section>
+      <div class="muscle-analysis-grid">
+       <section class="analysis-panel"><div class="section-head"><div><h2>Volume by muscle</h2><p class="section-note" id="muscleVolumeNote">Weighted volume. Secondary muscles receive 45% of the set’s volume.</p></div><div class="mini-segmented" role="group" aria-label="Volume by muscle metric" id="muscleVolumeMode"><button type="button" data-muscle-mode="volume">Volume</button><button type="button" data-muscle-mode="sets">Sets</button></div></div><div class="muscle-volume-list" id="muscleVolumeBreakdown"></div></section>
+      </div>
+      <div class="muscle-analysis-grid actionable-stats">
+       <section class="analysis-panel"><div class="section-head"><h2>Top exercises</h2><div class="mini-segmented" role="group" aria-label="Top exercises metric" id="topExercisesMode"><button type="button" data-top-mode="volume">Volume</button><button type="button" data-top-mode="sets">Sets</button></div></div><div id="topExercises"></div></section>
+       <section class="analysis-panel"><div class="section-head"><h2>Recent PRs</h2></div><div id="recentPRs"></div></section>
+      </div>
+      <section class="analysis-panel chart-card"><div class="section-head"><div><h2>Muscle trends</h2><p class="section-note" id="muscleTrendNote">Compared with the previous period</p></div></div><div class="muscle-trend-list" id="muscleTrends"></div></section>
+    </section>
+
+    <section id="settingsView" class="stats-view" aria-label="Settings">
+      <section class="dashboard-card account-card">
+       <div class="section-head settings-head"><h2>Account</h2></div>
+       <div id="accountSignedOut">
+        <label class="rule-field"><span>Email</span><input id="accountEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com"></label>
+        <div class="settings-actions"><button class="small-button" id="sendMagicLinkButton" type="button">Email me a code</button></div>
+        <div id="otpStep" hidden>
+          <label class="rule-field"><span>Code from the email</span><input id="accountOtp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from the email" maxlength="12"></label>
+          <div class="settings-actions"><button class="small-button" id="verifyOtpButton" type="button">Sign in</button></div>
+        </div>
+       </div>
+       <div id="accountSignedIn" hidden>
+        <button class="account-row" id="accountRowButton" type="button" aria-haspopup="dialog">
+          <span id="accountRowEmail"></span>
+        </button>
+       </div>
+       <p class="status-note" id="accountStatus" role="status"></p>
+       <div class="settings-actions"><button class="small-button" id="retrySyncButton" type="button" hidden>Try sync again</button></div>
       </section>
-
-      <section id="libraryView" class="library hidden" aria-label="Exercises">
-        <div class="controls">
-          <div class="search-wrap">
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
-            <label class="sr-only" for="searchInput">Search exercises</label>
-            <input class="search" id="searchInput" type="search" autocomplete="off" placeholder="Find lat pulldown…" />
-            <button class="clear-search" id="clearSearch" type="button" aria-label="Clear search">×</button>
+      <section class="dashboard-card">
+       <div class="section-head settings-head"><h2>Appearance</h2></div>
+       <div class="switch-row wide"><span class="switch-copy"><strong>Dark mode</strong></span><button class="switch" id="darkModeToggle" type="button" role="switch" aria-pressed="false" aria-label="Dark mode off"></button></div>
+       <div class="theme-picker"><span class="switch-copy"><strong>Theme</strong></span>
+        <div class="theme-pills theme-families" id="themePills" role="group" aria-label="Color theme">
+          <div class="theme-family" role="group" aria-label="Cruciferous family">
+           <button type="button" data-theme-name="cruciferous" aria-pressed="true"><i style="background:#2e7d32"></i>Cruciferous</button>
+           <button type="button" data-theme-name="macchiato" aria-pressed="false"><i style="background:#f5a97f"></i>Asterid</button>
           </div>
-          <button class="filter-button" id="filterToggle" type="button" aria-expanded="false" aria-controls="filterPanel">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"></path></svg>
-            <span>Filters</span>
-          </button>
+          <div class="theme-family" role="group" aria-label="Matcha family">
+           <button type="button" data-theme-name="rosepine" aria-pressed="false"><i style="background:#b4637a"></i>Rosé</button>
+           <button type="button" data-theme-name="mocha" aria-pressed="false"><i style="background:#a6e3a1"></i>Matcha</button>
+          </div>
         </div>
-
-        <div class="filter-panel" id="filterPanel">
-          <div class="filter-group">
-            <div class="filter-label-row"><span class="filter-label" id="showFilterLabel">SHOW</span></div>
-            <div class="muscle-options" role="group" aria-labelledby="showFilterLabel">
-              <button class="muscle-option" id="favoritesToggle" type="button" aria-pressed="false">★ Favorites</button>
-              <button class="muscle-option" id="customToggle" type="button" aria-pressed="false">Custom</button>
-            </div>
-          </div>
-          <div class="filter-group">
-            <div class="filter-label-row"><span class="filter-label" id="muscleFilterLabel">MUSCLES</span><button class="filter-clear" id="clearMuscles" type="button" hidden>Clear</button></div>
-            <div class="muscle-options" id="muscleOptions" role="group" aria-labelledby="muscleFilterLabel"></div>
-          </div>
-          <div class="filter-group"><label for="equipmentFilter">EQUIPMENT</label><select id="equipmentFilter"><option value="">All equipment</option></select></div>
-        </div>
-
-        <div class="summary-row"><p class="result-count" id="resultCount"></p></div>
-        <div id="exerciseResults"></div>
-        <div class="library-foot"><button class="add-exercise" id="addExerciseButton" type="button">+ Custom exercise</button></div>
+       </div>
+       <div class="switch-row wide"><span class="switch-copy"><strong>Swipe to delete</strong></span><button class="switch" id="swipeDeleteSetsToggle" type="button" role="switch" aria-pressed="true" aria-label="Swipe to delete on"></button></div>
       </section>
-
-      <section id="workoutView" class="workout-view" aria-label="Workout">
-        <div id="workoutStart" class="training-home">
-          <section class="workout-start training-hero">
-            <div id="programStartSuggestion"></div>
-            <span class="training-kicker">Ready when you are</span>
-            <h2>Start training</h2>
-            <p>Build from scratch, use a template, or pick up your last session.</p>
-            <div class="workout-start-options">
-              <button class="start-option primary" id="startBlankWorkout" type="button"><strong>Blank workout</strong><span>Add exercises and targets as you go.</span></button>
-              <button class="start-option" id="startNewTemplate" type="button"><strong>New template</strong><span>Name it, then add exercises.</span></button>
-              <details class="template-disclosure" id="templateDisclosure">
-                <summary class="start-option"><strong>From template</strong><span>Use a saved or built-in workout.</span></summary>
-                <div id="workoutTemplateList" class="template-disclosure-list"></div>
-              </details>
-              <button class="start-option" id="repeatLastWorkout" type="button"><strong>Repeat last</strong><span id="repeatLastWorkoutMeta">Copy your latest completed workout.</span></button>
-            </div>
-          </section>
-          <section class="training-recent" aria-labelledby="trainingRecentTitle"><div class="section-head"><div><h2 id="trainingRecentTitle">Recent workouts</h2><p class="section-note">Open details or repeat any session</p></div></div><div class="recent-workouts" id="workoutRecent"></div></section>
+      <section class="dashboard-card">
+       <div class="section-head settings-head"><div class="settings-title-row"><h2>Progression defaults</h2><button class="exercise-info-button" id="progressionInfoButton" type="button" aria-label="About progression defaults">i</button></div><p class="section-note">Used for new exercises and programs.</p></div>
+       <div class="settings-grid">
+        <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="settingsSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button></div></div>
+        <div class="rule-field"><span>RPE trigger threshold</span><div class="rep-preset-row" id="settingsRpePills" role="group" aria-label="RPE trigger threshold"><button class="rep-preset" type="button" data-rpe-threshold="7" aria-pressed="false">7</button><button class="rep-preset" type="button" data-rpe-threshold="8" aria-pressed="true">8</button><button class="rep-preset" type="button" data-rpe-threshold="9" aria-pressed="false">9</button></div></div>
+        <div class="settings-pair">
+          <label class="rule-field"><span>Increment type</span><select id="settingsIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
+          <label class="rule-field"><span>Increment value</span><input id="settingsIncrementValue" type="number" min="0" step="0.5" value="5"><em class="unit" id="settingsIncrementUnit">lb</em></label>
         </div>
-        <div id="workoutHistory" hidden>
-          <div class="history-top"><button class="back" id="backFromWorkoutHistory" type="button" aria-label="Back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>Back</button></div>
-          <div class="section-head"><div><h2>Workout history</h2><p class="section-note" id="historyCountNote">All completed sessions</p></div></div>
-          <div class="history-search"><input id="historySearch" type="search" placeholder="Search workouts…" autocomplete="off" aria-label="Search workouts by name"></div>
-          <div id="workoutHistoryList"></div>
-        </div>
-        <div id="workoutEditor" hidden>
-          <div class="workout-context" id="workoutContext" hidden></div>
-          <div class="progression-banner" id="workoutProgression" hidden></div>
-          <div class="workout-meta">
-            <div class="field"><label for="workoutName">WORKOUT NAME</label><input id="workoutName" type="text" value="" placeholder="Workout" autocomplete="off" aria-label="Workout name" /></div>
-            <div class="workout-focus-open" id="workoutFocus">
-              <span class="workout-focus-label" id="workoutFocusLabel">Workout focus</span>
-              <div class="rep-preset-row" role="group" aria-labelledby="workoutFocusLabel"><button class="rep-preset" type="button" data-workout-focus="strength">Strength · 1–5</button><button class="rep-preset" type="button" data-workout-focus="hypertrophy">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-workout-focus="endurance">Endurance · 12–20</button><button class="rep-preset" type="button" data-workout-focus="open">15+</button><button class="rep-preset" type="button" data-workout-focus="amrap">AMRAP</button><button class="rep-preset rep-preset-none" type="button" data-workout-focus="">No focus</button></div>
-              <p class="field-help">Applies the rep range to every reps-tracked exercise in this workout, replacing any per-exercise ranges you set.</p>
-            </div>
-            <div class="field date-field"><label id="workoutDateLabel" for="workoutDate">DATE</label><span class="date-display" id="workoutDateDisplay" aria-hidden="true">Thu, Sep 10, 2026</span><input id="workoutDate" type="date" class="date-input-overlay" aria-label="Workout date" /></div>
-          </div>
-          <div class="workout-toolbar">
-            <h2>Exercises</h2>
-            <div class="workout-toolbar-actions">
-              <button class="exercise-info-button plain-glyph" id="reorderWorkoutExercises" type="button" aria-label="Reorder exercises"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3v18M8 3 4 7m4-4 4 4M16 21V3m0 18 4-4m-4 4-4-4"/></svg></button>
-              <button class="exercise-info-button plain-glyph" id="addWorkoutExercise" type="button" aria-label="Add exercises">+</button>
-            </div>
-          </div>
-          <div class="draft-status" id="draftStatus" role="status">Changes are saved on this device</div>
-          <div class="workout-exercises" id="workoutExercises"></div>
-          <button class="secondary-button add-exercise-bottom" id="addWorkoutExerciseBottom" type="button">+ Add exercise</button>
-          <div class="workout-footer">
-            <p class="workout-error" id="workoutError" role="alert"></p>
-            <div class="workout-actions">
-              <button class="secondary-button" id="cancelWorkout" type="button">Discard</button>
-              <button class="primary-button" id="finishWorkout" type="button">Finish workout</button>
-            </div>
+        <div class="rule-field"><span>Default focus</span><div class="rep-preset-row" id="settingsRepPresets"><button class="rep-preset" type="button" data-rep-preset="strength" aria-pressed="false">Strength · 1–5</button><button class="rep-preset" type="button" data-rep-preset="hypertrophy" aria-pressed="true">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-rep-preset="endurance" aria-pressed="false">Endurance · 12–20</button><button class="rep-preset" type="button" data-rep-preset="open" aria-pressed="false">15+</button><button class="rep-preset" type="button" data-rep-preset="amrap" aria-pressed="false">AMRAP</button></div></div>
+        <div class="settings-subsection">
+          <span class="settings-subhead">Default rep range</span>
+          <div class="settings-pair">
+           <label class="rule-field"><span>Min</span><input id="settingsRepMin" type="number" min="1" step="1" value="6"></label>
+           <label class="rule-field"><span>Max</span><input id="settingsRepMax" type="number" min="1" step="1" value="12"></label>
           </div>
         </div>
-        <div id="workoutComplete" hidden></div>
+        <div class="settings-subsection">
+          <span class="settings-subhead">Time step</span>
+          <div class="step-pills" id="settingsTimeStepPills" role="group" aria-label="Time step in seconds"></div>
+        </div>
+       </div>
+       <div class="switch-row wide"><span class="switch-copy"><strong>Vary rep ranges by week</strong><span>Optional undulating periodization for new programs. Each program week can inherit its own range.</span></span><button class="switch" id="settingsUndulatingToggle" type="button" role="switch" aria-pressed="false" aria-label="Vary rep ranges by week off"></button></div>
+       <div class="settings-periodization" id="settingsPeriodizationWrap" hidden>
+        <button class="periodization-edit-button" id="editDefaultPeriodization" type="button">Edit default periodization</button>
+        <div class="undulating-panel" id="settingsUndulatingPanel" hidden>
+          <span class="filter-label">DEFAULT WEEKLY REP RANGE</span>
+          <div class="week-range-list" id="settingsWeekRangeList"></div>
+        </div>
+       </div>
       </section>
-
-      <section id="programView" class="program-view" aria-label="Program">
-        <div id="programSetup" class="program-setup">
-          <h2>Create your active program.</h2>
-          <p>Give the block a name, length, and a short focus. You can add its workouts in order next.</p>
-          <div class="program-form">
-            <div class="field wide"><label for="programName">PROGRAM NAME</label><input id="programName" type="text" autocomplete="off" placeholder="e.g. Fall strength block" /></div>
-            <div class="field"><label for="programLength">LENGTH (WEEKS)</label><input id="programLength" type="number" inputmode="numeric" min="1" max="52" value="8" aria-label="Program length in weeks" /></div>
-            <div class="field"><label for="programStartWeek">START AT WEEK</label><input id="programStartWeek" type="number" inputmode="numeric" min="1" max="8" value="1" aria-label="Program start week" /></div>
-            <div class="field wide"><label for="programFocus">FOCUS / NOTES</label><textarea id="programFocus" placeholder="What this block is meant to build"></textarea></div>
-          </div>
-          <section class="program-progression" aria-labelledby="progressionSetupTitle">
-            <div class="section-head settings-head"><div class="settings-title-row"><h3 class="program-progression-title" id="progressionSetupTitle">Progression rules</h3><button class="exercise-info-button" id="programProgressionInfoButton" type="button" aria-label="About progression rules">i</button></div><p class="section-note">Defaults for this program. Exercise-level overrides remain editable inside each workout.</p></div>
-            <div class="settings-grid">
-              <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="programSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button></div><p class="field-help">Linear adds the increment every session, no RPE needed. RPE-based adds reps first, then weight, gated by the RPE trigger.</p></div>
-              <label class="rule-field"><span>Top-set RPE trigger</span><input id="progressionThreshold" type="number" inputmode="decimal" min="1" max="10" step="0.5" value="8"></label>
-              <div class="settings-pair">
-                <label class="rule-field"><span>Increment type</span><select id="progressionIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
-                <label class="rule-field"><span>Increment value</span><input id="progressionIncrementValue" type="number" inputmode="decimal" min="0.5" step="0.5" value="5"><em class="unit" id="programIncrementUnit">lb</em></label>
-              </div>
-              <div class="settings-subsection">
-                <span class="settings-subhead">Default rep range</span>
-                <div class="rep-preset-row" id="programRepPresets" role="group" aria-label="Default rep range"><button class="rep-preset" type="button" data-rep-preset="strength" aria-pressed="false">Strength · 1–5</button><button class="rep-preset" type="button" data-rep-preset="hypertrophy" aria-pressed="true">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-rep-preset="endurance" aria-pressed="false">Endurance · 12–20</button><button class="rep-preset" type="button" data-rep-preset="open" aria-pressed="false">15+</button><button class="rep-preset" type="button" data-rep-preset="amrap" aria-pressed="false">AMRAP</button></div>
-                <div class="settings-pair">
-                  <label class="rule-field"><span>Min</span><input id="programRepMin" type="number" min="1" step="1" value="6"></label>
-                  <label class="rule-field"><span>Max</span><input id="programRepMax" type="number" min="1" step="1" value="12"></label>
-                </div>
-              </div>
-              <div class="settings-subsection"><span class="settings-subhead">Time step</span><div class="step-pills" id="programTimeStepPills" role="group" aria-label="Default time step in seconds"></div></div>
-              <div class="settings-subsection"><span class="settings-subhead">Next-session suggestions</span><p class="field-help">Targets appear as cards you can tap to apply. Nothing changes until you choose a suggestion.</p></div>
-            </div>
-            <div class="switch-row"><span class="switch-copy"><strong>Vary rep ranges by week</strong><span>Optional undulating periodization. Each program week can inherit its own range.</span></span><button class="switch" id="undulatingToggle" type="button" role="switch" aria-pressed="false" aria-label="Vary rep ranges by week off"></button></div>
-            <div class="undulating-panel" id="undulatingPanel" hidden><span class="filter-label">WEEKLY REP RANGE</span><div class="week-range-list" id="weekRangeList"></div></div>
-          </section>
-          <p class="form-error" id="programError" role="alert"></p>
-          <button class="primary-button" id="createProgram" type="button">Create active program</button>
-          <p class="session-note">Program edits are saved automatically on this device.</p>
-        </div>
-        <div id="programCover" class="program-cover" hidden></div>
-        <section class="dashboard-card archived-programs" id="archivedPrograms" aria-labelledby="archivedProgramsTitle" hidden><h2 id="archivedProgramsTitle">Archived programs</h2><div id="archivedProgramList"></div></section>
+      <section class="dashboard-card">
+       <div class="section-head settings-head"><h2>Units</h2></div>
+       <div class="step-pills" id="settingsUnitPills" role="group" aria-label="Weight units"><button type="button" data-units="imperial" aria-pressed="true">Pounds</button><button type="button" data-units="metric" aria-pressed="false">Kilograms</button></div>
+       <p class="filter-label stats-default-label">DEFAULT TRACKING METRIC</p>
+       <div class="step-pills" id="settingsStatsDefaultPills" role="group" aria-label="Default tracking metric"><button type="button" data-stats-default="volume" aria-pressed="true">Volume</button><button type="button" data-stats-default="sets" aria-pressed="false">Sets</button></div>
       </section>
-
-      <section id="statsView" class="stats-view" aria-label="Stats">
-        <div class="period-tabs" id="statsPeriodTabs" aria-label="Stats period"></div>
-        <div class="stats-grid" id="statsGrid"></div>
-        <section class="dashboard-card"><div class="section-head"><h2>Muscle map</h2></div><div id="muscleHeatmap"></div><div id="muscleStats"></div><div id="blindspotWrap"></div></section>
-        <div class="muscle-analysis-grid">
-          <section class="analysis-panel"><div class="section-head"><div><h2>Volume by muscle</h2><p class="section-note" id="muscleVolumeNote">Weighted volume. Secondary muscles receive 45% of the set’s volume.</p></div><div class="mini-segmented" role="group" aria-label="Volume by muscle metric" id="muscleVolumeMode"><button type="button" data-muscle-mode="volume">Volume</button><button type="button" data-muscle-mode="sets">Sets</button></div></div><div class="muscle-volume-list" id="muscleVolumeBreakdown"></div></section>
-          <section class="analysis-panel"><h2>Training focus</h2><p>Share of completed rep-based sets: strength 1–5, hypertrophy 6–12, endurance 13+. Timed sets are excluded.</p><div class="balance-list" id="trainingFocus"></div></section>
-        </div>
-        <div class="muscle-analysis-grid actionable-stats">
-          <section class="analysis-panel"><div class="section-head"><h2>Top exercises</h2><div class="mini-segmented" role="group" aria-label="Top exercises metric" id="topExercisesMode"><button type="button" data-top-mode="volume">Volume</button><button type="button" data-top-mode="sets">Sets</button></div></div><div id="topExercises"></div></section>
-          <section class="analysis-panel"><div class="section-head"><h2>Recent PRs</h2></div><div id="recentPRs"></div></section>
-        </div>
-        <section class="analysis-panel chart-card"><div class="section-head"><div><h2>Muscle trends</h2><p class="section-note" id="muscleTrendNote">Compared with the previous period</p></div></div><div class="muscle-trend-list" id="muscleTrends"></div></section>
-        <section class="dashboard-card chart-card"><div class="section-head"><div><h2>Exercise trends</h2><p class="section-note">Estimated 1RM and volume per session</p></div></div><div class="trend-picker" id="exerciseTrendPicker" role="group" aria-label="Choose exercise for trends"></div><div class="chart-wrap" id="exerciseTrendChart"></div><div class="chart-wrap" id="exerciseVolumeChart"></div></section>
-        <section class="dashboard-card chart-card"><div class="section-head"><h2>Weekly volume</h2><p class="section-note">Last 10 weeks · weight × reps</p></div><div class="chart-wrap" id="volumeChart"></div></section>
+      <section class="dashboard-card">
+       <div class="section-head settings-head"><h2>About</h2></div>
+       <p class="section-note" id="appVersionLine">Cruciferous Greens Workout</p>
+       <p class="section-note" id="buildUpdatedLine">Last updated: —</p>
+       <p class="section-note"><button class="small-button" id="checkUpdatesButton" type="button">Check for updates</button></p>
+       <p class="section-note"><a href="https://github.com/cruciferousgreens/workout-app-accounts/blob/main/RELEASES.md" target="_blank" rel="noreferrer">Release notes</a></p>
       </section>
-
-      <section id="settingsView" class="stats-view" aria-label="Settings">
-        <section class="dashboard-card account-card">
-          <div class="section-head settings-head"><h2>Account</h2></div>
-          <div id="accountSignedOut">
-            <label class="rule-field"><span>Email</span><input id="accountEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com"></label>
-            <div class="settings-actions"><button class="small-button" id="sendMagicLinkButton" type="button">Email me a code</button></div>
-            <div id="otpStep" hidden>
-              <label class="rule-field"><span>Code from the email</span><input id="accountOtp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Code from the email" maxlength="12"></label>
-              <div class="settings-actions"><button class="small-button" id="verifyOtpButton" type="button">Sign in</button></div>
-            </div>
-          </div>
-          <div id="accountSignedIn" hidden>
-            <button class="account-row" id="accountRowButton" type="button" aria-haspopup="dialog">
-              <span id="accountRowEmail"></span>
-            </button>
-          </div>
-          <p class="status-note" id="accountStatus" role="status"></p>
-        </section>
-        <section class="dashboard-card">
-          <div class="section-head settings-head"><h2>Appearance</h2></div>
-          <div class="switch-row wide"><span class="switch-copy"><strong>Dark mode</strong></span><button class="switch" id="darkModeToggle" type="button" role="switch" aria-pressed="false" aria-label="Dark mode off"></button></div>
-          <div class="theme-picker"><span class="switch-copy"><strong>Theme</strong></span>
-            <div class="theme-pills theme-families" id="themePills" role="group" aria-label="Color theme">
-              <div class="theme-family" role="group" aria-label="Cruciferous family">
-                <button type="button" data-theme-name="cruciferous" aria-pressed="true"><i style="background:#2e7d32"></i>Cruciferous</button>
-                <button type="button" data-theme-name="macchiato" aria-pressed="false"><i style="background:#f5a97f"></i>Asterid</button>
-              </div>
-              <div class="theme-family" role="group" aria-label="Matcha family">
-                <button type="button" data-theme-name="rosepine" aria-pressed="false"><i style="background:#b4637a"></i>Rosé</button>
-                <button type="button" data-theme-name="mocha" aria-pressed="false"><i style="background:#a6e3a1"></i>Matcha</button>
-              </div>
-            </div>
-          </div>
-          <div class="switch-row wide"><span class="switch-copy"><strong>Swipe to delete sets</strong><span>On touch devices, swipe a set row left to reveal Delete. The × button stays on desktop.</span></span><button class="switch" id="swipeDeleteSetsToggle" type="button" role="switch" aria-pressed="true" aria-label="Swipe to delete sets on"></button></div>
-        </section>
-        <section class="dashboard-card">
-          <div class="section-head settings-head"><div class="settings-title-row"><h2>Progression defaults</h2><button class="exercise-info-button" id="progressionInfoButton" type="button" aria-label="About progression defaults">i</button></div><p class="section-note">Used for new exercises and programs.</p></div>
-          <div class="settings-grid">
-            <div><span class="settings-subhead">Progression mode</span><div class="rep-preset-row" id="settingsSchemePills" role="group" aria-label="Progression mode"><button class="rep-preset" type="button" data-scheme="rpe" aria-pressed="true">RPE-based</button><button class="rep-preset" type="button" data-scheme="linear" aria-pressed="false">Linear</button></div></div>
-            <div class="rule-field"><span>RPE trigger threshold</span><div class="rep-preset-row" id="settingsRpePills" role="group" aria-label="RPE trigger threshold"><button class="rep-preset" type="button" data-rpe-threshold="7" aria-pressed="false">7</button><button class="rep-preset" type="button" data-rpe-threshold="8" aria-pressed="true">8</button><button class="rep-preset" type="button" data-rpe-threshold="9" aria-pressed="false">9</button></div></div>
-            <div class="settings-pair">
-              <label class="rule-field"><span>Increment type</span><select id="settingsIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
-              <label class="rule-field"><span>Increment value</span><input id="settingsIncrementValue" type="number" min="0" step="0.5" value="5"><em class="unit" id="settingsIncrementUnit">lb</em></label>
-            </div>
-            <div class="rule-field"><span>Default focus</span><div class="rep-preset-row" id="settingsRepPresets"><button class="rep-preset" type="button" data-rep-preset="strength" aria-pressed="false">Strength · 1–5</button><button class="rep-preset" type="button" data-rep-preset="hypertrophy" aria-pressed="true">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-rep-preset="endurance" aria-pressed="false">Endurance · 12–20</button><button class="rep-preset" type="button" data-rep-preset="open" aria-pressed="false">15+</button><button class="rep-preset" type="button" data-rep-preset="amrap" aria-pressed="false">AMRAP</button></div></div>
-            <div class="settings-subsection">
-              <span class="settings-subhead">Default rep range</span>
-              <div class="settings-pair">
-                <label class="rule-field"><span>Min</span><input id="settingsRepMin" type="number" min="1" step="1" value="6"></label>
-                <label class="rule-field"><span>Max</span><input id="settingsRepMax" type="number" min="1" step="1" value="12"></label>
-              </div>
-            </div>
-            <div class="settings-subsection">
-              <span class="settings-subhead">Time step</span>
-              <div class="step-pills" id="settingsTimeStepPills" role="group" aria-label="Time step in seconds"></div>
-            </div>
-          </div>
-          <div class="switch-row wide"><span class="switch-copy"><strong>Vary rep ranges by week</strong><span>Optional undulating periodization for new programs. Each program week can inherit its own range.</span></span><button class="switch" id="settingsUndulatingToggle" type="button" role="switch" aria-pressed="false" aria-label="Vary rep ranges by week off"></button></div>
-          <div class="settings-periodization" id="settingsPeriodizationWrap" hidden>
-            <button class="periodization-edit-button" id="editDefaultPeriodization" type="button">Edit default periodization</button>
-            <div class="undulating-panel" id="settingsUndulatingPanel" hidden>
-              <span class="filter-label">DEFAULT WEEKLY REP RANGE</span>
-              <div class="week-range-list" id="settingsWeekRangeList"></div>
-            </div>
-          </div>
-        </section>
-        <section class="dashboard-card">
-          <div class="section-head settings-head"><h2>Units</h2><p class="section-note">Pounds or kilograms for weight entry and display.</p></div>
-          <div class="step-pills" id="settingsUnitPills" role="group" aria-label="Weight units"><button type="button" data-units="imperial" aria-pressed="true">Pounds (lb)</button><button type="button" data-units="metric" aria-pressed="false">Kilograms (kg)</button></div>
-          <p class="section-note stats-default-label">Stats default metric</p>
-          <div class="step-pills" id="settingsStatsDefaultPills" role="group" aria-label="Stats default metric"><button type="button" data-stats-default="volume" aria-pressed="true">Volume</button><button type="button" data-stats-default="sets" aria-pressed="false">Sets</button></div>
-        </section>
-        <section class="dashboard-card">
-          <div class="section-head settings-head"><h2>About</h2></div>
-          <p class="section-note" id="appVersionLine">Cruciferous Greens Workout</p>
-          <p class="section-note" id="buildUpdatedLine">Last updated: —</p>
-          <p class="section-note"><button class="small-button" id="checkUpdatesButton" type="button">Check for updates</button></p>
-          <p class="section-note"><a href="https://github.com/cruciferousgreens/workout-app-accounts/blob/main/RELEASES.md" target="_blank" rel="noreferrer">Release notes</a></p>
-        </section>
-        <section class="dashboard-card">
-          <div class="section-head settings-head"><h2>Attributions</h2></div>
-          <ul class="attribution-list">
-            <li>Muscle heat map uses an anatomical front/back body SVG in the style of <a href="https://github.com/Olkre/Sasha-s-Body-Map" target="_blank" rel="noreferrer">Sasha-s-Body-Map</a>, with named muscle regions.</li>
-            <li>Exercise library: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noreferrer">free-exercise-db</a> — 876 exercises, public domain (Unlicense).</li>
-            <li>Built-in program template: StrongLifts 5×5 (<a href="https://stronglifts.com/5x5/" target="_blank" rel="noreferrer">stronglifts.com</a>).</li>
-            <li>Extra color themes use the <a href="https://github.com/catppuccin/catppuccin" target="_blank" rel="noreferrer">Catppuccin</a> palette and the <a href="https://rosepinetheme.com" target="_blank" rel="noreferrer">Rosé Pine</a> palette (Dawn).</li>
-            <li>The original color scheme was inspired by <a href="https://rosepinetheme.com" target="_blank" rel="noreferrer">Rosé Pine</a>.</li>
-          </ul>
-        </section>
-        <section class="dashboard-card">
-          <div class="section-head settings-head"><h2>Data</h2><p class="section-note">Backups and storage on this device.</p></div>
-          <div class="settings-actions">
-            <button class="small-button" id="exportDataButton" type="button">Export data (JSON)</button>
-            <button class="small-button danger" id="deleteAllDataButton" type="button">Delete all data</button>
-          </div>
-        </section>
+      <section class="dashboard-card">
+       <div class="section-head settings-head"><h2>Attributions</h2></div>
+       <ul class="attribution-list">
+        <li>Muscle heat map uses an anatomical front/back body SVG in the style of <a href="https://github.com/Olkre/Sasha-s-Body-Map" target="_blank" rel="noreferrer">Sasha-s-Body-Map</a>, with named muscle regions.</li>
+        <li>Exercise library: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noreferrer">free-exercise-db</a> — 876 exercises, public domain (Unlicense).</li>
+        <li>Built-in saved workout: StrongLifts 5×5 (<a href="https://stronglifts.com/5x5/" target="_blank" rel="noreferrer">stronglifts.com</a>).</li>
+        <li>Extra color themes use the <a href="https://github.com/catppuccin/catppuccin" target="_blank" rel="noreferrer">Catppuccin</a> palette and the <a href="https://rosepinetheme.com" target="_blank" rel="noreferrer">Rosé Pine</a> palette (Dawn).</li>
+        <li>The original color scheme was inspired by <a href="https://rosepinetheme.com" target="_blank" rel="noreferrer">Rosé Pine</a>.</li>
+       </ul>
       </section>
+      <section class="dashboard-card">
+       <div class="section-head settings-head"><h2>Data</h2><p class="section-note">Backups and storage on this device.</p></div>
+       <div class="settings-actions">
+        <button class="small-button" id="exportDataButton" type="button">Export data (JSON)</button>
+        <button class="small-button" id="importCsvButton" type="button">Import workouts (CSV)</button>
+        <button class="small-button danger" id="deleteAllDataButton" type="button">Delete all data</button>
+       </div>
+      </section>
+    </section>
 
-      <article id="detailView" class="detail" aria-live="polite">
-        <header class="detail-header">
-          <div>
-            <h1 class="detail-title" id="detailTitle"></h1>
-            <div class="detail-tags" id="detailTags"></div>
+    <article id="detailView" class="detail" aria-live="polite">
+      <header class="detail-header">
+       <div>
+        <h1 class="detail-title" id="detailTitle"></h1>
+        <div class="detail-tags" id="detailTags"></div>
+       </div>
+       <button class="fav-toggle" id="detailFavToggle" type="button" aria-pressed="false" aria-label="Add to favorites">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9z"/></svg>
+       </button>
+      </header>
+
+      <div class="stats" id="stats"></div>
+      <!-- Card order (user 2026-09-12): header, stats, muscle map, trends,
+           similar, how-to, notes, history. #125 moved trends here from Stats;
+           2026-09-12 puts the muscle map ahead of the charts.
+           Phone QA 2026-09-11: exercise images removed for now; similar
+           exercises auto-collapse. -->
+      <section class="dashboard-card chart-card exercise-musclemap"><button class="exercise-info-button musclemap-info" id="muscleMapInfoButton" type="button" aria-label="About this movement">i</button><div class="section-head"><h2>Muscles worked</h2></div><div id="exerciseBodyMap"></div></section>
+      <section class="dashboard-card chart-card"><div class="section-head"><h2>Progress</h2><p class="section-note" id="progressNote">Estimated 1RM and volume per session · tap a point to inspect it</p></div><div class="chart-wrap" id="exerciseProgressChart"></div><div class="chart-wrap" id="exerciseVolumeChart"></div></section>
+      <details class="dashboard-card similar-disclosure">
+        <summary><span><strong>Similar exercises</strong><span class="section-note">Ranked by movement overlap</span></span><span class="disclosure-chev" aria-hidden="true">›</span></summary>
+        <div class="similar-grid" id="similarGrid"></div>
+      </details>
+      <section class="dashboard-card" aria-labelledby="howHeading">
+        <div class="section-head"><h2 id="howHeading">How to</h2></div>
+        <ol class="instructions" id="instructions"></ol>
+      </section>
+      <section class="dashboard-card" aria-labelledby="notesHeading">
+        <div class="section-head"><h2 id="notesHeading">Notes</h2></div>
+        <div class="note-card" id="noteCard"></div>
+      </section>
+      <section class="dashboard-card" aria-labelledby="historyHeading">
+        <div class="section-head"><h2 id="historyHeading">History</h2><p class="section-note" id="historyCount"></p></div>
+        <button class="history-toggle" id="historyToggle" type="button" aria-expanded="false" aria-controls="historyList"><span id="historyToggleLabel">Show history</span><span class="toggle-chevron" aria-hidden="true">›</span></button>
+        <div class="history-list" id="historyList" hidden></div>
+      </section>
+      <div class="custom-tools-row" id="customToolsRow"></div>
+      <dialog class="custom-dialog" id="movementInfoDialog" aria-labelledby="movementInfoTitle">
+        <div class="custom-form">
+          <div class="custom-form-head">
+            <div><h2 id="movementInfoTitle">Movement</h2><p id="movementInfoSub"></p></div>
+            <button class="dialog-close" id="closeMovementInfo" type="button" aria-label="Close">×</button>
           </div>
-          <button class="fav-toggle" id="detailFavToggle" type="button" aria-pressed="false" aria-label="Add to favorites">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5-5.8-3-5.8 3 1.1-6.5L2.6 9.4l6.5-.9z"/></svg>
-          </button>
-        </header>
+          <dl class="movement-list" id="movementInfoBody"></dl>
+        </div>
+      </dialog>
+    </article>
+   </main>
 
-        <div class="exercise-visual" id="exerciseVisual"></div>
-        <div class="stats" id="stats"></div>
-        <section class="dashboard-card chart-card" id="exerciseProgressSection"><div class="section-head"><h2>Projected 1RM trend</h2><p class="section-note">By completed workout</p></div><div class="chart-wrap" id="exerciseProgressChart"></div></section>
-        <section class="dashboard-card chart-card exercise-musclemap" id="exerciseMuscleMapSection"><div class="section-head"><h2>Muscles worked</h2></div><div id="exerciseBodyMap"></div></section>
+   <div class="app-toast" id="appToast" role="status" aria-live="polite" hidden></div>
+   <dialog class="custom-dialog compact-dialog" id="updateAvailableDialog" aria-labelledby="updateAvailableTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="updateAvailableTitle">Update ready</h2><p>A new version of the app has finished downloading.</p></div><button class="dialog-close" id="closeUpdateAvailable" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="updateRefreshNow" type="button">Refresh now</button><button class="secondary-button" id="updateLater" type="button">Later</button></div></div>
+   </dialog>
+   <dialog class="custom-dialog compact-dialog" id="replaceDraftDialog" aria-labelledby="replaceDraftTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="replaceDraftTitle">Replace current workout?</h2><p>Your in-progress workout will be discarded and replaced with the selected session.</p></div><button class="dialog-close" id="closeReplaceDraft" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepCurrentDraft" type="button">Keep current</button><button class="primary-button" id="confirmReplaceDraft" type="button">Replace workout</button></div></div>
+   </dialog>
+   <dialog class="custom-dialog compact-dialog" id="startSavedConflictDialog" aria-labelledby="startSavedConflictTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="startSavedConflictTitle">Workout in progress</h2><p id="startSavedConflictDesc">You have a workout in progress.</p></div><button class="dialog-close" id="closeStartSavedConflict" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="backToLiveWorkout" type="button">Back to live workout</button><button class="secondary-button" id="switchToSavedWorkout" type="button">Switch workout</button></div></div>
+   </dialog>
+   <dialog class="custom-dialog compact-dialog" id="discardDraftDialog" aria-labelledby="discardDraftTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="discardDraftTitle">Discard workout?</h2><p>This permanently deletes the in-progress workout.</p></div><button class="dialog-close" id="closeDiscardDraft" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepDraftButton" type="button">Keep editing</button><button class="primary-button danger-button" id="confirmDiscardDraft" type="button">Discard</button></div></div>
+   </dialog>
+   <dialog class="custom-dialog compact-dialog" id="builderDraftExistsDialog" aria-labelledby="builderDraftExistsTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="builderDraftExistsTitle">Saved workout draft in progress</h2><p>You have an unfinished saved workout draft.</p></div><button class="dialog-close" id="closeBuilderDraftExists" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepBuilderDraft" type="button">Keep draft</button><button class="primary-button danger-button" id="deleteBuilderDraft" type="button">Delete draft</button></div></div>
+   </dialog>
+   <dialog class="custom-dialog compact-dialog" id="reviewSetsDialog" aria-labelledby="reviewSetsTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="reviewSetsTitle">Review sets</h2><p id="reviewSetsCopy"></p></div><button class="dialog-close" id="closeReviewSets" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="reviewSetsComplete" type="button">Mark all complete</button><button class="secondary-button danger-button" id="reviewSetsDelete" type="button">Finish and delete empty sets</button><button class="secondary-button" id="reviewSetsCancel" type="button">Keep editing</button></div></div>
+   </dialog>
+   <dialog class="custom-dialog compact-dialog" id="focusConfirmDialog" aria-labelledby="focusConfirmTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="focusConfirmTitle">Apply to every exercise?</h2><p id="focusConfirmCopy"></p></div><button class="dialog-close" id="closeFocusConfirm" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="focusConfirmApply" type="button">Apply</button><button class="secondary-button" id="focusConfirmCancel" type="button">Cancel</button></div></div>
+   </dialog>
 
-        <div class="detail-layout">
-          <div>
-            <section class="section" aria-labelledby="historyHeading">
-              <div class="section-head"><h2 id="historyHeading">History</h2><p class="section-note" id="historyCount"></p></div>
-              <div class="history-list" id="historyList"></div>
-              <p class="formula" id="formulaNote"></p>
-            </section>
-            <section class="section" aria-labelledby="similarHeading">
-              <details class="similar-collapse"><summary><span class="section-head"><h2 id="similarHeading">Similar exercises</h2><p class="section-note">Ranked by movement overlap</p></span></summary>
-              <div class="similar-grid" id="similarGrid"></div></details>
-            </section>
-          </div>
-          <aside class="detail-aside">
-            <section class="section" aria-labelledby="notesHeading">
-              <div class="section-head"><h2 id="notesHeading">Notes</h2></div>
-              <div class="note-card" id="noteCard"></div>
-            </section>
-            <section class="section" aria-labelledby="movementHeading">
-              <div class="section-head"><h2 id="movementHeading">Movement</h2></div>
-              <div class="movement-card" id="movementCard"></div>
-            </section>
-            <section class="section" aria-labelledby="howHeading">
-              <div class="section-head"><h2 id="howHeading">How to</h2></div>
-              <ol class="instructions" id="instructions"></ol>
-            </section>
-          </aside>
-        </div>
-        <div class="custom-delete-row" id="customDeleteRow"></div>
-      </article>
-    </main>
-
-    <div class="app-toast" id="appToast" role="status" aria-live="polite" hidden></div>
-    <dialog class="custom-dialog compact-dialog" id="updateAvailableDialog" aria-labelledby="updateAvailableTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="updateAvailableTitle">Update ready</h2><p>A new version of the app has finished downloading.</p></div><button class="dialog-close" id="closeUpdateAvailable" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="updateRefreshNow" type="button">Refresh now</button><button class="secondary-button" id="updateLater" type="button">Later</button></div></div>
-    </dialog>
-    <dialog class="custom-dialog compact-dialog" id="replaceDraftDialog" aria-labelledby="replaceDraftTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="replaceDraftTitle">Replace current workout?</h2><p>Your in-progress workout will be discarded and replaced with the selected session.</p></div><button class="dialog-close" id="closeReplaceDraft" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepCurrentDraft" type="button">Keep current</button><button class="primary-button" id="confirmReplaceDraft" type="button">Replace workout</button></div></div>
-    </dialog>
-    <dialog class="custom-dialog compact-dialog" id="discardDraftDialog" aria-labelledby="discardDraftTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="discardDraftTitle">Discard workout?</h2><p>This permanently deletes the in-progress workout.</p></div><button class="dialog-close" id="closeDiscardDraft" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepDraftButton" type="button">Keep editing</button><button class="primary-button danger-button" id="confirmDiscardDraft" type="button">Discard</button></div></div>
-    </dialog>
-    <dialog class="custom-dialog compact-dialog" id="reviewSetsDialog" aria-labelledby="reviewSetsTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="reviewSetsTitle">Review sets</h2><p id="reviewSetsCopy"></p></div><button class="dialog-close" id="closeReviewSets" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="reviewSetsComplete" type="button">Mark all complete</button><button class="secondary-button danger-button" id="reviewSetsDelete" type="button">Finish and delete empty sets</button><button class="secondary-button" id="reviewSetsCancel" type="button">Keep editing</button></div></div>
-    </dialog>
-    <dialog class="custom-dialog compact-dialog" id="focusConfirmDialog" aria-labelledby="focusConfirmTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="focusConfirmTitle">Apply to every exercise?</h2><p id="focusConfirmCopy"></p></div><button class="dialog-close" id="closeFocusConfirm" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="focusConfirmApply" type="button">Apply</button><button class="secondary-button" id="focusConfirmCancel" type="button">Cancel</button></div></div>
-    </dialog>
-
-    <dialog class="custom-dialog" id="customExerciseDialog" aria-labelledby="customExerciseTitle">
-      <form class="custom-form" id="customExerciseForm" novalidate>
-        <div class="custom-form-head">
-          <div>
-            <h2 id="customExerciseTitle">Custom exercise</h2>
-            <p>Add a movement that isn’t in the library. It’s saved to your library and syncs across your devices.</p>
-          </div>
-          <button class="dialog-close" id="closeCustomDialog" type="button" aria-label="Close">×</button>
-        </div>
-        <input id="customExerciseId" type="hidden" />
-        <div class="form-grid">
-          <div class="field wide">
-            <label for="customName">NAME</label>
-            <input id="customName" type="text" autocomplete="off" placeholder="e.g. Kneeling cable pulldown" required />
-          </div>
-          <fieldset class="field wide">
-            <legend>PRIMARY MUSCLES</legend>
-            <div class="form-pill-options" id="customPrimaryOptions" role="group" aria-label="Primary muscles"></div>
-            <span class="field-help">Select one or more.</span>
-          </fieldset>
-          <fieldset class="field wide">
-            <legend>SECONDARY MUSCLES</legend>
-            <div class="form-pill-options" id="customSecondaryOptions" role="group" aria-label="Secondary muscles"></div>
-            <span class="field-help">Optional. A muscle can’t be both primary and secondary.</span>
-          </fieldset>
-          <fieldset class="field wide">
-            <legend>EQUIPMENT</legend>
-            <div class="form-pill-options" id="customEquipmentOptions" role="group" aria-label="Equipment"></div>
-            <span class="field-help">Choose one, or leave blank.</span>
-          </fieldset>
-          <fieldset class="field">
-            <legend>FORCE</legend>
-            <div class="form-pill-options" id="customForceOptions" role="group" aria-label="Force"></div>
-            <span class="field-help">Push, pull, or static.</span>
-          </fieldset>
-          <fieldset class="field">
-            <legend>MECHANIC</legend>
-            <div class="form-pill-options" id="customMechanicOptions" role="group" aria-label="Mechanic"></div>
-            <span class="field-help">Compound or isolation.</span>
-          </fieldset>
-          <fieldset class="field">
-            <legend>TRACKING</legend>
-            <div class="form-pill-options" id="customTrackingOptions" role="group" aria-label="Tracking type"></div>
-            <span class="field-help">Log repetitions or seconds.</span>
-          </fieldset>
-          <div class="field wide">
-            <label for="customInstructions">INSTRUCTIONS</label>
-            <textarea id="customInstructions" placeholder="Enter one step per line"></textarea>
-          </div>
-        </div>
-        <p class="form-error" id="customFormError" role="alert"></p>
-        <div class="form-actions">
-          <button class="form-action secondary" id="cancelCustomExercise" type="button">Cancel</button>
-          <button class="form-action primary" type="submit">Add exercise</button>
-        </div>
-      </form>
-    </dialog>
-
-    <dialog class="custom-dialog" id="progressionInfoDialog" aria-labelledby="progressionInfoTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="progressionInfoTitle">Progression defaults</h2><p>How the app suggests your next session.</p></div>
-          <button class="dialog-close" id="closeProgressionInfo" type="button" aria-label="Close">×</button>
-        </div>
-        <div class="info-list">
-          <p><strong>Progression mode</strong><span>RPE-based adds reps inside the range first, then weight, when the top set hits the RPE trigger. Linear adds the increment every session with no RPE needed.</span></p>
-          <p><strong>RPE trigger threshold</strong><span>When your top set comes in at or under this RPE, the app suggests progressing next session.</span></p>
-          <p><strong>Increment type &amp; value</strong><span>How much load to add on a progression: a fixed amount (lb or kg) or a percent of the current weight.</span></p>
-          <p><strong>Default focus</strong><span>The rep-range preset applied to new programs and exercises.</span></p>
-          <p><strong>Default rep range</strong><span>Min and max reps for double progression: add reps inside the range first, then add weight and return to the bottom of the range.</span></p>
-          <p><strong>Time step</strong><span>For timed exercises, how many extra seconds to hold before adding weight.</span></p>
-          <p><strong>Vary rep ranges by week</strong><span>Optional undulating periodization for new programs: each program week can inherit its own rep range.</span></p>
-        </div>
-        <div class="form-actions"><button class="form-action primary" id="doneProgressionInfo" type="button">Got it</button></div>
+   <dialog class="custom-dialog" id="customExerciseDialog" aria-labelledby="customExerciseTitle">
+    <form class="custom-form" id="customExerciseForm" novalidate>
+      <div class="custom-form-head">
+       <div>
+        <h2 id="customExerciseTitle">Custom exercise</h2>
+        <p>Add a movement that isn’t in the library. It’s saved to your library and syncs across your devices.</p>
+       </div>
+       <button class="dialog-close" id="closeCustomDialog" type="button" aria-label="Close">×</button>
       </div>
-    </dialog>
+      <input id="customExerciseId" type="hidden" />
+      <div class="form-grid">
+       <div class="field wide">
+        <label for="customName">NAME</label>
+        <input id="customName" type="text" autocomplete="off" placeholder="e.g. Kneeling cable pulldown" required />
+       </div>
+       <fieldset class="field wide">
+        <legend>PRIMARY MUSCLES</legend>
+        <div class="form-pill-options" id="customPrimaryOptions" role="group" aria-label="Primary muscles"></div>
+        <span class="field-help">Select one or more.</span>
+       </fieldset>
+       <fieldset class="field wide">
+        <legend>SECONDARY MUSCLES</legend>
+        <div class="form-pill-options" id="customSecondaryOptions" role="group" aria-label="Secondary muscles"></div>
+        <span class="field-help">Optional. A muscle can’t be both primary and secondary.</span>
+       </fieldset>
+       <fieldset class="field wide">
+        <legend>EQUIPMENT</legend>
+        <div class="form-pill-options" id="customEquipmentOptions" role="group" aria-label="Equipment"></div>
+        <span class="field-help">Choose one, or leave blank.</span>
+       </fieldset>
+       <fieldset class="field">
+        <legend>FORCE</legend>
+        <div class="form-pill-options" id="customForceOptions" role="group" aria-label="Force"></div>
+        <span class="field-help">Push, pull, or static.</span>
+       </fieldset>
+       <fieldset class="field">
+        <legend>MECHANIC</legend>
+        <div class="form-pill-options" id="customMechanicOptions" role="group" aria-label="Mechanic"></div>
+        <span class="field-help">Compound or isolation.</span>
+       </fieldset>
+       <fieldset class="field">
+        <legend>TRACKING</legend>
+        <div class="form-pill-options" id="customTrackingOptions" role="group" aria-label="Tracking type"></div>
+        <span class="field-help">Log repetitions or seconds.</span>
+       </fieldset>
+       <div class="field wide">
+        <label for="customInstructions">INSTRUCTIONS</label>
+        <textarea id="customInstructions" placeholder="Enter one step per line"></textarea>
+       </div>
+      </div>
+      <p class="form-error" id="customFormError" role="alert"></p>
+      <div class="form-actions">
+       <button class="form-action secondary" id="cancelCustomExercise" type="button">Cancel</button>
+       <button class="form-action primary" type="submit">Add exercise</button>
+      </div>
+    </form>
+   </dialog>
 
-    <dialog class="custom-dialog" id="deleteAllDialog" aria-labelledby="deleteAllTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="deleteAllTitle">Delete all data?</h2><p>This erases everything on this device and in your cloud backup.</p></div>
-          <button class="dialog-close" id="cancelDeleteAll" type="button" aria-label="Close">×</button>
-        </div>
-        <div class="info-list">
-          <p><span>All workouts, templates, programs, custom exercises, favorites, tags, and settings will be permanently erased. This cannot be undone.</span></p>
-        </div>
-        <div class="form-actions">
-          <button class="form-action secondary" id="keepDeleteAll" type="button">Keep my data</button>
-          <button class="form-action danger" id="confirmDeleteAll" type="button">Delete everything</button>
-        </div>
+   <dialog class="custom-dialog" id="progressionInfoDialog" aria-labelledby="progressionInfoTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="progressionInfoTitle">Progression defaults</h2><p>How the app suggests your next session.</p></div>
+       <button class="dialog-close" id="closeProgressionInfo" type="button" aria-label="Close">×</button>
       </div>
-    </dialog>
-    <dialog class="custom-dialog" id="deleteProgramWorkoutDialog" aria-labelledby="deleteProgramWorkoutTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="deleteProgramWorkoutTitle">Delete workout?</h2><p id="deleteProgramWorkoutDesc">This removes the workout from your program.</p></div>
-          <button class="dialog-close" id="cancelDeleteProgramWorkout" type="button" aria-label="Close">×</button>
-        </div>
-        <div class="form-actions">
-          <button class="form-action secondary" id="keepProgramWorkout" type="button">Keep</button>
-          <button class="form-action danger" id="confirmDeleteProgramWorkout" type="button">Delete</button>
-        </div>
+      <div class="info-list">
+       <p><strong>Progression mode</strong><span>RPE-based adds reps inside the range first, then weight, when the top set hits the RPE trigger. Linear adds the increment every session with no RPE needed.</span></p>
+       <p><strong>RPE trigger threshold</strong><span>When your top set comes in at or under this RPE, the app suggests progressing next session.</span></p>
+       <p><strong>Increment type &amp; value</strong><span>How much load to add on a progression: a fixed amount (lb or kg) or a percent of the current weight.</span></p>
+       <p><strong>Default focus</strong><span>The rep-range preset applied to new programs and exercises.</span></p>
+       <p><strong>Default rep range</strong><span>Min and max reps for double progression: add reps inside the range first, then add weight and return to the bottom of the range.</span></p>
+       <p><strong>Time step</strong><span>For timed exercises, how many extra seconds to hold before adding weight.</span></p>
+       <p><strong>Vary rep ranges by week</strong><span>Optional undulating periodization for new programs: each program week can inherit its own rep range.</span></p>
       </div>
-    </dialog>
-    <dialog class="custom-dialog" id="removeExerciseDialog" aria-labelledby="removeExerciseTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="removeExerciseTitle">Remove exercise?</h2><p id="removeExerciseDesc">This removes the exercise from your workout.</p></div>
-          <button class="dialog-close" id="cancelRemoveExercise" type="button" aria-label="Close">×</button>
-        </div>
-        <div class="form-actions">
-          <button class="form-action secondary" id="keepExercise" type="button">Keep</button>
-          <button class="form-action danger" id="confirmRemoveExercise" type="button">Remove</button>
-        </div>
-      </div>
-    </dialog>
-    <dialog class="custom-dialog" id="reorderExercisesDialog" aria-labelledby="reorderExercisesTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="reorderExercisesTitle">Reorder exercises</h2><p>Use the arrows to change the order.</p></div>
-          <button class="dialog-close" id="cancelReorderExercises" type="button" aria-label="Close">×</button>
-        </div>
-        <div class="reorder-list" id="reorderExercisesList"></div>
-        <div class="form-actions">
-          <button class="form-action primary" id="doneReorderExercises" type="button">Done</button>
-        </div>
-      </div>
-    </dialog>
-    <dialog class="custom-dialog compact-dialog" id="renameTemplateDialog" aria-labelledby="renameTemplateTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="renameTemplateTitle">Rename template</h2></div><button class="dialog-close" id="cancelRenameTemplate" type="button" aria-label="Close">×</button></div><label class="rule-field"><span>Template name</span><input id="renameTemplateInput" type="text" maxlength="80" autocomplete="off"></label><div class="form-actions"><button class="form-action primary" id="saveRenameTemplate" type="button">Save</button></div></div>
-    </dialog>
-    <dialog class="custom-dialog compact-dialog" id="newTemplateDialog" aria-labelledby="newTemplateTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="newTemplateTitle">New template</h2></div><button class="dialog-close" id="cancelNewTemplate" type="button" aria-label="Close">×</button></div><label class="rule-field"><span>Template name</span><input id="newTemplateInput" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Push day"></label><div class="form-actions"><button class="form-action primary" id="saveNewTemplate" type="button">Create</button></div></div>
-    </dialog>
-    <dialog class="custom-dialog" id="deleteTemplateDialog" aria-labelledby="deleteTemplateTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="deleteTemplateTitle">Delete template?</h2><p id="deleteTemplateDesc">This cannot be undone.</p></div>
-          <button class="dialog-close" id="cancelDeleteTemplate" type="button" aria-label="Close">×</button>
-        </div>
-        <div class="form-actions">
-          <button class="form-action secondary" id="keepTemplate" type="button">Keep</button>
-          <button class="form-action danger" id="confirmDeleteTemplate" type="button">Delete</button>
-        </div>
-      </div>
-    </dialog>
-    <dialog class="custom-dialog" id="deleteCompletedWorkoutDialog" aria-labelledby="deleteCompletedWorkoutTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="deleteCompletedWorkoutTitle">Delete workout?</h2><p id="deleteCompletedWorkoutDesc">This permanently deletes this workout from your history.</p></div>
-          <button class="dialog-close" id="cancelDeleteCompletedWorkout" type="button" aria-label="Close">×</button>
-        </div>
-        <div class="form-actions">
-          <button class="form-action secondary" id="keepCompletedWorkout" type="button">Keep</button>
-          <button class="form-action danger" id="confirmDeleteCompletedWorkout" type="button">Delete</button>
-        </div>
-      </div>
-    </dialog>
+      <div class="form-actions"><button class="form-action primary" id="doneProgressionInfo" type="button">Got it</button></div>
+    </div>
+   </dialog>
 
-    <dialog class="custom-dialog compact-dialog" id="accountDialog" aria-labelledby="accountDialogTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="accountDialogTitle">Account</h2><p id="accountDialogEmail"></p></div><button class="dialog-close" id="closeAccountDialog" type="button" aria-label="Close">×</button></div><dl class="account-info"><div><dt>Display name</dt><dd id="accountDialogName"></dd></div><div><dt>Plan</dt><dd id="accountDialogPlan"></dd></div><div><dt>Last synced</dt><dd id="accountDialogSync"></dd></div></dl><div class="form-actions"><button id="accountDialogSyncNow" type="button">Sync now</button><button id="accountDialogEditName" type="button">Edit name</button><button id="accountDialogSignOut" type="button">Sign out</button><button class="danger-text" id="accountDialogDelete" type="button">Delete account</button></div></div>
-    </dialog>
-    <dialog class="custom-dialog compact-dialog" id="deleteAccountDialog" aria-labelledby="deleteAccountTitle">
-      <div class="custom-form"><div class="custom-form-head"><div><h2 id="deleteAccountTitle">Delete account?</h2><p id="deleteAccountDesc">This deletes all your data from this device and the cloud. This cannot be undone.</p></div><button class="dialog-close" id="closeDeleteAccount" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="cancelDeleteAccount" type="button">Keep my account</button><button class="danger-button" id="confirmDeleteAccount" type="button">Delete everything</button></div></div>
-    </dialog>
-
-    <dialog class="custom-dialog" id="editNameDialog" aria-labelledby="editNameTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="editNameTitle">Display name</h2><p>Shown in your account settings.</p></div>
-          <button class="dialog-close" id="cancelEditName" type="button" aria-label="Close">×</button>
-        </div>
-        <label class="rule-field"><span>Name</span><input id="editNameInput" type="text" autocomplete="name" maxlength="60"></label>
-        <div class="form-actions">
-          <button class="form-action secondary" id="dismissEditName" type="button">Cancel</button>
-          <button class="form-action primary" id="saveNameButton" type="button">Save</button>
-        </div>
+   <dialog class="custom-dialog" id="deleteAllDialog" aria-labelledby="deleteAllTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="deleteAllTitle">Delete all data?</h2><p>This erases everything on this device and in your cloud backup.</p></div>
+       <button class="dialog-close" id="cancelDeleteAll" type="button" aria-label="Close">×</button>
       </div>
-    </dialog>
-
-    <dialog class="custom-dialog" id="exercisePickerDialog" aria-labelledby="exercisePickerTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="exercisePickerTitle">Add exercise</h2><p>Choose a movement for this workout.</p></div>
-          <button class="dialog-close" id="closeExercisePicker" type="button" aria-label="Close">×</button>
-        </div>
-        <label class="sr-only" for="exercisePickerSearch">Search exercises</label>
-        <div class="picker-template-options" id="pickerTemplateOptions" hidden></div>
-        <div class="picker-controls">
-          <div class="search-wrap">
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
-            <input class="picker-search" id="exercisePickerSearch" type="search" autocomplete="off" placeholder="Search exercises…" />
-          </div>
-          <button class="filter-button picker-filter-button" id="pickerFilterToggle" type="button" aria-expanded="false" aria-controls="pickerFilterPanel" aria-label="Filters">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"></path></svg>
-            <span>Filters</span>
-          </button>
-        </div>
-        <div class="filter-panel picker-filter-panel" id="pickerFilterPanel">
-          <div class="filter-group">
-            <div class="filter-label-row"><span class="filter-label">SHOW</span></div>
-            <div class="muscle-options" role="group" aria-label="Show">
-              <button class="muscle-option" id="pickerFavoritesToggle" type="button" aria-pressed="false">★ Favorites</button>
-              <button class="muscle-option" id="pickerCustomToggle" type="button" aria-pressed="false">Custom</button>
-            </div>
-          </div>
-          <div class="filter-group">
-            <div class="filter-label-row"><span class="filter-label">MUSCLES</span><button class="filter-clear" id="pickerClearMuscles" type="button" hidden>Clear</button></div>
-            <div class="muscle-options" id="pickerMuscleOptions" role="group" aria-label="Muscles"></div>
-          </div>
-          <div class="filter-group"><label for="pickerEquipmentFilter">EQUIPMENT</label><select id="pickerEquipmentFilter"><option value="">All equipment</option></select></div>
-        </div>
-        <div class="picker-list" id="exercisePickerList"></div>
-        <div class="picker-footer"><button class="primary-button" id="doneExercisePicker" type="button">Done</button></div>
+      <div class="info-list">
+       <p><span>All workouts, saved workouts, programs, custom exercises, favorites, tags, and settings will be permanently erased. This cannot be undone.</span></p>
       </div>
-    </dialog>
-
-    <dialog class="custom-dialog tag-dialog" id="setTagsDialog" aria-labelledby="setTagsTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="setTagsTitle">Set tags</h2><p>Select any details that apply to this set.</p></div>
-          <button class="dialog-close" id="closeSetTags" type="button" aria-label="Close">×</button>
-        </div>
-        <div class="tag-picker-options" id="tagPickerOptions" role="group" aria-label="Set tags"></div>
-        <details class="tag-list-editor">
-          <summary>Edit tag list</summary>
-          <div class="tag-editor"><label class="sr-only" for="newTagInput">New set tag</label><input id="newTagInput" type="text" autocomplete="off" placeholder="Add a custom tag"><button class="secondary-button" id="addTagButton" type="button">Add</button></div>
-          <div class="tag-list" id="editableTagList"></div>
-        </details>
-        <div class="form-actions"><button class="form-action primary" id="doneSetTags" type="button">Done</button></div>
+      <div class="form-actions">
+       <button class="form-action secondary" id="keepDeleteAll" type="button">Keep my data</button>
+       <button class="form-action danger" id="confirmDeleteAll" type="button">Delete everything</button>
       </div>
-    </dialog>
-
-    <dialog class="custom-dialog tag-dialog" id="exerciseTagsDialog" aria-labelledby="exerciseTagsTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="exerciseTagsTitle">Exercise tags</h2><p>These labels stay with this exercise in the live workout and its history.</p></div>
-          <button class="dialog-close" id="closeExerciseTags" type="button" aria-label="Close">×</button>
-        </div>
-        <div class="tag-picker-options" id="exerciseTagPickerOptions" role="group" aria-label="Exercise tags"></div>
-        <div class="tag-list-editor">
-          <div class="tag-editor"><label class="sr-only" for="newExerciseTagInput">New exercise tag</label><input id="newExerciseTagInput" type="text" autocomplete="off" placeholder="Add a custom exercise tag"><button class="secondary-button" id="addExerciseTagButton" type="button">Add</button></div>
-        </div>
-        <div class="form-actions"><button class="form-action primary" id="doneExerciseTags" type="button">Done</button></div>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog" id="deleteProgramWorkoutDialog" aria-labelledby="deleteProgramWorkoutTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="deleteProgramWorkoutTitle">Delete workout?</h2><p id="deleteProgramWorkoutDesc">This removes the workout from your program.</p></div>
+       <button class="dialog-close" id="cancelDeleteProgramWorkout" type="button" aria-label="Close">×</button>
       </div>
-    </dialog>
-
-    <dialog class="custom-dialog tag-dialog" id="supersetDialog" aria-labelledby="supersetTitle">
-      <div class="custom-form">
-        <div class="custom-form-head">
-          <div><h2 id="supersetTitle">Create a superset</h2><p id="supersetDescription">Choose one or more exercises to group together.</p></div>
-          <button class="dialog-close" id="closeSuperset" type="button" aria-label="Close">×</button>
-        </div>
-        <div class="picker-list" id="supersetOptions"></div>
-        <div class="form-actions"><button class="form-action primary" id="doneSuperset" type="button">Done</button></div>
+      <div class="form-actions">
+       <button class="form-action secondary" id="keepProgramWorkout" type="button">Keep</button>
+       <button class="form-action danger" id="confirmDeleteProgramWorkout" type="button">Delete</button>
       </div>
-    </dialog>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog" id="savedFilterDialog" aria-labelledby="savedFilterTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="savedFilterTitle">Filter saved workouts</h2><p>Muscles, program membership, or both.</p></div>
+       <button class="dialog-close" id="closeSavedFilter" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="filter-label-row"><span class="filter-label" id="savedMuscleFilterLabel">PRIMARY MUSCLES</span><button class="filter-clear" id="clearSavedMuscles" type="button" hidden>Clear</button></div>
+      <div class="muscle-options" id="savedMuscleOptions" role="group" aria-labelledby="savedMuscleFilterLabel"></div>
+      <div class="filter-label-row"><span class="filter-label">PROGRAM</span></div>
+      <div class="muscle-options"><button class="muscle-option" id="savedInProgramToggle" type="button" aria-pressed="false">In a program</button></div>
+      <div class="form-actions">
+       <button class="form-action secondary" id="clearSavedFilters" type="button">Clear all</button>
+       <button class="form-action primary" id="applySavedFilters" type="button">Show workouts</button>
+      </div>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog" id="shareLinkDialog" aria-labelledby="shareLinkTitle">
+    <div class="custom-form">
+     <div class="custom-form-head">
+      <div><h2 id="shareLinkTitle">Share link</h2><p id="shareLinkNote">Copy this link and send it to a friend.</p></div>
+      <button class="dialog-close" id="closeShareLinkDialog" type="button" aria-label="Close">×</button>
+     </div>
+     <input id="shareLinkField" class="share-link-field" readonly autocomplete="off" spellcheck="false" aria-label="Share link">
+     <div class="form-actions">
+      <button class="form-action secondary" id="closeShareLinkDone" type="button">Done</button>
+      <button class="form-action secondary" id="nativeShareLinkBtn" type="button" hidden>Share…</button>
+      <button class="form-action primary" id="copyShareLinkBtn" type="button">Copy link</button>
+     </div>
+    </div>
+   </dialog>
+   <!-- Incoming share modal (user 2026-09-12): a share link tapped while the
+        app is already open pops the shared workout/program as a modal over
+        the current screen instead of yanking the user to a new page. -->
+   <dialog class="custom-dialog share-incoming-dialog" id="shareIncomingDialog" aria-labelledby="shareIncomingTitle">
+    <h2 id="shareIncomingTitle" class="sr-only">Shared workout</h2>
+    <div id="shareIncomingBody" class="share-incoming-body"></div>
+   </dialog>
+   <dialog class="custom-dialog" id="removeExerciseDialog" aria-labelledby="removeExerciseTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="removeExerciseTitle">Remove exercise?</h2><p id="removeExerciseDesc">This removes the exercise from your workout.</p></div>
+       <button class="dialog-close" id="cancelRemoveExercise" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="form-actions">
+       <button class="form-action secondary" id="keepExercise" type="button">Keep</button>
+       <button class="form-action danger" id="confirmRemoveExercise" type="button">Remove</button>
+      </div>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog" id="reorderExercisesDialog" aria-labelledby="reorderExercisesTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="reorderExercisesTitle">Reorder exercises</h2><p>Use the arrows to change the order.</p></div>
+       <button class="dialog-close" id="cancelReorderExercises" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="reorder-list" id="reorderExercisesList"></div>
+      <div class="form-actions">
+       <button class="form-action primary" id="doneReorderExercises" type="button">Done</button>
+      </div>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog compact-dialog" id="builderConfigureDialog" aria-labelledby="builderConfigureTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="builderConfigureTitle">Exercise targets</h2><p id="builderConfigureSub">Target rep range per set.</p></div><button class="dialog-close" id="cancelBuilderConfigure" type="button" aria-label="Close">×</button></div><div class="builder-configure-fields"><label class="rule-field"><span id="builderConfigureMinLabel">Min reps</span><input id="builderConfigureMin" type="number" inputmode="numeric" min="1"></label><label class="rule-field"><span id="builderConfigureMaxLabel">Max reps</span><input id="builderConfigureMax" type="number" inputmode="numeric" min="1" placeholder="AMRAP"></label></div><div class="form-actions"><button class="form-action primary" id="applyBuilderConfigure" type="button">Apply</button></div></div>
+   </dialog>
+   <dialog class="custom-dialog compact-dialog" id="discardProgramChangesDialog" aria-labelledby="discardProgramChangesTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="discardProgramChangesTitle">Discard changes?</h2><p>Your edits to this program will be lost.</p></div>
+       <button class="dialog-close" id="keepProgramChanges" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="form-actions">
+       <button class="form-action secondary" id="keepProgramChangesBtn" type="button">Keep editing</button>
+       <button class="form-action danger" id="confirmDiscardProgramChanges" type="button">Discard</button>
+      </div>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog" id="addSavedToProgramDialog" aria-labelledby="addSavedToProgramTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="addSavedToProgramTitle">Add saved workout</h2><p>Choose a saved workout to add to this program.</p></div>
+       <button class="dialog-close" id="closeAddSavedToProgram" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="addSavedToProgramList" class="dialog-list"></div>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog" id="deleteTemplateDialog" aria-labelledby="deleteTemplateTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="deleteTemplateTitle">Delete saved workout?</h2><p id="deleteTemplateDesc">This cannot be undone.</p></div>
+       <button class="dialog-close" id="cancelDeleteTemplate" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="form-actions">
+       <button class="form-action secondary" id="keepTemplate" type="button">Keep</button>
+       <button class="form-action danger" id="confirmDeleteTemplate" type="button">Delete</button>
+      </div>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog" id="deleteCustomDialog" aria-labelledby="deleteCustomTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="deleteCustomTitle">Delete custom exercise?</h2><p id="deleteCustomDesc">It will be hidden from the exercise library, but your workout history, stats, and PRs are kept.</p></div>
+       <button class="dialog-close" id="cancelDeleteCustom" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="form-actions">
+       <button class="form-action secondary" id="keepCustom" type="button">Keep</button>
+       <button class="form-action danger" id="confirmDeleteCustom" type="button">Delete</button>
+      </div>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog" id="deleteCompletedWorkoutDialog" aria-labelledby="deleteCompletedWorkoutTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="deleteCompletedWorkoutTitle">Delete workout?</h2><p id="deleteCompletedWorkoutDesc">This permanently deletes this workout from your history.</p></div>
+       <button class="dialog-close" id="cancelDeleteCompletedWorkout" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="form-actions">
+       <button class="form-action secondary" id="keepCompletedWorkout" type="button">Keep</button>
+       <button class="form-action danger" id="confirmDeleteCompletedWorkout" type="button">Delete</button>
+      </div>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog" id="corruptDataDialog" aria-labelledby="corruptDataTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="corruptDataTitle">Saved data couldn't be read</h2><p id="corruptDataDesc">The app's saved data was damaged, so it started fresh. The damaged copy was set aside — nothing was overwritten.</p></div>
+       <button class="dialog-close" id="closeCorruptData" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="form-actions">
+       <button class="form-action secondary" id="corruptDataExport" type="button">Export damaged copy</button>
+       <button class="form-action danger" id="corruptDataDiscard" type="button">Discard it</button>
+      </div>
+    </div>
+   </dialog>
 
-    <nav class="bottom-nav" aria-label="Primary navigation">
-      <button class="nav-item active" id="dashboardNav" type="button" aria-current="page">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12 12 4l9 8"></path><path d="M5 10v10h14V10"></path></svg>Home
-      </button>
-      <button class="nav-item" id="libraryNav" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 6.5C10 5 7.2 4.5 4 4.5v13.5c3.2 0 6 .5 8 2 2-1.5 4.8-2 8-2V4.5c-3.2 0-6 .5-8 2z"></path><path d="M12 6.5V20"></path></svg>Exercises
-      </button>
-      <button class="nav-item" id="workoutsNav" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h18"></path><path d="M7 8v8M17 8v8M4.5 10v4M19.5 10v4"></path></svg>Workout
-      </button>
-      <button class="nav-item" id="programNav" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 4h14v16H5z"></path><path d="M8 8h8M8 12h8M8 16h5"></path></svg>Program
-      </button>
-      <button class="nav-item" id="statsNav" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"></path></svg>Stats
-      </button>
-    </nav>
+   <dialog class="custom-dialog compact-dialog" id="accountDialog" aria-labelledby="accountDialogTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="accountDialogTitle">Account</h2><p id="accountDialogEmail"></p></div><button class="dialog-close" id="closeAccountDialog" type="button" aria-label="Close">×</button></div><dl class="account-info"><div><dt>Display name</dt><dd id="accountDialogName"></dd></div><div><dt>Plan</dt><dd id="accountDialogPlan"></dd></div><div><dt>Last synced</dt><dd id="accountDialogSync"></dd></div></dl><div class="form-actions"><button id="accountDialogSyncNow" type="button">Sync now</button><button id="accountDialogEditName" type="button">Edit name</button><button id="accountDialogSignOut" type="button">Sign out</button><button class="danger-text" id="accountDialogDelete" type="button">Delete account</button></div></div>
+   </dialog>
+   <dialog class="custom-dialog compact-dialog" id="deleteAccountDialog" aria-labelledby="deleteAccountTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="deleteAccountTitle">Delete account?</h2><p>This deletes all your data from this device and the cloud. This cannot be undone.</p></div><button class="dialog-close" id="closeDeleteAccount" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="cancelDeleteAccount" type="button">Keep my account</button><button class="danger-button" id="confirmDeleteAccount" type="button">Delete everything</button></div></div>
+   </dialog>
+
+   <dialog class="custom-dialog" id="editNameDialog" aria-labelledby="editNameTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="editNameTitle">Display name</h2><p>Shown in your account settings.</p></div>
+       <button class="dialog-close" id="cancelEditName" type="button" aria-label="Close">×</button>
+      </div>
+      <label class="rule-field"><span>Name</span><input id="editNameInput" type="text" autocomplete="name" maxlength="60"></label>
+      <div class="form-actions">
+       <button class="form-action secondary" id="dismissEditName" type="button">Cancel</button>
+       <button class="form-action primary" id="saveNameButton" type="button">Save</button>
+      </div>
+    </div>
+   </dialog>
+
+   <dialog class="custom-dialog" id="exercisePickerDialog" aria-labelledby="exercisePickerTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="exercisePickerTitle">Add exercise</h2><p>Choose a movement for this workout.</p></div>
+       <button class="dialog-close" id="closeExercisePicker" type="button" aria-label="Close">×</button>
+      </div>
+      <label class="sr-only" for="exercisePickerSearch">Search exercises</label>
+      <div class="picker-template-options" id="pickerTemplateOptions" hidden></div>
+      <div class="picker-controls">
+       <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <input class="picker-search" id="exercisePickerSearch" type="search" autocomplete="off" placeholder="Search exercises…" />
+       </div>
+       <button class="filter-button picker-filter-button" id="pickerFilterToggle" type="button" aria-expanded="false" aria-controls="pickerFilterPanel" aria-label="Filters">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"></path></svg>
+        <span>Filters</span>
+       </button>
+      </div>
+      <div class="filter-panel picker-filter-panel" id="pickerFilterPanel">
+       <div class="filter-group">
+        <div class="filter-label-row"><span class="filter-label">SHOW</span></div>
+        <div class="muscle-options" role="group" aria-label="Show">
+          <button class="muscle-option" id="pickerFavoritesToggle" type="button" aria-pressed="false">★ Favorites</button>
+          <button class="muscle-option" id="pickerCustomToggle" type="button" aria-pressed="false">Custom</button>
+        </div>
+       </div>
+       <div class="filter-group">
+        <div class="filter-label-row"><span class="filter-label">MUSCLES</span><button class="filter-clear" id="pickerClearMuscles" type="button" hidden>Clear</button></div>
+        <div class="muscle-options" id="pickerMuscleOptions" role="group" aria-label="Muscles"></div>
+       </div>
+       <div class="filter-group"><label for="pickerEquipmentFilter">EQUIPMENT</label><select id="pickerEquipmentFilter"><option value="">All equipment</option></select></div>
+      </div>
+      <div class="picker-list" id="exercisePickerList"></div>
+      <div class="picker-footer"><button class="primary-button" id="doneExercisePicker" type="button">Done</button></div>
+    </div>
+   </dialog>
+
+   <dialog class="custom-dialog tag-dialog" id="setTagsDialog" aria-labelledby="setTagsTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="setTagsTitle">Set tags</h2><p>Select any details that apply to this set.</p></div>
+       <button class="dialog-close" id="closeSetTags" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="tag-picker-options" id="tagPickerOptions" role="group" aria-label="Set tags"></div>
+      <details class="tag-list-editor">
+       <summary>Edit tag list</summary>
+       <div class="tag-editor"><label class="sr-only" for="newTagInput">New set tag</label><input id="newTagInput" type="text" autocomplete="off" placeholder="Add a custom tag"><button class="secondary-button" id="addTagButton" type="button">Add</button></div>
+       <div class="tag-list" id="editableTagList"></div>
+      </details>
+      <div class="form-actions"><button class="form-action primary" id="doneSetTags" type="button">Done</button></div>
+    </div>
+   </dialog>
+
+   <dialog class="custom-dialog tag-dialog" id="exerciseTagsDialog" aria-labelledby="exerciseTagsTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="exerciseTagsTitle">Exercise tags</h2><p>These labels stay with this exercise in the live workout and its history.</p></div>
+       <button class="dialog-close" id="closeExerciseTags" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="tag-picker-options" id="exerciseTagPickerOptions" role="group" aria-label="Exercise tags"></div>
+      <div class="tag-list-editor">
+       <div class="tag-editor"><label class="sr-only" for="newExerciseTagInput">New exercise tag</label><input id="newExerciseTagInput" type="text" autocomplete="off" placeholder="Add a custom exercise tag"><button class="secondary-button" id="addExerciseTagButton" type="button">Add</button></div>
+      </div>
+      <div class="form-actions"><button class="form-action primary" id="doneExerciseTags" type="button">Done</button></div>
+    </div>
+   </dialog>
+
+   <dialog class="custom-dialog tag-dialog" id="supersetDialog" aria-labelledby="supersetTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="supersetTitle">Create a superset</h2><p id="supersetDescription">Choose one or more exercises to group together.</p></div>
+       <button class="dialog-close" id="closeSuperset" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="picker-list" id="supersetOptions"></div>
+      <div class="form-actions"><button class="form-action primary" id="doneSuperset" type="button">Done</button></div>
+    </div>
+   </dialog>
+
+   <nav class="bottom-nav" aria-label="Primary navigation">
+    <button class="nav-item active" id="dashboardNav" type="button" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12 12 4l9 8"></path><path d="M5 10v10h14V10"></path></svg>Home
+    </button>
+    <button class="nav-item" id="libraryNav" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 6.5C10 5 7.2 4.5 4 4.5v13.5c3.2 0 6 .5 8 2 2-1.5 4.8-2 8-2V4.5c-3.2 0-6 .5-8 2z"></path><path d="M12 6.5V20"></path></svg>Exercises
+    </button>
+    <button class="nav-item" id="workoutsNav" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h18"></path><path d="M7 8v8M17 8v8M4.5 10v4M19.5 10v4"></path></svg>Workout
+    </button>
+    <button class="nav-item" id="programNav" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 4h14v16H5z"></path><path d="M8 8h8M8 12h8M8 16h5"></path></svg>Program
+    </button>
+    <button class="nav-item" id="statsNav" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"></path></svg>Stats
+    </button>
+   </nav>
   </div>
 
   <script src="data/exercises-db.js"></script>
   <script src="assets/js/build-info.js"></script>
+  <script src="assets/js/exercise-data.js"></script>
   <script src="assets/js/catalog.js"></script>
 <script src="assets/js/utilities.js"></script>
 <script src="assets/js/program-templates.js"></script>
 <script src="assets/js/state.js"></script>
 <script src="assets/js/persistence.js"></script>
-<script src="assets/js/sync.js"></script>
+<script src="assets/js/sync-adapter.js"></script>
+<script src="assets/js/sync-engine.js"></script>
+<script src="assets/js/sync-auth.js"></script>
+<script src="assets/js/sync-account-ui.js"></script>
 <script src="assets/js/exercise-library.js"></script>
 <script src="assets/js/exercise-detail.js"></script>
 <script src="assets/js/navigation.js"></script>
@@ -655,9 +763,13 @@
 <script src="assets/js/set-tags.js"></script>
 <script src="assets/js/workout-history.js"></script>
 <script src="assets/js/dashboard-stats.js"></script>
+<script src="assets/js/saved-workouts.js"></script>
 <script src="assets/js/programs.js"></script>
 <script src="assets/js/custom-exercises.js"></script>
 <script src="assets/js/app-updates.js"></script>
+<script src="assets/js/csv-import.js"></script>
+<script src="assets/js/share-codec.js"></script>
+<script src="assets/js/share.js"></script>
 <script src="assets/js/app-bootstrap.js"></script>
 </body>
 </html>

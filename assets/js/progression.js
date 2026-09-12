@@ -27,7 +27,7 @@
       // adds the increment every session with no RPE gate (per-program setting,
       // stamped onto each exercise at program start so repeats stay linear).
       const scheme=profile?.scheme||programConfig?.scheme||'rpe';
-      const logs=getExerciseLogs(exerciseId).sort((a,b)=>b.isoDate.localeCompare(a.isoDate));
+      const logs=getExerciseLogs(exerciseId).sort(sortByRecencyDesc); /* #99 A13: completedAt first, isoDate fallback */
       if(!logs.length)return null;
       const targetMode=profile?.mode || 'reps';
       const threshold=Number(programConfig.threshold ?? 8);
@@ -169,7 +169,8 @@
     function progressionProfileForDraftItem(item) {
       const ex=exercises.find(row=>row.id===item.exerciseId),mode=exerciseTracking(item,ex);
       const config=workoutState.activeProgram?.progression||progressionSetup,range=config.defaultRange||progressionSetup.defaultRange;
-      return item.progression || {mode,min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:config.timeStep||5,incrementType:config.incrementType||'lb',incrementValue:config.incrementValue||5,repsOnly:false};
+      /* #99 B7: the draft fallback routes through the canonical factory. */
+      return item.progression || defaultExerciseProgression({mode,min:range.min,max:range.max,openTop:range.openTop,amrap:range.amrap,timeStep:config.timeStep||5,incrementType:config.incrementType||'lb',incrementValue:config.incrementValue||5});
     }
 
     function freeformProgressionConfig() {
@@ -193,7 +194,9 @@
     function applyProgressionSuggestion(draft,suggestion,rerender=true) {
       const item=draft?.exercises.find(row=>row.exerciseId===suggestion.exerciseId); if(!item)return;
       item.tracking=suggestion.mode;
-      item.sets.forEach(set=>{set.w='';set.r='';set.seconds='';set.complete=false;});
+      /* #99 C2: never touch user-entered values or complete=true attestations.
+         The suggestion writes only to suggestedTarget (ghosted placeholders,
+         per the comment below); sets with user-entered values are left alone. */
       // Suggested targets are hints, not values: they render as true HTML placeholders
       // (ghosted text, empty value, cleared on focus) and are saved only when a set is
       // completed with its field untouched.

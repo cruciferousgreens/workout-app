@@ -7,6 +7,8 @@
     const pickerFilters={muscles:new Set(),equipment:'',onlyFavorites:false,onlyCustom:false};
     function resetPickerFilters(){pickerFilters.muscles.clear();pickerFilters.equipment='';pickerFilters.onlyFavorites=false;pickerFilters.onlyCustom=false;}
     function pickerFilterMatch(x){
+      /* A8 (#99): soft-deleted customs never list in the picker. */
+      if(exerciseDeleted(x))return false;
       const allMuscles=[...(x.primary||[]),...(x.secondary||[])];
       const muscleMatch=!pickerFilters.muscles.size||[...pickerFilters.muscles].every(m=>allMuscles.includes(m));
       const favMatch=!pickerFilters.onlyFavorites||state.favorites.has(x.id);
@@ -20,7 +22,7 @@
     let pickerSessionAdded=new Set();
     function resetPickerSession(){pickerSessionAdded=new Set();}
     function populatePickerFilters(){
-      const muscles=[...new Set(exercises.flatMap(x=>[...(x.primary||[]),...(x.secondary||[])]))].sort();
+      const muscles=allMuscleOptions();
       const equipment=[...new Set(exercises.map(x=>x.equipment).filter(Boolean))].sort();
       $('#pickerMuscleOptions').innerHTML=muscles.map(x=>`<button class="muscle-option" type="button" data-picker-muscle="${x}" aria-pressed="false">${titleCase(x)}</button>`).join('');
       $('#pickerEquipmentFilter').innerHTML='<option value="">All equipment</option>'+equipment.map(x=>`<option value="${x}">${titleCase(x)}</option>`).join('');
@@ -39,33 +41,47 @@
       const panel=$('#pickerFilterPanel');panel.classList.remove('open');
       $('#pickerFilterToggle').setAttribute('aria-expanded','false');
     }
-    function cloneTemplateExercises(rows){return (rows||[]).map(item=>({exerciseId:item.exerciseId,tracking:item.tracking||item.progression?.mode||null,note:item.note||'',exerciseTags:[...(item.exerciseTags||[])],supersetId:item.supersetId||null,progression:item.progression?{...item.progression}:null,sets:(item.sets?.length?item.sets:[{w:'',r:'',seconds:'',rpe:'',tags:[]}]).map(set=>({w:'',r:set.r??'',seconds:set.seconds??'',rpe:set.rpe??'',tags:[...(set.tags||[])],complete:false}))}));}
-    function pickerProgramWorkout(){return workoutState.activeProgram?.workouts.find(row=>row.uid===workoutState.programWorkoutTarget)||null;}
+    function cloneTemplateExercises(rows){return (rows||[]).map(item=>cloneExerciseItem(item,'fromTemplate',{trackingFallback:null,emptyDefault:true}));}
     /* #74: edit a saved template in the builder. Live-mutates the template's
-       exercises like program mode does (no draft involved). */
-    function pickerTemplate(){return workoutState.templates.find(row=>row.id===workoutState.templateEditTarget)||null;}
+       exercises directly (no draft involved). */
+    function pickerTemplate(){
+      /* The saved-workout builder (user 2026-09-11) is in-memory until saved,
+         so the picker falls back to it when the edit target matches. */
+      if(state.savedBuilder&&workoutState.templateEditTarget===state.savedBuilder.id)return state.savedBuilder;
+      return workoutState.templates.find(row=>row.id===workoutState.templateEditTarget)||null;
+    }
     function openTemplateBuilder(template){
-      workoutState.pickerMode='template';workoutState.templateEditTarget=template.id;workoutState.programWorkoutTarget=null;
-      $('#exercisePickerTitle').textContent=`Edit ${template.name}`;
+      workoutState.pickerMode='template';workoutState.templateEditTarget=template.id;
+      $('#exercisePickerTitle').textContent=`Edit ${template.name||'New saved workout'}`;
       $('#exercisePickerTitle').nextElementSibling.textContent='Add exercises from the library.';
       $('#exercisePickerSearch').value='';preparePickerFilters();resetPickerSession();renderExercisePicker();$('#exercisePickerDialog').showModal();
       requestAnimationFrame(()=>$('#exercisePickerSearch').focus());
     }
-    function openProgramWorkoutBuilder(program,workout){
-      workoutState.pickerMode='program';workoutState.programWorkoutTarget=workout.uid;
-      $('#exercisePickerTitle').textContent=`Build ${workout.name}`;
-      $('#exercisePickerTitle').nextElementSibling.textContent='Add exercises from the library.';
-      $('#exercisePickerSearch').value='';preparePickerFilters();resetPickerSession();renderExercisePicker();$('#exercisePickerDialog').showModal();
-      requestAnimationFrame(()=>$('#exercisePickerSearch').focus());
+    function pickerCollection(){const mode=workoutState.pickerMode;if(mode==='template')return pickerTemplate()?.exercises||[];return workoutState.draft?.exercises||[];}
+    /* Builder edit mode for a program workout (user 2026-09-12): exercises
+       added here default to the program's rep range for the current week, not
+       the global default — the program's prescription wins until configured. */
+    function builderPickerDefaultRange(){
+      const b=state.savedBuilder;
+      if(b?.editTarget?.kind==='program'&&workoutState.activeProgram){
+        return programRangeForWeek(workoutState.activeProgram,programWeek(workoutState.activeProgram));
+      }
+      /* P6 #100 (user 2026-09-12): a focus pill selected in the saved-workout
+         builder applies to exercises added afterwards too — the header says
+         Strength 1–5, so new exercises must not fall back to the global
+         default. The program's own prescription still wins for program
+         edits (above). */
+      const focusKey=b?.focusKey||'',preset=focusKey?REP_PRESETS[focusKey]:null;
+      if(preset)return {preset:focusKey,min:preset.min,max:preset.max,openTop:!!preset.openTop,amrap:!!preset.amrap,custom:true};
+      return progressionSetup.defaultRange;
     }
-    function pickerCollection(){const mode=workoutState.pickerMode;if(mode==='program')return pickerProgramWorkout()?.template?.exercises||[];if(mode==='template')return pickerTemplate()?.exercises||[];return workoutState.draft?.exercises||[];}
     // Rules section only (chosen exercises + their sets/range/load config).
     // Re-renders without touching the exercise list below, so the list's scroll
     // position and the search field's focus survive adding/removing exercises.
     // Pass a selector to restore focus after the re-render (rule field edits).
     function renderPickerRules(focusSelector) {
       const dialog=$('#exercisePickerDialog'),prevScroll=dialog?dialog.scrollTop:0;
-      const programMode=workoutState.pickerMode==='program',programWorkout=pickerProgramWorkout(),templateMode=workoutState.pickerMode==='template',editTemplate=pickerTemplate();
+      const templateMode=workoutState.pickerMode==='template',editTemplate=pickerTemplate();
       const collection=pickerCollection();
       const templateBox=$('#pickerTemplateOptions');
       templateBox.hidden=false;
@@ -84,9 +100,10 @@
       const sessionItems=collection.filter(item=>pickerSessionAdded.has(item.exerciseId));
       const ruleRows=sessionItems.length?`<div class="exercise-rules-list">${sessionItems.map(item=>{
         const ex=exercises.find(row=>row.id===item.exerciseId);
-        const defaults=(programMode?workoutState.activeProgram?.progression:progressionSetup)||progressionSetup;
+        const defaults=progressionSetup;
         const range=defaults.defaultRange||progressionSetup.defaultRange;
-        const profile=item.progression||{mode:item.tracking||ex?.tracking||'reps',min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:defaults.timeStep||5,incrementType:defaults.incrementType,incrementValue:defaults.incrementValue,repsOnly:false};
+        /* #99 B7: all progression fallbacks route through the canonical factory. */
+        const profile=item.progression||defaultExerciseProgression({mode:item.tracking||ex?.tracking||'reps',min:range.min,max:range.max,openTop:range.openTop,amrap:range.amrap,timeStep:defaults.timeStep||5,incrementType:defaults.incrementType,incrementValue:defaults.incrementValue});
         const time=profile.mode==='time', setCount=Math.max(1,item.sets?.length||1), incrementType=profile.incrementType||progressionSetup.incrementType||'lb';
         const rangeSummary=ruleRangeSummary(profile,time,setCount);
         const accordionOpen=openAccordions.has(item.uid||item.exerciseId);
@@ -109,10 +126,8 @@
       templateBox.innerHTML=templateButtons+ruleRows;
       /* Hide the box when empty (no templates, no rules) to avoid a weird empty bar. */
       templateBox.hidden=!templateBox.innerHTML.trim();
-      document.querySelectorAll('[data-use-program-template]').forEach(button=>button.addEventListener('click',()=>{const template=workoutState.templates.find(row=>row.id===button.dataset.useProgramTemplate);if(!template||!programWorkout)return;programWorkout.template={name:programWorkout.name,exercises:cloneTemplateExercises(template.exercises)};programWorkout.template.exercises.forEach(item=>pickerSessionAdded.add(item.exerciseId));renderPickerRules();}));
       document.querySelectorAll('[data-program-rule-id]').forEach(row=>{
         const getItem=()=>{
-          if(programMode)return programWorkout?.template?.exercises.find(entry=>entry.exerciseId===row.dataset.programRuleId);
           if(templateMode)return editTemplate?.exercises.find(entry=>entry.exerciseId===row.dataset.programRuleId);
           return workoutState.draft?.exercises.find(entry=>entry.uid===row.dataset.ruleUid)||workoutState.draft?.exercises.find(entry=>entry.exerciseId===row.dataset.programRuleId);
         };
@@ -122,16 +137,15 @@
           event.preventDefault();event.stopPropagation();
           const item=getItem();if(!item)return;
           pickerSessionAdded.delete(item.exerciseId);
-          if(programMode){if(programWorkout?.template)programWorkout.template.exercises=programWorkout.template.exercises.filter(entry=>entry.exerciseId!==item.exerciseId);}
-          else if(templateMode){if(editTemplate)editTemplate.exercises=editTemplate.exercises.filter(entry=>entry.exerciseId!==item.exerciseId);schedulePersist();renderWorkoutTemplateList();}
+          if(templateMode){if(editTemplate)editTemplate.exercises=editTemplate.exercises.filter(entry=>entry.exerciseId!==item.exerciseId);schedulePersist();if(typeof refreshTemplateViews==='function')refreshTemplateViews();}
           else{workoutState.draft.exercises=workoutState.draft.exercises.filter(entry=>entry.uid!==item.uid);prepareDraftProgression(workoutState.draft,freeformProgressionConfig());renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();}
           renderPickerRules();renderPickerList();
         });
         row.querySelectorAll('[data-program-rule]').forEach(control=>control.addEventListener('change',()=>{
           const item=getItem(); if(!item)return;
           const ex=exercises.find(entry=>entry.id===item.exerciseId);
-          const defaults=(programMode?workoutState.activeProgram?.progression:progressionSetup)||progressionSetup,range=defaults.defaultRange||progressionSetup.defaultRange;
-          const profile=item.progression||{mode:item.tracking||ex?.tracking||'reps',min:range.min,max:range.max,timeMin:30,timeMax:60,timeStep:defaults.timeStep||5,incrementType:defaults.incrementType,incrementValue:defaults.incrementValue,repsOnly:false};
+          const defaults=progressionSetup,range=defaults.defaultRange||progressionSetup.defaultRange;
+          const profile=item.progression||defaultExerciseProgression({mode:item.tracking||ex?.tracking||'reps',min:range.min,max:range.max,openTop:range.openTop,amrap:range.amrap,timeStep:defaults.timeStep||5,incrementType:defaults.incrementType,incrementValue:defaults.incrementValue});
           const field=control.dataset.programRule;
           if(field==='setCount'){
             const count=Math.max(1,Math.min(20,Number(control.value)||1));
@@ -162,7 +176,7 @@
             const small=row.querySelector('.exercise-rule-accordion-title small');
             if(small)small.textContent=ruleRangeSummary(profile,profile.mode==='time',Math.max(1,item.sets?.length||1));
           }
-          if(templateMode){schedulePersist();}else if(!programMode){prepareDraftProgression(workoutState.draft,freeformProgressionConfig());renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();}
+          if(templateMode){schedulePersist();}else{prepareDraftProgression(workoutState.draft,freeformProgressionConfig());renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();}
           if(field==='setCount'||field==='mode'||field==='incrementType'){
             // Rules-only re-render keeps the exercise list's scroll; restore
             // focus to the edited control so keyboard/VO users don't lose place.
@@ -171,25 +185,24 @@
           }
         }));
         row.querySelectorAll('[data-step-pills]').forEach(pills=>{
-          const readStep=()=>{const item=getItem();return item?.progression?.timeStep||(programMode?workoutState.activeProgram?.progression?.timeStep:progressionSetup.timeStep)||5;};
+          const readStep=()=>{const item=getItem();return item?.progression?.timeStep||progressionSetup.timeStep||5;};
           wireTimeStepPills(pills,readStep,n=>{
             const item=getItem(); if(!item)return;
             const ex=exercises.find(entry=>entry.id===item.exerciseId);
-            const dflt=(programMode?workoutState.activeProgram?.progression:progressionSetup)||progressionSetup,range=dflt.defaultRange||progressionSetup.defaultRange;
-            const profile=item.progression||{mode:item.tracking||ex?.tracking||'reps',min:range.min,max:range.max,timeMin:30,timeMax:60,timeStep:dflt.timeStep||5,incrementType:dflt.incrementType,incrementValue:dflt.incrementValue,repsOnly:false};
+            const dflt=progressionSetup,range=dflt.defaultRange||progressionSetup.defaultRange;
+            const profile=item.progression||defaultExerciseProgression({mode:item.tracking||ex?.tracking||'reps',min:range.min,max:range.max,openTop:range.openTop,amrap:range.amrap,timeStep:dflt.timeStep||5,incrementType:dflt.incrementType,incrementValue:dflt.incrementValue});
             profile.timeStep=n; item.progression=profile;
-            if(templateMode){schedulePersist();}else if(!programMode){prepareDraftProgression(workoutState.draft,freeformProgressionConfig());renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();}
-            else syncTimeStepPills(pills,n);
+            if(templateMode){schedulePersist();}else{prepareDraftProgression(workoutState.draft,freeformProgressionConfig());renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();}
           });
         });
         row.querySelector('[data-program-reps-only]')?.addEventListener('click',()=>{
           const item=getItem(); if(!item)return;
           const ex=exercises.find(entry=>entry.id===item.exerciseId);
-          const defaults=(programMode?workoutState.activeProgram?.progression:progressionSetup)||progressionSetup,range=defaults.defaultRange||progressionSetup.defaultRange;
-          const profile=item.progression||{mode:item.tracking||ex?.tracking||'reps',min:range.min,max:range.max,timeMin:30,timeMax:60,timeStep:defaults.timeStep||5,incrementType:defaults.incrementType,incrementValue:defaults.incrementValue,repsOnly:false};
-          profile.repsOnly=!profile.repsOnly; item.progression=profile; if(templateMode){schedulePersist();}else if(!programMode){renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();} renderPickerRules();
+          const defaults=progressionSetup,range=defaults.defaultRange||progressionSetup.defaultRange;
+          const profile=item.progression||defaultExerciseProgression({mode:item.tracking||ex?.tracking||'reps',min:range.min,max:range.max,openTop:range.openTop,amrap:range.amrap,timeStep:defaults.timeStep||5,incrementType:defaults.incrementType,incrementValue:defaults.incrementValue});
+          profile.repsOnly=!profile.repsOnly; item.progression=profile; if(templateMode){schedulePersist();}else{renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();} renderPickerRules();
         });
-        row.querySelector('[data-program-exercise-tags]')?.addEventListener('click',()=>openExerciseTagDialog(programMode?{mode:'program',exerciseId:row.dataset.programRuleId}:templateMode?{mode:'template',exerciseId:row.dataset.programRuleId}:{mode:'draft',exerciseUid:row.dataset.ruleUid}));
+        row.querySelector('[data-program-exercise-tags]')?.addEventListener('click',()=>openExerciseTagDialog(templateMode?{mode:'template',exerciseId:row.dataset.programRuleId}:{mode:'draft',exerciseUid:row.dataset.ruleUid}));
       });
       if(dialog)dialog.scrollTop=prevScroll;
       if(focusSelector){const el=document.querySelector(focusSelector);if(el)el.focus({preventScroll:true});}
@@ -199,7 +212,7 @@
     // tap exercises no longer jumps back to the top on every tap.
     function renderPickerList() {
       const list=$('#exercisePickerList'),prevScroll=list?list.scrollTop:0;
-      const programMode=workoutState.pickerMode==='program',programWorkout=pickerProgramWorkout(),templateMode=workoutState.pickerMode==='template',editTemplate=pickerTemplate();
+      const templateMode=workoutState.pickerMode==='template',editTemplate=pickerTemplate();
       const q=normalize($('#exercisePickerSearch').value);
       const collection=pickerCollection();
       const chosen=new Set(collection.map(item=>item.exerciseId));
@@ -214,26 +227,19 @@
       if(list)list.scrollTop=prevScroll;
       document.querySelectorAll('#exercisePickerList .picker-item').forEach(button => button.addEventListener('click', () => {
         let nowChosen;
-        if(programMode){
-          if(!programWorkout)return;
-          if(!programWorkout.template)programWorkout.template={name:programWorkout.name,exercises:[]};
-          const existing=programWorkout.template.exercises.find(item=>item.exerciseId===button.dataset.id);
-          nowChosen=!existing;
-          if(existing){programWorkout.template.exercises=programWorkout.template.exercises.filter(item=>item.exerciseId!==button.dataset.id);pickerSessionAdded.delete(button.dataset.id);}
-          else{const ex=exercises.find(row=>row.id===button.dataset.id),program=workoutState.activeProgram,range=programRangeForWeek(program,programWeek(program));programWorkout.template.exercises.push({exerciseId:button.dataset.id,tracking:ex?.tracking||'reps',note:'',exerciseTags:[],supersetId:null,progression:{mode:ex?.tracking||'reps',min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:program?.progression?.timeStep||5,incrementType:program?.progression?.incrementType||'lb',incrementValue:program?.progression?.incrementValue||5,repsOnly:false},sets:Array.from({length:3},()=>({w:'',r:range.amrap?'':String(range.min),seconds:'',rpe:'',tags:[],complete:false}))});pickerSessionAdded.add(button.dataset.id);}
-        }else if(templateMode){
+        if(templateMode){
           /* #74: add/remove exercises on the template being edited. */
           if(!editTemplate)return;
           const existing=editTemplate.exercises.find(item=>item.exerciseId===button.dataset.id);
           nowChosen=!existing;
           if(existing){editTemplate.exercises=editTemplate.exercises.filter(item=>item.exerciseId!==button.dataset.id);pickerSessionAdded.delete(button.dataset.id);}
-          else{const ex=exercises.find(row=>row.id===button.dataset.id),range=progressionSetup.defaultRange;editTemplate.exercises.push({exerciseId:button.dataset.id,tracking:ex?.tracking||'reps',note:'',exerciseTags:[],supersetId:null,progression:{mode:ex?.tracking||'reps',min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:progressionSetup.timeStep||5,incrementType:progressionSetup.incrementType,incrementValue:progressionSetup.incrementValue,repsOnly:false},sets:Array.from({length:3},()=>({w:'',r:range.amrap?'':String(range.min),seconds:'',rpe:'',tags:[],complete:false}))});pickerSessionAdded.add(button.dataset.id);}
+          else{const ex=exercises.find(row=>row.id===button.dataset.id),range=builderPickerDefaultRange();const progression=Object.assign(defaultExerciseProgression({mode:ex?.tracking||'reps',min:range.min,max:range.max,openTop:range.openTop,amrap:range.amrap,custom:range.custom}),range.preset?{preset:range.preset}:null);editTemplate.exercises.push(newExerciseItem({exerciseId:button.dataset.id,tracking:ex?.tracking||'reps',progression,sets:Array.from({length:3},()=>Object.assign(newSet(),{r:range.amrap?'':String(range.min)}))}));pickerSessionAdded.add(button.dataset.id);}
           schedulePersist();
         }else{
           const existing=workoutState.draft.exercises.find(item=>item.exerciseId===button.dataset.id);
           nowChosen=!existing;
           if(existing){workoutState.draft.exercises=workoutState.draft.exercises.filter(item=>item.exerciseId!==button.dataset.id);pickerSessionAdded.delete(button.dataset.id);}
-          else{const ex=exercises.find(row=>row.id===button.dataset.id),range=progressionSetup.defaultRange;workoutState.draft.exercises.push({uid:uid('exercise'),exerciseId:button.dataset.id,tracking:ex?.tracking||'reps',sets:Array.from({length:3},()=>newSet()),note:'',exerciseTags:[],supersetId:null,progression:{mode:ex?.tracking||'reps',min:range.min,max:range.max,openTop:!!range.openTop,amrap:!!range.amrap,timeMin:30,timeMax:60,timeStep:progressionSetup.timeStep||5,incrementType:progressionSetup.incrementType,incrementValue:progressionSetup.incrementValue,repsOnly:false,custom:false}});pickerSessionAdded.add(button.dataset.id);}
+          else{const ex=exercises.find(row=>row.id===button.dataset.id),range=progressionSetup.defaultRange;workoutState.draft.exercises.push(newExerciseItem({exerciseId:button.dataset.id,tracking:ex?.tracking||'reps',sets:Array.from({length:3},()=>newSet()),progression:defaultExerciseProgression({mode:ex?.tracking||'reps',min:range.min,max:range.max,openTop:range.openTop,amrap:range.amrap})}));pickerSessionAdded.add(button.dataset.id);}
           prepareDraftProgression(workoutState.draft, workoutState.activeProgram?.id===workoutState.draft.programId?workoutState.activeProgram.progression:freeformProgressionConfig());
           renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();
         }

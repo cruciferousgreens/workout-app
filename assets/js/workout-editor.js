@@ -1,5 +1,10 @@
 
 /* ===== module: workout-editor.js ===== */
+    /* Shared lookup (efficiency pass 2026-09-12): the live draft's exercise
+       row by uid — one place instead of a dozen inline find() calls. */
+    function findDraftExercise(uid){
+      return workoutState.draft?.exercises.find(item=>item.uid===uid);
+    }
     /** Manages the live workout draft, set completion, exercise notes, and mobile interactions. */
     let pendingRemoveExerciseUid=null;
     function doRemoveExercise(){
@@ -12,58 +17,65 @@
     $('#cancelRemoveExercise')?.addEventListener('click',()=>$('#removeExerciseDialog').close());
     $('#keepExercise')?.addEventListener('click',()=>$('#removeExerciseDialog').close());
     $('#confirmRemoveExercise')?.addEventListener('click',()=>{ $('#removeExerciseDialog').close(); doRemoveExercise(); });
-    /* #1: reorder exercises via modal popup (up/down arrows, no drag). */
     function openReorderDialog(){
-      const draft=workoutState.draft; if(!draft||draft.exercises.length<2)return;
+      /* Reuses the shared exercise-list context (user 2026-09-12): the saved-
+         workout builder gets reordering through this same dialog. */
+      const list=contextExercises(); if(!list||list.length<2)return;
       renderReorderList();
       $('#reorderExercisesDialog').showModal();
     }
-    /* #81: number superset groups (Superset 1, Superset 2, …) so multiple
-       groups are visually distinct. Numbering follows order of first appearance. */
-    function supersetGroupNumber(exercises,supersetId){
-      const seen=[];
-      for(const row of exercises){
-        if(row.supersetId&&!seen.includes(row.supersetId))seen.push(row.supersetId);
-      }
-      return seen.indexOf(supersetId)+1;
-    }
     function renderReorderList(){
-      const draft=workoutState.draft; if(!draft)return;
-      const list=$('#reorderExercisesList'); if(!list)return;
-      list.innerHTML=draft.exercises.map((item,idx)=>{
+      const list=contextExercises(); if(!list)return;
+      const listEl=$('#reorderExercisesList'); if(!listEl)return;
+      listEl.innerHTML=list.map((item,idx)=>{
         const ex=exercises.find(x=>x.id===item.exerciseId);
         const name=ex?ex.name:'Exercise';
-        const grouped=item.supersetId&&draft.exercises.filter(x=>x.supersetId===item.supersetId).length>1;
-        const groupNum=grouped?supersetGroupNumber(draft.exercises,item.supersetId):0;
+        const grouped=item.supersetId&&list.filter(x=>x.supersetId===item.supersetId).length>1;
+        const groupNum=grouped?supersetGroupNumber(list,item.supersetId):0;
         return `<div class="reorder-row" data-reorder-uid="${escapeHtml(item.uid)}">
           <span class="reorder-name">${escapeHtml(name)}${grouped?`<span class="reorder-superset-tag">Superset ${groupNum}</span>`:''}</span>
           <span class="reorder-arrows">
             <button class="reorder-arrow" type="button" data-move="up" data-uid="${escapeHtml(item.uid)}" ${idx===0?'disabled':''} aria-label="Move ${escapeHtml(name)} up"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button>
-            <button class="reorder-arrow" type="button" data-move="down" data-uid="${escapeHtml(item.uid)}" ${idx===draft.exercises.length-1?'disabled':''} aria-label="Move ${escapeHtml(name)} down"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+            <button class="reorder-arrow" type="button" data-move="down" data-uid="${escapeHtml(item.uid)}" ${idx===list.length-1?'disabled':''} aria-label="Move ${escapeHtml(name)} down"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
           </span>
         </div>`;
       }).join('');
-      list.querySelectorAll('.reorder-arrow').forEach(btn=>btn.addEventListener('click',()=>{
-        const draft2=workoutState.draft; if(!draft2)return;
-        const i=draft2.exercises.findIndex(x=>x.uid===btn.dataset.uid); if(i<0)return;
+      listEl.querySelectorAll('.reorder-arrow').forEach(btn=>btn.addEventListener('click',()=>{
+        const list2=contextExercises(); if(!list2)return;
+        const i=list2.findIndex(x=>x.uid===btn.dataset.uid); if(i<0)return;
         const j=btn.dataset.move==='up'?i-1:i+1;
-        if(j<0||j>=draft2.exercises.length)return;
-        const [moved]=draft2.exercises.splice(i,1);
-        draft2.exercises.splice(j,0,moved);
-        markDraftSaved();
+        if(j<0||j>=list2.length)return;
+        const [moved]=list2.splice(i,1);
+        list2.splice(j,0,moved);
+        contextSaved();
         renderReorderList();
       }));
     }
     $('#reorderWorkoutExercises')?.addEventListener('click',openReorderDialog);
     $('#cancelReorderExercises')?.addEventListener('click',()=>$('#reorderExercisesDialog').close());
-    $('#doneReorderExercises')?.addEventListener('click',()=>{ $('#reorderExercisesDialog').close(); renderWorkoutExercises(); renderWorkoutProgression(); });
+    $('#doneReorderExercises')?.addEventListener('click',()=>{ $('#reorderExercisesDialog').close(); contextRerender(); });
     /* #18: workout history view wiring. */
-    $('#backFromWorkoutHistory')?.addEventListener('click',hideWorkoutHistory);
     $('#historySearch')?.addEventListener('input',()=>renderWorkoutHistoryList());
-    function newSet() { return {uid:uid('set'), w:'', r:'', seconds:'', rpe:'', tags:[], complete:false}; }
-    function exerciseTracking(item, ex) { return item?.tracking || item?.progression?.mode || ex?.tracking || (ex?.force === 'static' ? 'time' : 'reps'); }
+    function newSet() { return {uid:newSetId(), w:'', r:'', seconds:'', rpe:'', targetRpe:'', tags:[], complete:false}; }
+    /* #99 H3: ONE factory owns the exercise-item shape. Every construction site
+       (picker, templates, programs, history-edit) must build items through here
+       so uids and fields never drift again. `sets` are passed in; use newSet()
+       (or Object.assign(newSet(), overrides)) for those. */
+    function newExerciseItem(opts={}) {
+      return {
+        uid: newExerciseUid(),
+        exerciseId: opts.exerciseId,
+        tracking: opts.tracking || 'reps',
+        note: opts.note || '',
+        noteOpen: !!opts.noteOpen,
+        exerciseTags: [...(opts.exerciseTags || [])],
+        supersetId: opts.supersetId || null,
+        progression: opts.progression ? {...opts.progression} : null,
+        sets: opts.sets || []
+      };
+    }
     function lastUsedWeight(exerciseId) {
-      const logs = getExerciseLogs(exerciseId).slice().sort((a,b) => b.isoDate.localeCompare(a.isoDate));
+      const logs = getExerciseLogs(exerciseId).slice().sort(sortByRecencyDesc); /* #99 A13: completedAt first, isoDate fallback */
       for (const log of logs) {
         const weighted = log.sets.filter(set => Number(set.w) > 0);
         if (weighted.length) return String(weighted[weighted.length - 1].w);
@@ -71,7 +83,7 @@
       return '';
     }
     function lastSessionSetSummary(exerciseId) {
-      const logs=getExerciseLogs(exerciseId).sort((a,b)=>b.isoDate.localeCompare(a.isoDate));
+      const logs=getExerciseLogs(exerciseId).sort(sortByRecencyDesc); /* #99 A13: completedAt first, isoDate fallback */
       const latest=logs[0]; if(!latest?.sets?.length)return '';
       const set=latest.sets.slice().sort((a,b)=>estimate1RM(b)-estimate1RM(a))[0];
       const timed=latest.tracking==='time'||set.seconds!=null;
@@ -79,76 +91,82 @@
       const performance=timed?(set.seconds!=null?`${set.seconds} sec`:''):(set.r!=null?`${set.r} reps`:'');
       return `Last: ${load}${performance||'—'}${set.rpe==null?'':` @ RPE ${set.rpe}`} · ${formatLogDate(latest.isoDate)}`;
     }
-    /* Rep/time-range placeholder for set inputs (2026-09-10): the placeholder
-       shows the target range ("6–12", "6+", "AMRAP", "30–60 sec") while the
-       value auto-saved when completing an untouched set is the range minimum —
-       the conservative, honest default. AMRAP has no auto value: reps must be
-       entered. A progression suggestion (target) takes precedence over both. */
-    function rangePlaceholder(profile,time){
-      profile=profile||{};
-      if(time){
-        const min=profile.timeMin,max=profile.timeMax;
-        if(min&&max&&min!==max)return {text:`${min}–${max} sec`,value:String(min)};
-        if(min)return {text:`${min} sec`,value:String(min)};
-        return {text:'',value:''};
-      }
-      if(profile.amrap)return {text:profile.min>1?`AMRAP from ${profile.min}`:'AMRAP',value:''};
-      const min=profile.min,max=profile.max;
-      if(profile.openTop&&min)return {text:`${min}+`,value:String(min)};
-      if(min&&max)return min===max?{text:String(min),value:String(min)}:{text:`${min}–${max}`,value:String(min)};
-      if(min)return {text:String(min),value:String(min)};
-      return {text:'',value:''};
+    /* v0.99al: latest top set's performance, for hold-case ghost defaults. When
+       the progression engine holds (completed history exists but no suggestion
+       fired), set rows ghost the latest top set (e.g. 6 reps) instead of the
+       range minimum (1) — so 100 lb × 6 doesn't read as 100 × 1. Returns ''
+       when there is no history, the top set logged no performance, or the
+       exercise is AMRAP (reps stay explicit: completing an untouched AMRAP set
+       must not auto-save a value). */
+    function latestTopSetPerf(exerciseId, tracking, isAmrap) {
+      if (isAmrap) return '';
+      const logs = getExerciseLogs(exerciseId).slice().sort(sortByRecencyDesc); /* #99 A13: completedAt first, isoDate fallback */
+      const latest = logs[0];
+      if (!latest?.sets?.length) return '';
+      const top = latest.sets.slice().sort((a,b) => estimate1RM(b) - estimate1RM(a))[0];
+      const v = tracking === 'time' ? top.seconds : top.r;
+      return v == null || v === '' ? '' : String(v);
     }
-
     function livePRLabel(item,set) {
       if(!item||!set||exerciseTracking(item,exercises.find(ex=>ex.id===item.exerciseId))!=='reps'||Number(set.w)<=0)return '';
       const prior=getExerciseLogs(item.exerciseId).flatMap(log=>log.sets).filter(row=>Number(row.w)>0);
       if(!prior.length)return '';
-      const bestEstimate=Math.max(...prior.map(estimate1RM)),bestWeight=Math.max(...prior.map(row=>Number(row.w)||0));
       const ex=exercises.find(row=>row.id===item.exerciseId);
-      if(estimate1RM(set)>bestEstimate+.5)return `${ex?.name||'Exercise'} · new estimated 1RM PR`;
-      if(Number(set.w)>bestWeight)return `${ex?.name||'Exercise'} · new heaviest set PR`;
+      const kind=detectExercisePRs([set],prior);
+      if(kind==='e1rm')return `${ex?.name||'Exercise'} · new estimated 1RM PR`;
+      if(kind==='heaviest')return `${ex?.name||'Exercise'} · new heaviest set PR`;
       return '';
     }
 
-    let toastTimer, toastFadeTimer;
-    /* Toasts pop up and fade away (user 2026-09-10) — never a static banner. */
-    function showToast(message,kind='',durationMs=3600) {
-      const toast=$('#appToast'); if(!toast)return;
-      toast.textContent=message; toast.className=`app-toast ${kind}`.trim(); toast.hidden=false;
-      clearTimeout(toastTimer); clearTimeout(toastFadeTimer);
-      requestAnimationFrame(()=>requestAnimationFrame(()=>toast.classList.add('show')));
-      toastTimer=setTimeout(()=>{
-        toast.classList.remove('show');
-        toastFadeTimer=setTimeout(()=>{ if(!toast.classList.contains('show'))toast.hidden=true; },300);
-      },durationMs);
-    }
+    /* #99 B12: showToast lives in utilities.js now (one shared toast service).
+       Toasts pop up and fade away (user 2026-09-10) — never a static banner. */
 
-    let saveStatusTimer;
+    /* markDraftSaved = persist only (user 2026-09-12): the visible autosave
+       note was deleted, so there's no status element to update anymore. */
     function markDraftSaved() {
       schedulePersist();
-      const status = $('#draftStatus');
-      if (!status) return;
-      status.textContent = 'Saved just now';
-      clearTimeout(saveStatusTimer);
-      saveStatusTimer = setTimeout(() => { status.textContent = 'Changes are saved on this device'; }, 1800);
     }
 
     function startBlankWorkout(name = '', programId = null, programWorkoutUid = null) {
       /* #95 (user 2026-09-11): new workouts default to the Settings Default
          Focus, so the matching pill renders highlighted from the start. */
       const defaultFocus = progressionSetup.defaultRange?.preset || null;
+      /* #99 H5: a live draft wins over the history sub-pane (was done in render). */
+      state.workoutHistoryOpen=false;
       workoutState.draft = {name, date:localIsoDate(), exercises:[], programId, programWorkoutUid, editingId:null, focusPreset:defaultFocus};
       $('#workoutComplete').hidden = true;
+      state.workoutEditorOpen = true; /* #129: fresh session opens the editor directly. */
       renderWorkoutScreen();
     }
 
+    /* Program-name chip (user 2026-09-12): a completed workout that belonged
+       to a program shows the program name next to the workout name, like the
+       Built-in chip. Looks in the active program first, then archived ones. */
+    /* Shared lookup (efficiency pass 2026-09-12): a program by id, active
+       first then archived — one place instead of inline copies. */
+    function findProgramById(id){
+      if(!id)return null;
+      return (workoutState.activeProgram?.id===id?workoutState.activeProgram:null)
+        ||(workoutState.archivedPrograms||[]).find(p=>p.id===id)
+        ||null;
+    }
+    function programNameChip(workout){
+      if(!workout?.programId)return '';
+      const program=findProgramById(workout.programId);
+      return program?` <span class="built-in-label">${escapeHtml(program.name)}</span>`:'';
+    }
+    /* #99: single canonical recent-workout row — replaces three duplicated
+       button markups (dashboard recent, workout-tab recent, history list). */
+    function recentWorkoutButton(workout, dataAttr, smallText) {
+      const summary = smallText || (()=>{const s=workoutSummary(workout);return `${formatLogDate(workout.date)} · ${s.sets} sets · ${formatVolume(s.volume)}`;})();
+      return `<button class="recent-workout" type="button" ${dataAttr}="${escapeHtml(workout.id)}"><span><strong>${escapeHtml(workout.name)}${programNameChip(workout)}</strong><small>${escapeHtml(summary)}</small></span><span aria-hidden="true">›</span></button>`;
+    }
     function renderWorkoutRecent() {
       const host=$('#workoutRecent'); if(!host)return;
-      const sorted=workoutState.completed.slice().sort((a,b)=>b.date.localeCompare(a.date));
+      const sorted=workoutState.completed.slice().sort(sortByRecencyDesc); /* #99 A13: latest by completion */
       const recent=sorted.slice(0,6);
-      host.innerHTML=recent.length?recent.map(workout=>{const summary=workoutSummary(workout);return `<button class="recent-workout" type="button" data-training-workout="${escapeHtml(workout.id)}"><span><strong>${escapeHtml(workout.name)}</strong><small>${escapeHtml(formatLogDate(workout.date))} · ${summary.sets} sets · ${formatVolume(summary.volume)}</small></span><span aria-hidden="true">›</span></button>`;}).join('')+(sorted.length>6?`<button class="view-all-history" type="button" id="viewAllWorkouts">View all ${sorted.length} workouts ›</button>`:''):'<p class="section-note">Your completed workouts will appear here.</p>';
-      document.querySelectorAll('[data-training-workout]').forEach(button=>button.addEventListener('click',()=>{state.workoutDetailReturn='workout';renderCompletedWorkout(workoutState.completed.find(workout=>workout.id===button.dataset.trainingWorkout));}));
+      host.innerHTML=recent.length?recent.map(workout=>recentWorkoutButton(workout,'data-training-workout')).join('')+(sorted.length>6?`<button class="view-all-history" type="button" id="viewAllWorkouts">View all ${sorted.length} workouts ›</button>`:''):'<p class="section-note">Your completed workouts will appear here.</p>';
+      document.querySelectorAll('[data-training-workout]').forEach(button=>button.addEventListener('click',()=>{state.workoutDetailReturn=ROUTES.DETAIL_RETURN.WORKOUT;renderCompletedWorkout(workoutState.completed.find(workout=>workout.id===button.dataset.trainingWorkout),{push:true});}));
       $('#viewAllWorkouts')?.addEventListener('click',showWorkoutHistory);
     }
     /* #18: full workout history with search + month grouping. */
@@ -156,43 +174,59 @@
       state.workoutHistoryOpen=true;
       const s=$('#historySearch'); if(s)s.value='';
       renderWorkoutScreen();
+      /* Logs are their own page (user 2026-09-12): no tab highlight on the
+         list. Coherent history: the list is a pushed page, so system back
+         returns here instead of skipping to the pre-list screen. */
+      setActiveNav('workout', null);
       window.scrollTo({top:0,behavior:'auto'});
+      history.pushState({view:'workout', sub:'history'}, '', '#workout');
     }
     function hideWorkoutHistory(){
       state.workoutHistoryOpen=false;
       renderWorkoutScreen();
       window.scrollTo({top:0,behavior:'auto'});
     }
-    function monthKey(dateStr){ return dateStr.slice(0,7); }
-    function monthLabel(key){
-      const parts=key.split('-'); const y=Number(parts[0]), m=Number(parts[1]);
-      return new Date(y,m-1,1).toLocaleDateString(undefined,{month:'long',year:'numeric'});
+    /* #128 (user 2026-09-12): workout logs get the same period pills as
+       Home/Stats (Today / Week / Month / Year / All time) and the same flat
+       card layout as Home's Recent workouts — no month grouping. Search
+       covers workout names and exercise names. */
+    function exerciseNamesForSearch(workout){
+      return (workout.exercises||[]).map(item=>{
+        const ex=exercises.find(row=>row.id===item.exerciseId);
+        return ex?ex.name:'';
+      });
     }
     function renderWorkoutHistoryList(){
       const host=$('#workoutHistoryList'); if(!host)return;
+      /* Period pills (shared periodTabs helper, same look as Home/Stats). */
+      const tabsHost=$('#logPeriodTabs');
+      if(tabsHost){
+        tabsHost.innerHTML=periodTabs('data-log-period',state.logPeriod||'all');
+        tabsHost.querySelectorAll('[data-log-period]').forEach(button=>button.addEventListener('click',()=>{
+          if(state.logPeriod===button.dataset.logPeriod)return;
+          state.logPeriod=button.dataset.logPeriod;schedulePersist();
+          /* The list height changes with the period — pin the scroll so the
+             page doesn't jump, same pattern as the dashboard period tabs. */
+          const scrollY=window.scrollY;
+          renderWorkoutHistoryList();
+          requestAnimationFrame(()=>{if(window.scrollY!==scrollY)window.scrollTo(0,scrollY);});
+        }));
+      }
       const searchEl=$('#historySearch');
       const query=(searchEl&&searchEl.value||'').trim().toLowerCase();
-      let list=workoutState.completed.slice().sort((a,b)=>b.date.localeCompare(a.date));
-      if(query) list=list.filter(w=>(w.name||'').toLowerCase().includes(query));
+      let list=workoutsForPeriod(state.logPeriod||'all').slice().sort(sortByRecencyDesc); /* #99 A13: latest by completion */
+      if(query) list=list.filter(w=>(w.name||'').toLowerCase().includes(query)||exerciseNamesForSearch(w).some(name=>name.toLowerCase().includes(query)));
       const countNote=$('#historyCountNote');
       if(countNote)countNote.textContent=list.length===workoutState.completed.length
         ? `${list.length} completed session${list.length===1?'':'s'}`
         : `${list.length} of ${workoutState.completed.length} sessions`;
       if(!list.length){
-        host.innerHTML=`<p class="section-note">${query?'No workouts match your search.':'No completed workouts yet.'}</p>`;
+        host.innerHTML=`<p class="section-note">${query?'No workouts match your search.':'No completed workouts in this period.'}</p>`;
         return;
       }
-      const groups=new Map();
-      list.forEach(w=>{const k=monthKey(w.date); if(!groups.has(k))groups.set(k,[]); groups.get(k).push(w);});
-      let html='';
-      groups.forEach((workouts,key)=>{
-        html+=`<div class="history-month-group"><h3 class="history-month">${escapeHtml(monthLabel(key))}</h3>`;
-        workouts.forEach(workout=>{const summary=workoutSummary(workout);
-          html+=`<button class="recent-workout" type="button" data-history-workout="${escapeHtml(workout.id)}"><span><strong>${escapeHtml(workout.name)}</strong><small>${escapeHtml(formatLogDate(workout.date))} · ${summary.sets} sets · ${formatVolume(summary.volume)}</small></span><span aria-hidden="true">›</span></button>`;});
-        html+=`</div>`;
-      });
-      host.innerHTML=html;
-      host.querySelectorAll('[data-history-workout]').forEach(button=>button.addEventListener('click',()=>{state.workoutDetailReturn='history';renderCompletedWorkout(workoutState.completed.find(workout=>workout.id===button.dataset.historyWorkout));}));
+      /* Flat Home-style card: one card, hairline-divided rows, no groups. */
+      host.innerHTML=`<div class="dashboard-card history-card"><div class="recent-workouts">${list.map(workout=>recentWorkoutButton(workout,'data-history-workout')).join('')}</div></div>`;
+      host.querySelectorAll('[data-history-workout]').forEach(button=>button.addEventListener('click',()=>{state.workoutHistoryOpen=false;state.workoutDetailReturn=ROUTES.DETAIL_RETURN.HISTORY;renderCompletedWorkout(workoutState.completed.find(workout=>workout.id===button.dataset.historyWorkout),{push:true});}));
     }
     function renderWorkoutProgramSuggestion() {
       const host=$('#programStartSuggestion'),program=workoutState.activeProgram;
@@ -223,34 +257,93 @@
     }
     function renderWorkoutScreen() {
       const hasDraft = !!workoutState.draft;
-      // Exactly one sub-pane is ever visible: a live draft wins over everything, a completed
-      // workout under review wins over the start screen, otherwise the start screen shows.
-      if (hasDraft) { $('#workoutComplete').hidden = true; state.workoutHistoryOpen=false; }
+      /* #129: the live editor is a destination, not the default. A draft puts a
+         Continue card on the start screen; the editor opens only when the user
+         taps Continue or starts a fresh session (state.workoutEditorOpen). */
+      const editorOpen = hasDraft && state.workoutEditorOpen;
+      // Exactly one sub-pane is ever visible: the editor wins over everything, a
+      // completed workout under review wins over the start screen, otherwise the
+      // start screen shows.
+      // #99 H5: no state mutation here — draft creators clear workoutHistoryOpen.
+      if (hasDraft) { $('#workoutComplete').hidden = true; }
       const viewingComplete = !hasDraft && !$('#workoutComplete').hidden;
       const viewingHistory = !hasDraft && !viewingComplete && state.workoutHistoryOpen;
-      noteWorkoutSubScreen(hasDraft ? 'editor' : (viewingComplete ? 'complete' : (viewingHistory ? 'history' : 'start')));
-      $('#workoutStart').hidden = hasDraft || viewingComplete || viewingHistory;
-      $('#workoutEditor').hidden = !hasDraft;
+      /* Share preview (user 2026-09-12): a shared workout/program renders as
+         its own full-screen page. The live editor still wins when open. */
+      const viewingShare = !editorOpen && !!state.sharePreview;
+      /* Saved-workout editor page (user 2026-09-12): a saved workout opens its
+         own editor, never a live session. The live editor still wins when open. */
+      const viewingSaved = !editorOpen && !viewingShare && !!state.savedWorkoutId;
+      /* Saved-workout builder (user 2026-09-11): its own page, like the saved
+         editor. The live editor still wins when open. */
+      const viewingBuilder = !editorOpen && !!state.savedBuilder && state.builderOpen;
+      const showingStart = !editorOpen && !viewingComplete && !viewingHistory && !viewingSaved && !viewingBuilder && !viewingShare;
+      noteWorkoutSubScreen(editorOpen ? 'editor' : (viewingShare ? 'share' : (viewingBuilder ? 'builder' : (viewingComplete ? 'complete' : (viewingHistory ? 'history' : (viewingSaved ? 'saved' : 'start'))))));
+      /* Title-bar back follows the sub-screen (user 2026-09-11): keep the
+         top bar in sync whenever the workout sub-screen changes. */
+      if (state.activeView === 'workout') updateTopBar('workout');
+      $('#workoutStart').hidden = !showingStart;
+      $('#workoutEditor').hidden = !editorOpen;
       $('#workoutHistory').hidden = !viewingHistory;
+      $('#savedWorkout').hidden = !viewingSaved;
+      $('#savedBuilder').hidden = !viewingBuilder;
+      $('#sharePreview').hidden = !viewingShare;
       const lede = $('#workoutLede');
-      if (lede) lede.textContent = hasDraft ? 'Workout in progress — log your sets below.'
+      if (lede) lede.textContent = editorOpen ? 'Workout in progress — log your sets below.'
         : viewingComplete ? 'Reviewing a completed session.'
         : viewingHistory ? 'Browse all completed sessions.'
+        : viewingShare ? 'Someone shared this with you — start it or save it.'
+        : viewingSaved ? 'View or edit this saved workout.'
+        : viewingBuilder ? 'Build a reusable saved workout.'
+        : hasDraft ? 'A session is in progress — tap Continue to jump back in.'
         : 'Start a session or revisit your recent work.';
       updateLiveWorkoutIndicator();
-      renderWorkoutProgramSuggestion();
-      renderWorkoutTemplateList();
-      const latestReal=workoutState.completed.slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
-      if($('#repeatLastWorkout')){$('#repeatLastWorkout').disabled=!latestReal;$('#repeatLastWorkoutMeta').textContent=latestReal?`${latestReal.name} · ${formatLogDate(latestReal.date)}`:'Complete a workout to enable this.';}
-      renderWorkoutRecent();
+      if (showingStart) {
+        renderContinueWorkout();
+        renderBuilderContinue();
+        /* Phone QA 2026-09-12, revised user 2026-09-11: with a live session the
+           start screen shows the Continue card AND the saved list (hidden hero
+           only). The draft is discarded from inside the editor, never here. */
+        $('#workoutStart')?.classList.toggle('draft-live', hasDraft);
+        if (!hasDraft) {
+          renderWorkoutProgramSuggestion();
+          const latestReal=workoutState.completed.slice().sort(sortByRecencyDesc)[0]; /* #99 A13: latest by completion */
+          if($('#repeatLastWorkout')){$('#repeatLastWorkout').disabled=!latestReal;$('#repeatLastWorkoutMeta').textContent=latestReal?`${latestReal.name} · ${formatLogDate(latestReal.date)}`:'Complete a workout to enable this.';}
+        }
+        renderWorkoutTemplateList();
+      }
       if (viewingHistory) renderWorkoutHistoryList();
-      if (!hasDraft) return;
+      if (viewingShare) renderSharePreview();
+      if (viewingSaved) renderSavedWorkoutEditor();
+      if (viewingBuilder) renderSavedBuilder();
+      if (!editorOpen) return;
       $('#workoutName').value = workoutState.draft.name || '';
       $('#workoutDate').value = workoutState.draft.date;
       renderWorkoutDateDisplay();
       renderWorkoutExercises();
       renderWorkoutProgression();
       syncWorkoutFocusPills();
+    }
+    /* #129: Continue card — the autosaved in-progress workout ("draft" is
+       internal-only language, never user-facing) leads the start screen with
+       program + workout info. Tapping it opens the live editor. */
+    function renderContinueWorkout() {
+      const wrap = $('#continueWorkoutWrap');
+      if (!wrap) return;
+      const draft = workoutState.draft;
+      if (!draft) { wrap.hidden = true; wrap.innerHTML = ''; return; }
+      wrap.hidden = false;
+      let programLine = '';
+      if (draft.programId) {
+        const program=findProgramById(draft.programId);
+        const pw = program?.workouts?.find(w => w.uid === draft.programWorkoutUid);
+        if (program) programLine = `<small class="continue-program">${escapeHtml(program.name)}${pw ? ` · ${escapeHtml(pw.name)}` : ''}</small>`;
+      }
+      const exCount = (draft.exercises || []).length;
+      const totalSets = (draft.exercises || []).reduce((n, x) => n + (x.sets || []).length, 0);
+      const doneSets = (draft.exercises || []).reduce((n, x) => n + (x.sets || []).filter(s => s.complete).length, 0);
+      wrap.innerHTML = `<button class="continue-workout-card" id="continueWorkoutCard" type="button" aria-label="Continue ${escapeHtml(draft.name || 'workout')}"><span><span class="continue-kicker">Workout in progress</span><strong>${escapeHtml(draft.name || 'Workout')}</strong>${programLine}<small>${exCount} exercise${exCount === 1 ? '' : 's'} · ${doneSets}/${totalSets} sets done</small></span><span class="continue-arrow" aria-hidden="true">›</span></button>`;
+      $('#continueWorkoutCard').addEventListener('click', () => { state.workoutEditorOpen = true; renderWorkoutScreen(); });
     }
 
     /* Swipe-to-delete helpers (user 2026-09-11): iOS-Mail style — swipe left
@@ -322,9 +415,15 @@
           /* Set rows are mostly text fields: the swipe may start anywhere on
              the row except the checkbox (see above). Tap vs swipe is decided
              at release by how far the finger actually traveled (see finish). */
+          /* Program rows (user 2026-09-12): the row-open button covers the
+             whole row, so every swipe started "on a button" and died here —
+             the × was the only visible delete path. The open button IS the row
+             body, so swipes may start on it (tap-vs-swipe is still decided at
+             release); the × keeps the interactive exemption. */
+          const rowBodyStart = !isSetSwipe && !!event.target.closest('.program-workout-open');
           interactiveStart = isSetSwipe
             ? false
-            : !!event.target.closest('input, button, textarea, select, a, summary');
+            : (!rowBodyStart && !!event.target.closest('input, button, textarea, select, a, summary'));
           /* Deliberately NEVER calling setPointerCapture: iOS gives every touch
              implicit capture to its touch target, and these listeners sit on an
              ancestor so the events arrive regardless. An explicit
@@ -408,44 +507,24 @@
       });
     }
 
-    function progressionSummaryForOptions(item) {
-      // user 2026-09-11: show the exercise's progression setup under Exercise
-      // options so the suggestion basis is visible during the workout.
-      const prof = item.progression || {};
-      const scheme = prof.scheme || 'rpe';
-      const schemeLabel = scheme === 'linear' ? 'Linear' : 'RPE-based';
-      let target;
-      if (prof.mode === 'time' || item.tracking === 'seconds') {
-        target = `${prof.timeMin || 30}–${prof.timeMax || 60} sec`;
-      } else if (prof.amrap) {
-        target = `AMRAP from ${prof.min || 1} reps`;
-      } else if (prof.openTop) {
-        target = `${prof.min || 5}+ reps`;
-      } else {
-        target = `${prof.min || 5}–${prof.max || 8} reps`;
-      }
-      let detail = '';
-      {
-        const incType = prof.incrementType || 'lb';
-        const incVal = prof.incrementValue ?? 5;
-        detail = prof.repsOnly ? 'reps only, no load progression' : `+${incVal} ${incType === 'percent' ? '%' : weightUnit()} per jump`;
-      }
-      // Include the live suggestion reason if one exists for this exercise
-      const sugg = (workoutState.draft?.progressionSuggestions || []).find(x => x.exerciseId === item.exerciseId);
-      const basis = sugg?.reason ? `<span class="prog-basis">${escapeHtml(sugg.reason)}</span>` : '';
-      return `<div class="prog-summary"><span class="prog-scheme">${escapeHtml(schemeLabel)}</span><span class="prog-target">${escapeHtml(target)}</span><span class="prog-detail">${escapeHtml(detail)}</span>${basis}</div>`;
-    }
 
-    function renderWorkoutExercises() {
-      const draft = workoutState.draft;
-      if (!draft) return;
-      /* Reorder button only makes sense with 2+ exercises to reorder. */
-      const reorderBtn = $('#reorderWorkoutExercises');
-      if (reorderBtn) reorderBtn.style.display = draft.exercises.length >= 2 ? '' : 'none';
-      /* Preserve scroll across re-renders (prevents tap-induced jumps). */
-      const _scrollY=window.scrollY;
-      draft.exercises.forEach(item=>{if(!item.uid)item.uid=uid('exercise');item.sets=(item.sets||[]).map(set=>({...set,uid:set.uid||uid('set'),tags:[...(set.tags||[])]}));});
-      $('#workoutExercises').innerHTML = draft.exercises.length ? draft.exercises.map((item,itemIndex) => {
+    /* #99 B5: renderWorkoutExercises decomposed by pure code motion. HTML
+       building moved verbatim into liveExerciseCardHtml; the draft-uid
+       backfill into backfillDraftUids; each listener group verbatim into a
+       wireLive* helper; deleteWorkoutSet hoisted to module scope (it was a
+       nested declaration used once). renderWorkoutExercises only
+       orchestrates the same steps in the same order. */
+    function backfillDraftUids(draft){
+      /* #99 H3: all constructors go through newExerciseItem()/newSet(), so fresh
+         items always carry uids. This one-time migration backfills uids for
+         drafts persisted before the factory existed (pre-v0.99d); it is a
+         no-op for everything already built by the factory. */
+      draft.exercises.forEach(item=>{
+        if(!item.uid)item.uid=newExerciseUid();
+        (item.sets||[]).forEach(set=>{if(!set.uid)set.uid=newSetId();});
+      });
+    }
+    function liveExerciseCardHtml(item,draft){
         const ex = exercises.find(x => x.id === item.exerciseId); if (!ex) return '';
         const isBodyweight = ex.equipment === 'body only';
         const isDumbbell = ex.equipment === 'dumbbell';
@@ -454,8 +533,16 @@
         const target = item.suggestedTarget || {};
         const weightHint = target.w || lastWeight || '';
         const rp = rangePlaceholder(item.progression,tracking==='time');
-        const perfHint = tracking === 'time' ? (target.seconds || rp.text) : (target.r || rp.text);
-        const perfFallback = tracking === 'time' ? (target.seconds || rp.value) : (target.r || rp.value);
+        /* v0.99al: hold case — history exists but no suggestion fired, so ghost
+           the latest top set instead of the range minimum (100×6, not 100×1).
+           An explicit suggestion always wins; the range placeholder (and its
+           minimum as the untouched-completion fallback) applies only when
+           there is no completed history. AMRAP keeps explicit reps. The ghost
+           placeholder and the untouched-completion fallback below stay in sync
+           because both derive from these two values. */
+        const holdPerf = (!target.r && !target.seconds) ? latestTopSetPerf(item.exerciseId, tracking, !!item.progression?.amrap) : '';
+        const perfHint = tracking === 'time' ? (target.seconds || holdPerf || rp.text) : (target.r || holdPerf || rp.text);
+        const perfFallback = tracking === 'time' ? (target.seconds || holdPerf || rp.value) : (target.r || holdPerf || rp.value);
         const lastSummary = lastSessionSetSummary(item.exerciseId);
         const grouped = item.supersetId && draft.exercises.filter(x => x.supersetId === item.supersetId).length > 1;
         const topWeight=Math.max(0,...item.sets.map(set=>Number(set.w)||0));
@@ -464,7 +551,7 @@
            the weight summary. */
         const cardSummary=`${topWeight?`${displayWeight(topWeight)} ${weightUnit()}`:''}`;
         return `<details class="exercise-accordion workout-exercise" data-workout-exercise="${escapeHtml(item.uid)}" ${item.cardOpen===false?'':'open'}>
-            <!-- #12 corner-icon rule (user 2026-09-11): the info button lives in the card's top-right corner, matching the library star. REVERT: delete this button and restore it inside .exercise-accordion-actions above. -->
+            <!-- #12 corner-icon rule (user 2026-09-11): the info button lives in the card's top-right corner, matching the library star. -->
             <button class="exercise-info-button corner-icon" type="button" data-exercise-info="${escapeHtml(item.exerciseId)}" aria-label="About ${escapeHtml(ex.name)}">i</button>
             <summary class="exercise-accordion-head"><span class="exercise-accordion-chevron" aria-hidden="true">›</span><span class="exercise-accordion-title"><strong>${escapeHtml(ex.name)}</strong>${cardSummary?`<small>${escapeHtml(cardSummary)}</small>`:''}</span></summary>
             <div class="exercise-accordion-body">
@@ -478,7 +565,7 @@
                 <button class="log-set-number ${set.tags.length ? 'has-tags' : ''}" type="button" data-tag-exercise-uid="${escapeHtml(item.uid)}" data-tag-set-uid="${escapeHtml(set.uid)}" aria-label="Choose tags for set ${index + 1}" aria-haspopup="dialog">${index + 1}</button>
                 <label class="weight-entry"><input class="log-input weight-input" data-field="w" data-placeholder-weight="${escapeHtml(weightHint)}" type="number" min="0" step="${isMetric()?'0.1':'0.5'}" inputmode="decimal" value="${escapeHtml(displayWeight(set.w))}" placeholder="${weightHint?escapeHtml(displayWeight(weightHint)):(isBodyweight?'Optional':'Weight')}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : isDumbbell ? 'total dumbbell weight' : 'weight'} in ${isMetric()?'kilograms':'pounds'}${weightHint ? (target.w ? `; suggested ${escapeHtml(displayWeight(weightHint))}` : `; last used ${escapeHtml(displayWeight(weightHint))}`) : ''}" /></label>
                 <input class="log-input reps-input" data-field="${tracking === 'time' ? 'seconds' : 'r'}" data-placeholder-perf="${escapeHtml(perfFallback)}" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(tracking === 'time' ? (set.seconds ?? '') : (set.r ?? ''))}" placeholder="${tracking === 'time' ? (perfHint || 'Seconds') : (perfHint || 'Reps')}" aria-label="Set ${index + 1} ${tracking === 'time' ? 'seconds' : 'reps'}${perfHint ? `; target ${escapeHtml(perfHint)}` : ''}" />
-                <input class="log-input rpe-input" data-field="rpe" type="number" min="1" max="10" step="0.5" inputmode="decimal" value="${escapeHtml(set.rpe)}" placeholder="RPE" aria-label="Set ${index + 1} optional RPE" />
+                <input class="log-input rpe-input" data-field="rpe" type="number" min="1" max="10" step="0.5" inputmode="decimal" value="${escapeHtml(set.rpe)}" placeholder="${set.targetRpe!==''&&set.targetRpe!=null?('Target '+escapeHtml(String(set.targetRpe))):'RPE'}" aria-label="Set ${index + 1} optional RPE${set.targetRpe!==''&&set.targetRpe!=null?`; target RPE ${escapeHtml(String(set.targetRpe))}`:''}" />
                 <div class="set-actions">
                   <button class="complete-set" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-pressed="${set.complete}" aria-label="${set.complete ? 'Mark set incomplete' : 'Mark set complete'}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect class="box" x="3.2" y="3.2" width="17.6" height="17.6" rx="5.5"/><path class="tick" d="m8 12.4 2.6 2.6 5.6-6.2"/></svg></button>
                   <button class="delete-set delete-set-inline" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-label="Delete set ${index + 1}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
@@ -491,7 +578,15 @@
             <details class="advanced-options" ${item.optionsOpen?'open':''}><summary>Exercise options</summary><div class="advanced-options-body"><div class="exercise-tools"><div class="tracking-segment" role="group" aria-label="Track reps or seconds"><button type="button" data-tracking-mode="reps" data-tracking-uid="${escapeHtml(item.uid)}" aria-pressed="${tracking==='time'?'false':'true'}">Reps</button><button type="button" data-tracking-mode="seconds" data-tracking-uid="${escapeHtml(item.uid)}" aria-pressed="${tracking==='time'?'true':'false'}">Seconds</button></div></div>${progressionSummaryForOptions(item)}<div class="exercise-tag-row">${(item.exerciseTags||[]).map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}<button class="exercise-tag-button" type="button" data-draft-exercise-tags="${escapeHtml(item.uid)}">${item.exerciseTags?.length?'Edit exercise tags':'+ Exercise tags'}</button></div><div class="options-apply-row"><button class="copy-first-set" type="button" data-copy-first-set="${escapeHtml(item.uid)}" ${item.sets.length<2?'disabled':''}>Apply set 1 to all</button><span class="inline-feedback" data-copy-feedback="${escapeHtml(item.uid)}" aria-live="polite"></span></div><div class="remove-exercise-separator"></div><button class="remove-workout-exercise text-danger-button" type="button" data-uid="${escapeHtml(item.uid)}" aria-label="Remove ${escapeHtml(ex.name)} from this workout">Remove exercise</button></div></details>
             </div>
           </details>`;
-      }).join('') : '<div class="history-empty">No exercises yet. Add your first movement to begin logging.</div>';
+    }
+    function deleteWorkoutSet(exerciseUid,setUid){
+      const draft=workoutState.draft;if(!draft)return;
+      const item=findDraftExercise(exerciseUid);if(!item)return;
+      item.sets=item.sets.filter(set=>set.uid!==setUid);
+      if(!item.sets.length){ /* Deleting the last set removes the exercise (user 2026-09-11). */ draft.exercises=draft.exercises.filter(row=>row.uid!==item.uid); }
+      renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();
+    }
+    function wireLiveRemoveExercise(){
 
       document.querySelectorAll('.remove-workout-exercise').forEach(button => button.addEventListener('click', () => {
         const draft=workoutState.draft;
@@ -501,23 +596,26 @@
         $('#removeExerciseDesc').textContent = ex ? `Remove "${ex.name}" from this workout? This cannot be undone.` : 'Remove this exercise from the workout? This cannot be undone.';
         $('#removeExerciseDialog').showModal();
       }));
-      document.querySelectorAll('.add-set').forEach(button => button.addEventListener('click', () => { draft.exercises.find(item => item.uid === button.dataset.uid)?.sets.push(newSet()); renderWorkoutExercises(); markDraftSaved(); }));
+    }
+    function wireLiveAddSet(){
+      document.querySelectorAll('.add-set').forEach(button => button.addEventListener('click', () => { findDraftExercise(button.dataset.uid)?.sets.push(newSet()); renderWorkoutExercises(); markDraftSaved(); }));
+    }
+    function wireLiveCopyFirstSet(){
       document.querySelectorAll('[data-copy-first-set]').forEach(button => button.addEventListener('click', () => {
-        const item=draft.exercises.find(row=>row.uid===button.dataset.copyFirstSet); if(!item||item.sets.length<2)return;
+        const item=findDraftExercise(button.dataset.copyFirstSet); if(!item||item.sets.length<2)return;
         const first=item.sets[0], fallback=lastUsedWeight(item.exerciseId);
-        item.sets.slice(1).forEach(set=>{set.w=first.w!==''?first.w:fallback;set.r=first.r;set.seconds=first.seconds;set.rpe=first.rpe;});
+        item.sets.slice(1).forEach(set=>{set.w=first.w!==''?first.w:fallback;set.r=first.r;set.seconds=first.seconds;set.rpe=first.rpe;set.targetRpe=first.targetRpe;});
         renderWorkoutExercises(); markDraftSaved();
         requestAnimationFrame(()=>{const feedback=document.querySelector(`[data-copy-feedback="${CSS.escape(item.uid)}"]`);if(feedback)feedback.textContent='Applied';});
       }));
-      function deleteWorkoutSet(exerciseUid,setUid){
-        const draft=workoutState.draft;if(!draft)return;
-        const item=draft.exercises.find(row=>row.uid===exerciseUid);if(!item)return;
-        item.sets=item.sets.filter(set=>set.uid!==setUid);
-        if(!item.sets.length){ /* Deleting the last set removes the exercise (user 2026-09-11). */ draft.exercises=draft.exercises.filter(row=>row.uid!==item.uid); }
-        renderWorkoutExercises();renderWorkoutProgression();markDraftSaved();
-      }
+    }
+    function wireLiveDeleteSet(){
       document.querySelectorAll('.delete-set,.delete-set-swipe').forEach(button => button.addEventListener('click', () => deleteWorkoutSet(button.dataset.exerciseUid,button.dataset.setUid)));
-      document.querySelectorAll('.log-input').forEach(input => input.addEventListener('input', () => { const row=input.closest('.log-set'); const exerciseUid = input.closest('.workout-exercise').dataset.workoutExercise; const setUid = row.dataset.setUid; const set = draft.exercises.find(item => item.uid === exerciseUid)?.sets.find(itemSet => itemSet.uid === setUid); if (set) { set[input.dataset.field] = input.dataset.field==='w' ? storageWeight(input.value) : input.value; if (set.complete) { set.complete = false; row.classList.remove('is-complete'); const check=row.querySelector('.complete-set'); check?.setAttribute('aria-pressed','false'); check?.setAttribute('aria-label','Mark set complete'); } } $('#workoutError').textContent = ''; markDraftSaved(); }));
+    }
+    function wireLiveSetInputs(){
+      document.querySelectorAll('.log-input').forEach(input => input.addEventListener('input', () => { const row=input.closest('.log-set'); const exerciseUid = input.closest('.workout-exercise').dataset.workoutExercise; const setUid = row.dataset.setUid; const set = findDraftExercise(exerciseUid)?.sets.find(itemSet => itemSet.uid === setUid); if (set) { set[input.dataset.field] = input.dataset.field==='w' ? storageWeight(input.value) : input.value; } /* #161: editing a value no longer silently un-completes the set — the old flip shrank completed-set counts on every keystroke. The checkbox stays the one explicit complete/incomplete control. */ $('#workoutError').textContent = ''; markDraftSaved(); }));
+    }
+    function wireLiveCompleteSet(){
       document.querySelectorAll('.complete-set').forEach(button => button.addEventListener('click', () => {
         /* #93 (user 2026-09-11): a checkbox click means the user's intent was
            to toggle the set, not to swipe — so unconditionally clear any swipe
@@ -527,7 +625,7 @@
         const swipeItem = button.closest('.swipe-item');
         if (swipeItem) setSwipeOpen(swipeItem, false);
         const set = findDraftSet(button.dataset.exerciseUid, button.dataset.setUid);
-        const item=draft.exercises.find(row=>row.uid===button.dataset.exerciseUid);
+        const item=findDraftExercise(button.dataset.exerciseUid);
         const ex=exercises.find(row=>row.id===item?.exerciseId);
         const tracking=exerciseTracking(item,ex), weightOptional=ex?.equipment==='body only';
         if (!set) return;
@@ -537,14 +635,19 @@
         const perfField=tracking==='time'?'seconds':'r';
         if (!set.complete && set.w === '' && weightInput?.dataset.placeholderWeight) {
           set.w=weightInput.dataset.placeholderWeight;
-          weightInput.value=set.w;
+          /* A6/#156: the field renders in the user's display unit — show the
+             converted value, not the canonical-lb value, or metric users see
+             (and then edit) lbs. Input converts back via storageWeight(). */
+          weightInput.value=displayWeight(set.w);
         }
         if (!set.complete && (set[perfField]==null||set[perfField]==='') && perfInput?.dataset.placeholderPerf) {
           set[perfField]=perfInput.dataset.placeholderPerf;
           perfInput.value=set[perfField];
         }
         const performanceValue=tracking==='time'?set.seconds:set.r;
-        if (!set.complete && ((!weightOptional && set.w === '') || performanceValue === '' || Number(set.w||0) < 0 || Number(performanceValue) < 1 || (set.rpe !== '' && (Number(set.rpe) < 1 || Number(set.rpe) > 10)))) {
+        /* A10 (#99): NaN comparisons are false, so non-numeric input used to
+           pass this gate as valid — require finite numbers explicitly. */
+        if (!set.complete && ((!weightOptional && set.w === '') || performanceValue === '' || !Number.isFinite(Number(set.w||0)) || Number(set.w||0) < 0 || !Number.isFinite(Number(performanceValue)) || Number(performanceValue) < 1 || (set.rpe !== '' && (!Number.isFinite(Number(set.rpe)) || Number(set.rpe) < 1 || Number(set.rpe) > 10)))) {
           const perfWord = tracking==='time'?'seconds':'reps';
           showToast(weightOptional ? `Enter ${perfWord} to complete this set. Weight and RPE are optional.` : `Enter weight and ${perfWord} to complete this set. RPE is optional.`);
           setRow.querySelector((!weightOptional&&set.w==='')?'.weight-input':'.reps-input')?.focus(); return;
@@ -552,8 +655,14 @@
         const pr=!set.complete?livePRLabel(item,set):'';
         set.complete = !set.complete; button.setAttribute('aria-pressed', String(set.complete)); button.setAttribute('aria-label', set.complete ? 'Mark set incomplete' : 'Mark set complete'); button.closest('.log-set').classList.toggle('is-complete', set.complete); $('#workoutError').textContent = ''; if(pr)showToast(`PR · ${pr}`,'pr-toast'); markDraftSaved();
       }));
-      document.querySelectorAll('.advanced-options').forEach(details => details.addEventListener('toggle', () => { const item=draft.exercises.find(row=>row.uid===details.closest('.workout-exercise')?.dataset.workoutExercise); if(item)item.optionsOpen=details.open; }));
-      document.querySelectorAll(".exercise-accordion").forEach(card => card.addEventListener('toggle', () => { const item=draft.exercises.find(row=>row.uid===card.dataset.workoutExercise); if(item){item.cardOpen=card.open;markDraftSaved();} }));
+    }
+    function wireLiveAdvancedToggles(){
+      document.querySelectorAll('.advanced-options').forEach(details => details.addEventListener('toggle', () => { const item=findDraftExercise(details.closest('.workout-exercise')?.dataset.workoutExercise); if(item)item.optionsOpen=details.open; }));
+    }
+    function wireLiveCardToggles(){
+      document.querySelectorAll(".exercise-accordion").forEach(card => card.addEventListener('toggle', () => { const item=findDraftExercise(card.dataset.workoutExercise); if(item){item.cardOpen=card.open;markDraftSaved();} }));
+    }
+    function wireLiveCardExpandAnimation(){
       /* #88 (user 2026-09-11): tiny pleasant expand animation. When a card
          opens, the body grows from 0 to full height with a soft fade (220ms).
          Close stays native/instant — animating it would require intercepting
@@ -571,22 +680,61 @@
         anim.onfinish = () => { body.style.height = ''; body.style.opacity = ''; body.style.overflow = ''; };
         anim.oncancel = () => { body.style.height = ''; body.style.opacity = ''; body.style.overflow = ''; };
       }));
+    }
+    function wireLiveSetTags(){
       document.querySelectorAll('[data-tag-set-uid]').forEach(button => button.addEventListener('click', () => openTagDialog(button.dataset.tagExerciseUid, button.dataset.tagSetUid)));
+    }
+    function wireLiveExerciseTags(){
       document.querySelectorAll('[data-draft-exercise-tags]').forEach(button => button.addEventListener('click', () => openExerciseTagDialog({mode:'draft',exerciseUid:button.dataset.draftExerciseTags})));
+    }
+    function wireLiveExerciseInfo(){
       document.querySelectorAll('[data-exercise-info]').forEach(button => button.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); openExercise(button.dataset.exerciseInfo); }));
-      document.querySelectorAll('[data-add-note]').forEach(button => button.addEventListener('click', () => { const item = draft.exercises.find(x => x.uid === button.dataset.addNote); if (!item) return; item.noteOpen = true; /* Surgical swap: replace the button with the textarea in place. A full renderWorkoutExercises() here destroys all DOM and causes scroll jumps; the in-place swap keeps layout stable. */ const ta = document.createElement('textarea'); ta.id = `note-${item.uid}`; ta.dataset.exerciseNote = item.uid; ta.setAttribute('aria-label', 'Exercise notes'); ta.placeholder = 'Cues, setup, pain, or anything to remember'; ta.value = item.note || ''; ta.addEventListener('input', () => { item.note = ta.value; markDraftSaved(); }); button.replaceWith(ta); ta.focus({preventScroll:true}); }));
-      document.querySelectorAll('[data-exercise-note]').forEach(input => input.addEventListener('input', () => { const item = draft.exercises.find(x => x.uid === input.dataset.exerciseNote); if (item) item.note = input.value; markDraftSaved(); }));
+    }
+    function wireLiveAddNote(){
+      document.querySelectorAll('[data-add-note]').forEach(button => button.addEventListener('click', () => { const item = findDraftExercise(button.dataset.addNote); if (!item) return; item.noteOpen = true; /* Surgical swap: replace the button with the textarea in place. A full renderWorkoutExercises() here destroys all DOM and causes scroll jumps; the in-place swap keeps layout stable. */ const ta = document.createElement('textarea'); ta.id = `note-${item.uid}`; ta.dataset.exerciseNote = item.uid; ta.setAttribute('aria-label', 'Exercise notes'); ta.placeholder = 'Cues, setup, pain, or anything to remember'; ta.value = item.note || ''; ta.addEventListener('input', () => { item.note = ta.value; markDraftSaved(); }); button.replaceWith(ta); ta.focus({preventScroll:true}); }));
+    }
+    function wireLiveNoteInputs(){
+      document.querySelectorAll('[data-exercise-note]').forEach(input => input.addEventListener('input', () => { const item = findDraftExercise(input.dataset.exerciseNote); if (item) item.note = input.value; markDraftSaved(); }));
+    }
+    function wireLiveTracking(){
       document.querySelectorAll('[data-tracking-uid]').forEach(button => button.addEventListener('click', () => {
-        const item = draft.exercises.find(row => row.uid === button.dataset.trackingUid); if (!item) return;
-        const next = button.dataset.trackingMode || 'reps';
-        if (exerciseTracking(item, exercises.find(ex => ex.id === item.exerciseId)) === (next === 'seconds' ? 'time' : 'reps')) return;
-        item.tracking = next === 'seconds' ? 'time' : 'reps';
-        item.progression = {...progressionProfileForDraftItem(item), mode:item.tracking};
-        item.sets.forEach(set => { set.complete = false; });
+        const item = findDraftExercise(button.dataset.trackingUid); if (!item) return;
+        /* One canonical switch (efficiency pass 2026-09-12): maps "seconds"
+           to 'time', no-ops when already set (no scroll jump), keeps the
+           progression mode in sync, never mutates entered values. */
+        if(!setExerciseTracking(item, button.dataset.trackingMode||'reps', {resetCompletion:true}))return;
         renderWorkoutExercises(); renderWorkoutProgression(); markDraftSaved();
       }));
+    }
+    function wireLiveSuperset(){
       document.querySelectorAll('[data-superset-uid]').forEach(button => button.addEventListener('click', () => openSupersetDialog(button.dataset.supersetUid)));
-      attachReorderHandles();
+    }
+    function renderWorkoutExercises() {
+      const draft = workoutState.draft;
+      if (!draft) return;
+      /* Reorder button only makes sense with 2+ exercises to reorder. */
+      const reorderBtn = $('#reorderWorkoutExercises');
+      if (reorderBtn) reorderBtn.style.display = draft.exercises.length >= 2 ? '' : 'none';
+      /* Preserve scroll across re-renders (prevents tap-induced jumps). */
+      const _scrollY=window.scrollY;
+      backfillDraftUids(draft);
+      $('#workoutExercises').innerHTML = draft.exercises.length ? draft.exercises.map(item => liveExerciseCardHtml(item, draft)).join('') : '<div class="history-empty">No exercises yet. Add your first movement to begin logging.</div>';
+      wireLiveRemoveExercise();
+      wireLiveAddSet();
+      wireLiveCopyFirstSet();
+      wireLiveDeleteSet();
+      wireLiveSetInputs();
+      wireLiveCompleteSet();
+      wireLiveAdvancedToggles();
+      wireLiveCardToggles();
+      wireLiveCardExpandAnimation();
+      wireLiveSetTags();
+      wireLiveExerciseTags();
+      wireLiveExerciseInfo();
+      wireLiveAddNote();
+      wireLiveNoteInputs();
+      wireLiveTracking();
+      wireLiveSuperset();
       attachSwipeDelete($('#workoutExercises'));
       window.scrollTo(0,_scrollY);
     }
