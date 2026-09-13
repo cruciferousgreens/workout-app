@@ -40,6 +40,20 @@
      document.documentElement.dataset.theme = _tn === 'cruciferous' ? (_dk ? 'macchiato' : 'light') : _tn;
    } catch (_) { document.documentElement.dataset.theme = 'light'; }
   </script>
+  <script>
+   /* #307 (user 2026-09-13): a share-link cold open flashes the empty home
+      dashboard for a split second before the parser-blocking app scripts
+      finish loading. Detect the share boot pre-paint and flag it on <html>
+      so CSS + the inline scripts below render the loading skeleton on the
+      very first paint. Detection mirrors bootShareAttempt in
+      app-bootstrap.js: #share= hash, /s/<slug> path, or the 404-handoff key
+      (only peeked — takeSpaRedirectSlug consumes it later). */
+   try {
+     var _shareBoot = /^#share=/.test(location.hash || '') || /(?:^|\/)s\/[^\/]+\/?$/.test(location.pathname || '');
+     if (!_shareBoot) { try { _shareBoot = sessionStorage.getItem('cg-spa-redirect') != null; } catch (_) {} }
+     if (_shareBoot) document.documentElement.classList.add('share-boot');
+   } catch (_) {}
+  </script>
   <link rel="stylesheet" href="assets/styles.css">
   <link rel="manifest" href="manifest.webmanifest">
 </head>
@@ -59,6 +73,21 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
     </button>
    </header>
+   <script>
+    /* #307 pre-paint: on a share boot the landing is the Workout view with a
+       back chevron. This inline script runs during parsing — before the
+       parser-blocking app scripts are fetched — so the first paint already
+       shows it. Only the first text node is replaced so #liveTitleDot (and
+       setTopBarTitle's re-append of it) keeps working. */
+    try {
+      if (document.documentElement.classList.contains('share-boot')) {
+        var _stt = document.getElementById('topBarTitleText');
+        if (_stt && _stt.firstChild) _stt.firstChild.nodeValue = 'Workout';
+        var _sbk = document.getElementById('topBarBack');
+        if (_sbk) _sbk.hidden = false;
+      }
+    } catch (_) {}
+   </script>
    <main class="shell">
     <section id="dashboardView" class="dashboard-view active" aria-label="Home">
       <div class="calendar-toolbar">
@@ -141,7 +170,12 @@
        <div id="savedWorkoutBody"></div>
       </div>
       <div id="sharePreview" hidden>
-       <div id="sharePreviewBody"></div>
+       <div id="sharePreviewBody"><!-- #307 pre-paint skeleton: the signed-out variant of sharePreviewSkeletonHtml() in assets/js/share.js, so the first paint on a share cold open already shows the loading card. Signed-in users gain the bookmark-circle skeleton when the scripts render the live skeleton — same task, no paint between. Keep this markup in sync with sharePreviewSkeletonHtml(). -->
+        <div class="completed-card" aria-busy="true" aria-label="Loading shared link"><span class="continue-kicker">Shared link</span><div class="detail-title-row"><span class="skel skel-title"></span><div class="share-header-actions"><span class="skel skel-start"></span></div></div><p class="share-context"><span class="skel skel-line" style="width:55%"></span></p><p class="completed-meta"><span class="skel skel-line" style="width:40%"></span></p>
+        <div class="section-head"><span class="skel skel-line" style="width:130px"></span></div><div class="skel skel-map"></div><div class="workout-muscles"><span class="skel skel-pill"></span><span class="skel skel-pill"></span><span class="skel skel-pill"></span><span class="skel skel-pill"></span></div>
+        <div class="section-head"><span class="skel skel-line" style="width:100px"></span></div><div class="skel skel-row" style="margin-bottom:8px"></div><div class="skel skel-row" style="margin-bottom:8px"></div><div class="skel skel-row"></div>
+        <div class="share-footer-actions"><div class="share-actions"><span class="skel skel-btn"></span><span class="skel skel-line" style="width:150px;margin-top:8px"></span></div><p class="section-note"><span class="skel skel-line" style="width:60%;margin:0 auto"></span></p></div></div>
+       </div>
       </div>
       <div id="workoutEditor" hidden>
        <div class="workout-context" id="workoutContext" hidden></div>
@@ -818,6 +852,18 @@
     </button>
    </nav>
   </div>
+  <script>
+   /* #307 pre-paint: light the Workout tab on a share boot, mirroring
+      setActiveNav('workout'). Runs during parsing, before first paint. */
+   try {
+     if (document.documentElement.classList.contains('share-boot')) {
+       var _hn = document.getElementById('dashboardNav');
+       if (_hn) { _hn.classList.remove('active'); _hn.removeAttribute('aria-current'); }
+       var _wn = document.getElementById('workoutsNav');
+       if (_wn) { _wn.classList.add('active'); _wn.setAttribute('aria-current', 'page'); }
+     }
+   } catch (_) {}
+  </script>
 
   <script src="data/exercises-db.js"></script>
   <script src="assets/js/build-info.js"></script>

@@ -206,3 +206,38 @@ describe('#241: the PR toast background is opaque, not translucent',()=>{
     assert.ok(!/rgba?\(/.test(m[0]),'no translucent rgba fill');
   });
 });
+
+describe('#307: pre-paint share boot — no empty-dashboard flash before the skeleton',()=>{
+  it('the head script flags a share boot on <html> before first paint',()=>{
+    const head=html.slice(0,html.indexOf('</head>'));
+    assert.ok(head.includes("document.documentElement.classList.add('share-boot')"),'share-boot class added pre-paint');
+    assert.ok(head.includes('/^#share=/'),'hash share links detected');
+    assert.ok(head.includes('/s/'),'short-link paths detected');
+    assert.ok(head.includes('cg-spa-redirect'),'404-handoff key peeked (not consumed)');
+  });
+  it('a static skeleton lives in #sharePreviewBody for the first paint',()=>{
+    const body=html.slice(html.indexOf('id="sharePreviewBody"'),html.indexOf('id="sharePreviewBody"')+2600);
+    assert.ok(body.includes('aria-busy="true"'),'static skeleton marked busy');
+    assert.ok(body.includes('continue-kicker'),'kicker present');
+    assert.ok(body.includes('Shared link'),'kicker reads "Shared link"');
+    assert.ok(body.includes('skel-title')&&body.includes('skel-map')&&body.includes('skel-row')&&body.includes('skel-btn'),'skeleton blocks present');
+    assert.ok(!body.includes('skel-circle'),'static skeleton is the signed-out variant (no bookmark circle)');
+    assert.ok(body.includes('sharePreviewSkeletonHtml'),'comment points at the JS source of truth');
+  });
+  it('CSS shows the skeleton and hides the dashboard on the first paint',()=>{
+    assert.ok(css.includes('html.share-boot #dashboardView'),'dashboard hidden pre-paint');
+    assert.ok(css.includes('html.share-boot #workoutView'),'workout view shown pre-paint');
+    assert.ok(css.includes('html.share-boot #sharePreview'),'share preview shown pre-paint');
+    assert.ok(css.includes('#workoutView > :not(#sharePreview)'),'other workout children hidden pre-paint');
+  });
+  it('inline scripts set the Workout title, back chevron, and nav tab pre-paint',()=>{
+    assert.ok(html.includes("nodeValue = 'Workout'")||html.includes('nodeValue="Workout"')||html.includes("nodeValue='Workout'"),'title set to Workout');
+    const backFix=html.indexOf("getElementById('topBarBack')");
+    assert.ok(backFix!==-1&&html.slice(backFix,backFix+120).includes('hidden = false'),'back chevron unhidden pre-paint');
+    assert.ok(html.includes("getElementById('workoutsNav')"),'workout nav tab lit pre-paint');
+  });
+  it('openSharePreviewLoading drops the pre-paint flag when the live skeleton renders',()=>{
+    const fn=shareSrc.match(/function openSharePreviewLoading\(\)\{([\s\S]*?)\n    \}/)[1];
+    assert.ok(fn.includes("classList.remove('share-boot')"),'flag removed in the same task as the live skeleton render');
+  });
+});

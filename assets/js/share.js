@@ -243,6 +243,10 @@
        links). The landing renders immediately in a loading state; the
        resolved payload fills it in. */
     function openSharePreviewLoading(){
+      /* #307: drop the pre-paint .share-boot flag — the static skeleton in
+         index.html is replaced by the live one below in the same synchronous
+         task, so no paint lands between them. */
+      try{document.documentElement.classList.remove('share-boot');}catch(_){}
       state.sharePreview={loading:true};
       state.savedWorkoutId=null;state.builderOpen=false;
       state.workoutHistoryOpen=false;$('#workoutComplete').hidden=true;

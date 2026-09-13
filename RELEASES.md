@@ -2,6 +2,9 @@
 
 Newest first. Only user-facing milestones.
 
+## v1.6 (2026-09-13)
+- #307 (user): share-link cold open no longer flashes the empty home dashboard — the share boot is detected pre-paint, so the first paint already shows the loading skeleton with the Workout title and tab lit. No × during loading for anyone (v1.51).
+
 ## v1.51 (2026-09-13)
 - #307 (user): no × on the share-link loading skeleton for anyone — signed-in included. If a resolve hangs, system Back exits via the pushed history entry.
 

@@ -336,6 +336,18 @@
     .skel-circle { width: 40px; height: 40px; border-radius: 50%; }
     .skel-start { width: 88px; height: 40px; border-radius: 999px; }
     @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+    /* #307 (user 2026-09-13): pre-paint share boot. The head script adds
+       .share-boot to <html> when the URL is a share link, so the FIRST paint
+       already shows the loading skeleton — the empty home dashboard never
+       flashes before the scripts run. openSharePreviewLoading() removes the
+       class when it renders the live skeleton (same synchronous task, so no
+       paint lands between the static and live skeletons). Author styles beat
+       the UA [hidden] rule, and the class is gone before any later
+       show/hide, so the hidden attribute keeps working afterwards. */
+    html.share-boot #dashboardView { display: none; }
+    html.share-boot #workoutView { display: block; }
+    html.share-boot #workoutView > :not(#sharePreview) { display: none; }
+    html.share-boot #sharePreview { display: block; }
     .custom-form { padding: 24px; }
     .custom-form-head { display: flex; align-items: start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
     .custom-form-head h2 { margin: 0 0 5px; font: 700 24px/1.15 var(--font-sans); letter-spacing: -.02em; }
