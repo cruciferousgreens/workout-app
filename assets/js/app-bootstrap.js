@@ -130,7 +130,6 @@
       const incPair=$('#settingsIncrementValue')?.closest('.settings-pair');
       if(incPair)incPair.hidden=scheme==='onerm';
       const pctRow=$('#settingsPctRow'); if(pctRow)pctRow.hidden=scheme!=='onerm';
-      const deloadPctRow=$('#settingsDeloadPctRow'); if(deloadPctRow)deloadPctRow.hidden=scheme!=='onerm';
     }
     function renderSettings(){
       const darkToggle=$('#darkModeToggle');
@@ -152,7 +151,11 @@
       syncStatsDefaultPills();
       syncTimeStepPills($('#settingsTimeStepPills'),progressionSetup.timeStep);
       const pctDef=$('#settingsPercentOf1RM'); if(pctDef)pctDef.value=progressionSetup.percentOf1RM??75;
-      const deloadEveryDef=$('#settingsDeloadEvery'); if(deloadEveryDef)deloadEveryDef.value=progressionSetup.deloadEvery??0;
+      /* #321: Auto Deload toggle + panel (defaults for new programs). */
+      const settingsAdToggle=$('#settingsAutoDeloadToggle');
+      if(settingsAdToggle){const on=!!progressionSetup.autoDeload;settingsAdToggle.setAttribute('aria-pressed',String(on));settingsAdToggle.setAttribute('aria-label',`Auto Deload ${on?'on':'off'}`);}
+      const settingsAdPanel=$('#settingsAutoDeloadPanel'); if(settingsAdPanel)settingsAdPanel.hidden=!progressionSetup.autoDeload;
+      const deloadEveryDef=$('#settingsDeloadEvery'); if(deloadEveryDef)deloadEveryDef.value=progressionSetup.deloadEvery??4;
       const deloadPctDef=$('#settingsDeloadPct'); if(deloadPctDef)deloadPctDef.value=progressionSetup.deloadPct??60;
       syncSettingsScheme();
       const und=$('#settingsUndulatingToggle');
@@ -254,8 +257,8 @@
     document.querySelectorAll('#settingsStatsDefaultPills [data-stats-default]').forEach(button=>button.addEventListener('click',()=>{
       const def=button.dataset.statsDefault; if(progressionSetup.statsDefaultMetric===def)return;
       progressionSetup.statsDefaultMetric=def; syncStatsDefaultPills(); schedulePersist();
-      /* Apply immediately: both Stats toggles follow the new default. */
-      state.topExercisesMode=def; state.muscleVolumeMode=def; renderStats();
+      /* Apply immediately: all Stats toggles follow the new default. */
+      state.topExercisesMode=def; state.muscleVolumeMode=def; state.muscleMapMode=def; renderStats();
     }));
     document.querySelectorAll('#settingsRpePills [data-rpe-threshold]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.threshold=Number(button.dataset.rpeThreshold);document.querySelectorAll('#settingsRpePills [data-rpe-threshold]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));schedulePersist();}));
     $('#settingsIncrementType').addEventListener('change',e=>{progressionSetup.incrementType=e.target.value;syncSettingsIncrementUnit();schedulePersist();});
@@ -267,7 +270,10 @@
     wireTimeStepPills($('#programTimeStepPills'),()=>programFormProgression().timeStep,v=>{programFormProgression().timeStep=v;syncAllTimeStepPills();schedulePersist();});
     document.querySelectorAll('#settingsSchemePills [data-scheme]').forEach(button=>button.addEventListener('click',()=>{progressionSetup.scheme=button.dataset.scheme;syncSettingsScheme();schedulePersist();}));
     $('#settingsPercentOf1RM')?.addEventListener('input',e=>{progressionSetup.percentOf1RM=clampPct1RM(Number(e.target.value)||75);schedulePersist();});
-    $('#settingsDeloadEvery')?.addEventListener('input',e=>{progressionSetup.deloadEvery=Math.max(0,Math.floor(Number(e.target.value)||0));schedulePersist();});
+    /* #321: Auto Deload toggle (default for new programs). Enabling with no
+       valid N-weeks value seeds the conventional 4. */
+    $('#settingsAutoDeloadToggle')?.addEventListener('click',()=>{progressionSetup.autoDeload=!progressionSetup.autoDeload;if(progressionSetup.autoDeload&&!(Number(progressionSetup.deloadEvery)>0))progressionSetup.deloadEvery=4;const toggle=$('#settingsAutoDeloadToggle');toggle.setAttribute('aria-pressed',String(!!progressionSetup.autoDeload));toggle.setAttribute('aria-label',`Auto Deload ${progressionSetup.autoDeload?'on':'off'}`);const panel=$('#settingsAutoDeloadPanel');if(panel)panel.hidden=!progressionSetup.autoDeload;const every=$('#settingsDeloadEvery');if(every)every.value=progressionSetup.deloadEvery;schedulePersist();});
+    $('#settingsDeloadEvery')?.addEventListener('input',e=>{progressionSetup.deloadEvery=Math.max(1,Math.floor(Number(e.target.value)||4));schedulePersist();});
     $('#settingsDeloadPct')?.addEventListener('input',e=>{progressionSetup.deloadPct=clampDeloadPct(Number(e.target.value)||60);schedulePersist();});
     /* Settings → default periodization editor (user 2026-09-11). Mirrors the
        program week-range editor: 8-week cycle, edits progressionSetup.weeklyRanges
@@ -453,9 +459,11 @@
     $('#progressionThreshold').addEventListener('input',e=>{programFormProgression().threshold=Number(e.target.value)||8;schedulePersist();});
     $('#progressionIncrementType').addEventListener('change',e=>{programFormProgression().incrementType=e.target.value;syncProgramIncrementUnit();schedulePersist();});
     $('#progressionIncrementValue').addEventListener('input',e=>{programFormProgression().incrementValue=Number(e.target.value)||5;schedulePersist();});
-    /* %1RM + scheduled deloads (#54, v1.001). */
+    /* %1RM + scheduled deloads (#54, v1.001). #321: the deload fields live in
+       the Auto Deload panel now; enabling with no valid N-weeks seeds 4. */
     $('#progressionPercentOf1RM').addEventListener('input',e=>{programFormProgression().percentOf1RM=clampPct1RM(Number(e.target.value)||75);schedulePersist();});
-    $('#deloadEvery').addEventListener('input',e=>{const d=programFormProgression();d.deloadEvery=Math.max(0,Math.floor(Number(e.target.value)||0));schedulePersist();});
+    $('#autoDeloadToggle').addEventListener('click',()=>{const d=programFormProgression();d.autoDeload=!d.autoDeload;if(d.autoDeload&&!(Number(d.deloadEvery)>0))d.deloadEvery=4;syncProgramForm();schedulePersist();});
+    $('#deloadEvery').addEventListener('input',e=>{const d=programFormProgression();d.deloadEvery=Math.max(1,Math.floor(Number(e.target.value)||4));schedulePersist();});
     $('#deloadPct').addEventListener('input',e=>{programFormProgression().deloadPct=clampDeloadPct(Number(e.target.value)||60);schedulePersist();});
     $('#programRepMin').addEventListener('input',e=>{const d=programFormProgression();d.defaultRange.min=Math.max(1,Number(e.target.value)||1);d.defaultRange.preset='custom';document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
     $('#programRepMax').addEventListener('input',e=>{const d=programFormProgression(),v=e.target.value.trim();d.defaultRange.max=v===''?null:Math.max(d.defaultRange.min,Number(v)||d.defaultRange.min);d.defaultRange.preset='custom';document.querySelectorAll('#programRepPresets [data-rep-preset]').forEach(button=>button.setAttribute('aria-pressed','false'));schedulePersist();});
@@ -614,8 +622,8 @@
     $('#confirmDiscardDraft').addEventListener('click', () => { $('#discardDraftDialog').close(); if(discardingBuilder){discardingBuilder=false;closeBuilderToReturn(true);} else doDiscardDraft(); });
     $('#finishWorkout').addEventListener('click', () => finishWorkout());
     /* Single review prompt on finish (2026-09-10, #43): unfilled values and
-       unmarked sets are reviewed together — mark all complete, delete the
-       unfinished sets, or keep editing. */
+       unmarked sets are reviewed together — mark all complete, finish anyway
+       (deleting the unfinished sets), or keep editing (#262). */
     $('#closeReviewSets').addEventListener('click',()=>$('#reviewSetsDialog').close());
     $('#reviewSetsCancel').addEventListener('click',()=>$('#reviewSetsDialog').close());
     $('#reviewSetsComplete').addEventListener('click',()=>{$('#reviewSetsDialog').close();const draft=workoutState.draft;if(draft){draft.exercises.forEach(item=>item.sets.forEach(set=>{set.complete=true;}));renderWorkoutExercises();markDraftSaved();}finishWorkout(true);});
@@ -639,19 +647,14 @@
       }
       finishWorkout(true);
     });
-    /* #178: explicit finish-anyway — the user's deliberate decision, recorded
-       on the workout. Drops only fully-empty sets (no user data whatsoever),
-       prunes exercises left with no sets, keeps partial sets as entered.
-       Correction: the bypass runs only when pruning resolved every invalid
-       set. A surviving invalid set (e.g. partial values, or tags with no
-       values) falls back to the review dialog — partial values must never
-       ride the bypass into a null serialization. */
-    /* User 2026-09-12 (phone QA): "Finish anyway" (primary) and "Delete
-       unfinished sets" (middle) share one operation — drop every unfinished
-       set and finish in one tap. Partial values are dropped, never saved
-       half-filled (never-nulls, user 2026-09-11). One dialog only (#189):
-       after the drop everything left is value-valid, so it finishes
-       directly without re-prompting. Neither returns to editing. */
+    /* #262 (user 2026-09-13): "Finish anyway" drops every unfinished set
+       (empty AND incomplete) and finishes in one tap — the user's deliberate
+       decision, recorded on the workout. Partial values are dropped, never
+       saved half-filled (never-nulls, user 2026-09-11). The old middle
+       "Delete unfinished sets" button ran this identical operation and is
+       gone; two buttons only. One dialog only (#189): after the drop
+       everything left is value-valid, so it finishes directly without
+       re-prompting. */
     function reviewFinishAfterDrop(){
       $('#reviewSetsDialog').close();
       const draft=workoutState.draft;
@@ -667,7 +670,6 @@
       finishWorkout(true,{finishedAnyway:true});
     }
     $('#reviewSetsFinishAnyway').addEventListener('click',reviewFinishAfterDrop);
-    $('#reviewSetsDeleteUnfinished').addEventListener('click',reviewFinishAfterDrop);
 
     $('#searchInput').addEventListener('input', e => {
       state.query = e.target.value;
@@ -686,6 +688,9 @@
     $('#equipmentFilter').addEventListener('change', e => { state.equipment = e.target.value; renderLibrary(); });
     $('#libraryNav').addEventListener('click', () => goTab(showLibrary));
     window.addEventListener('popstate', e => {
+      /* #265: backing out of a share preview clears the preview state first —
+         otherwise the destination renders with a stale preview cached. */
+      backOutOfSharePreview();
       const hash = decodeURIComponent(location.hash.slice(1)); const id = e.state?.exercise || hash;
       if (hash === 'dashboard' || e.state?.view === 'dashboard' || !hash) showDashboard(false);
       else if (hash === 'library' || e.state?.view === 'library') showLibrary(false);
@@ -737,7 +742,12 @@
    was skipped — otherwise the inline × stays visible on touch. */
 applySwipeSets();
 updateLiveWorkoutIndicator();
-populateFilters(); renderLibrary(); renderDashboard(); renderStats();
+populateFilters(); renderLibrary(); renderDashboard();
+/* User 2026-09-12 (perf): renderStats() ran at boot too, but showStats()
+   re-renders every time the tab opens — the boot pass was pure waste
+   (period aggregations + body-map hydration over all history). Deferred
+   until first Stats visit. renderLibrary stays: showLibrary doesn't
+   re-render, so the Exercises tab needs it pre-rendered. */
 /* #296 (user 2026-09-12): detect a share route synchronously, BEFORE the
    initial tab render — a cold-opened share link must land directly on the
    share landing (loading state), never flash the home tab first while the
@@ -790,7 +800,7 @@ parseShareHash().then(sharePayload=>{
     const shareFailed=()=>{if(bootShareAttempt&&bootShareAttempt.type==='short'){dismissSharePreview();showDashboard(false);}};
     if(typeof isValidShareSlug!=='function'||!isValidShareSlug(attempt)){shareFailed();showToast(INVALID_LINK_MSG);return;}
     resolveShortShareLink(attempt).then(payload=>{
-      if(payload)openSharePreview(payload);
+      if(payload){openSharePreview(payload);/* #303: keep the /s/<slug> deep link in the address bar. */try{if(typeof restoreShortSharePath==='function')restoreShortSharePath(attempt);}catch(_){}}
       else{shareFailed();showToast(INVALID_LINK_MSG);}
     }).catch(()=>{shareFailed();showToast(INVALID_LINK_MSG);});
   }catch(_){/* short links are best-effort; boot continues */}
@@ -802,7 +812,9 @@ parseShareHash().then(sharePayload=>{
 window.addEventListener('hashchange',()=>{
   if(!/^#share=/.test(location.hash||''))return;
   parseShareHash().then(payload=>{
-    if(payload)openSharePreview(payload);
+    /* #265: the hash navigation already pushed a history entry — opening the
+       preview must not push a second one or Back takes two presses. */
+    if(payload)openSharePreview(payload,{push:false});
     else showToast('That share link didn\u2019t open \u2014 it may be broken or from an older version of the app.');
   });
 });

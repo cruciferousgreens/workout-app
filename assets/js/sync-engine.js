@@ -133,8 +133,27 @@
       function isTombstoned(item){return !!(item&&typeof item==='object'&&item.deletedAt);}
       /** Visible set: the array minus tombstone records. */
       function liveItems(arr){return (Array.isArray(arr)?arr:[]).filter(item=>!isTombstoned(item));}
+      /* #292: ids are never re-minted, so the registry only grows. Prune
+         tombstones older than 90 days — a device that hasn't synced in 90
+         days is treated as gone, and a dropped tombstone can never collide
+         with a new item. */
+      const TOMBSTONE_MAX_AGE_MS=90*24*60*60*1000;
+      function pruneOldTombstones(){
+        ensureSyncMeta();
+        const cutoff=Date.now()-TOMBSTONE_MAX_AGE_MS;
+        let changed=false;
+        for(const key of Object.keys(syncMeta.tombstones||{})){
+          const raw=syncMeta.tombstones[key]||{};
+          for(const id of Object.keys(raw)){
+            if(!(Number(raw[id])>cutoff)){delete raw[id];changed=true;}
+          }
+          if(!Object.keys(raw).length)delete syncMeta.tombstones[key];
+        }
+        if(changed)saveSyncMeta();
+      }
       function getTombstoneMap(key){
         ensureSyncMeta();
+        pruneOldTombstones();
         const raw=(syncMeta.tombstones&&syncMeta.tombstones[key])||{};
         const map=new Map();
         for(const id of Object.keys(raw)){const ts=Number(raw[id]);if(ts>0)map.set(id,ts);}
@@ -163,9 +182,9 @@
       }
       /** Record a delete for propagation. The caller removes the item from the
           live array first; the tombstone rides the next push as an
-          `{id, deletedAt}` stub. Registry entries are never cleared except by
-          account deletion — ids are never re-minted, so a tombstone can only
-          ever match the item it was made for. */
+          `{id, deletedAt}` stub. Entries older than 90 days are pruned (#292);
+          ids are never re-minted, so a tombstone can only ever match the
+          item it was made for. */
       function noteTombstone(key,id){
         if(id==null||!REGISTRY_KEYS.has(key))return;
         const map=getTombstoneMap(key), sid=String(id), now=Date.now();

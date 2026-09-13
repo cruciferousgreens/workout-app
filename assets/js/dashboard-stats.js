@@ -48,6 +48,15 @@
     function recentPRRows(workouts) {
       const rows=[];
       workouts.slice().sort(sortByRecencyDesc).forEach(workout=>workout.exercises.forEach(item=>{
+        /* #282: timed PRs — longest hold at a given load, same celebration. */
+        if((item.tracking||'reps')==='time'){
+          const current=item.sets.filter(set=>Number(set.seconds)>0); if(!current.length)return;
+          const prior=priorSetsForPR(workout,item.exerciseId);
+          if(!prior.length||!detectTimedPRs(current,prior))return;
+          const best=Math.max(...current.map(set=>Number(set.seconds)));
+          rows.push({exerciseId:item.exerciseId,date:workout.date,kind:'Longest hold PR',value:`${best} sec`});
+          return;
+        }
         const current=item.sets.filter(set=>Number(set.w)>0&&Number(set.r)>0); if(!current.length)return;
         /* #99 A15 + #158: compare against prior sessions — all other records
            except the current one, including earlier same-day sessions (never
@@ -233,9 +242,15 @@
              beside it carry the information. Hide the whole host from
              assistive tech so a screen reader doesn't walk dozens of region
              <title> nodes, and keep the SVG out of the tab order. */
-          if(!template){host.innerHTML='<div class="chart-empty">Body map unavailable.</div>';return;}
+          if(!template){host.innerHTML='<div class="chart-empty">Body map unavailable.</div>';host.setAttribute('data-hydrated','true');return;}
           host.setAttribute('aria-hidden','true');
           host.innerHTML=template;
+          host.setAttribute('data-hydrated','true');
+          /* User 2026-09-13: mark the host hydrated so the CSS pre-hydration
+             reserve (min-height + 760/614 aspect-ratio, #182) releases and the
+             host hugs the injected SVG — without this the compact home map
+             kept its tall ratio box under the 160px-capped SVG, leaving dead
+             space between the map and the legend. */
           host.querySelectorAll('svg').forEach(svgNode=>{svgNode.setAttribute('aria-hidden','true');svgNode.setAttribute('focusable','false');});
           const regions=[...host.querySelectorAll('[data-muscle]')];
           /* #170: a volume map may ALSO carry data-worked (comma-separated
@@ -253,12 +268,14 @@
           }else if(host.dataset.volumes!==undefined){
             const volumes=JSON.parse(decodeURIComponent(host.dataset.volumes));
             const worked=new Set((host.dataset.worked||'').split(',').filter(Boolean));
+            const bySets=host.dataset.metric==='sets';
             const regionValue=region=>regionMuscleTotal(volumes,region);
+            const valueLabel=value=>bySets?`${value} set${value===1?'':'s'}`:formatVolume(value);
             const max=Math.max(1,...regions.map(regionValue));
             regions.forEach(region=>{
               const value=regionValue(region);
               if(value>0){
-                paintBodyRegion(region,heatLevel(value,max),`${titleCase((bodyMapMuscleAliases[region.dataset.muscle]||[])[0]||region.dataset.muscle)} · ${formatVolume(value)}`);
+                paintBodyRegion(region,heatLevel(value,max),`${titleCase((bodyMapMuscleAliases[region.dataset.muscle]||[])[0]||region.dataset.muscle)} · ${valueLabel(value)}`);
               }else{
                 const hit=(bodyMapMuscleAliases[region.dataset.muscle]||[]).find(m=>worked.has(m));
                 if(hit){
@@ -283,25 +300,31 @@
         });
       });
     }
-    function muscleHeatmapMarkup(volumes,worked,compact=false) {
+    /* #319 (user 2026-09-13): the Stats Volume|Sets toggle also switches
+       the muscle map — `bySets` renders per-muscle set counts (heat ranking,
+       value labels, tooltips) instead of volume. The dashboard's compact map
+       stays volume-only (it has no toggle). */
+    function muscleHeatmapMarkup(volumes,worked,compact=false,bySets=false) {
       /* Anatomical muscle map, always the worked view (user 2026-09-11:
          the #72 Worked/Unworked toggle was removed).
          #170: `worked` is the Set of lowercase muscle names with at least one
          completed set in the period (workedMuscles) — bodyweight work has
          volume 0 but must still light its regions (flat heat-worked, no
          volume ranking). */
+      const valueLabel=value=>bySets?`${value} set${value===1?'':'s'}`:formatVolume(value);
       const rows=Object.entries(volumes).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
       const workedList=[...(worked||[])];
-      if(!rows.length&&!workedList.length)return '<div class="chart-empty">No weighted training volume in this period.</div>';
+      if(!rows.length&&!workedList.length)return `<div class="chart-empty">${bySets?'No completed sets in this period.':'No weighted training volume in this period.'}</div>`;
       const max=Math.max(1,...rows.map(([,v])=>v));
       const shown=compact?rows.slice(0,4):rows;
       const encoded=encodeURIComponent(JSON.stringify(volumes));
       const workedAttr=workedList.map(m=>String(m).toLowerCase()).join(',');
-      const map=`<div class="anatomy-map" data-volumes="${encoded}" data-worked="${escapeHtml(workedAttr)}"><div class="chart-empty">Loading anatomical map\u2026</div></div>`;
-      const list=shown.map(([muscle,value])=>`<div class="heatmap-row"><i class="heatmap-swatch heat-${heatLevel(value,max)}"></i><span>${escapeHtml(titleCase(muscle))}</span><strong>${formatVolume(value)}</strong></div>`).join('');
-      const note=!rows.length?'<p class="section-note">Bodyweight work only — no weighted volume this period.</p>':'';
-      const legend=(compact||!rows.length)?'':`<div class="heatmap-legend"><span>Less</span><i class="heatmap-gradient"></i><span>More volume</span></div>`;
-      return `<div class="heatmap-shell">${map}<div><div class="heatmap-list">${list}</div>${note}${legend}</div></div>`;
+      const map=`<div class="anatomy-map" data-volumes="${encoded}" data-worked="${escapeHtml(workedAttr)}"${bySets?' data-metric="sets"':''}><div class="chart-empty">Loading anatomical map\u2026</div></div>`;
+      const list=shown.map(([muscle,value])=>`<div class="heatmap-row"><i class="heatmap-swatch heat-${heatLevel(value,max)}"></i><span>${escapeHtml(titleCase(muscle))}</span><strong>${valueLabel(value)}</strong></div>`).join('');
+      const note=(!rows.length&&!bySets)?'<p class="section-note">Bodyweight work only — no weighted volume this period.</p>':'';
+      /* #238 (user 2026-09-12): the Less/More legend was duplicative — the
+         swatches and volume numbers already carry the scale. */
+      return `<div class="heatmap-shell">${map}<div><div class="heatmap-list">${list}</div>${note}</div></div>`;
     }
     /* Completed-workout body map (user phone QA 2026-09-12): data-worked holds
        comma-separated library muscle names; every worked region gets ONE flat
@@ -474,7 +497,10 @@
       const now=new Date();
       const {start,end}=dashboardWeekModel(now);
       renderDashboardCalendar(now,start,end);
-      const selectedWorkouts=state.selectedDashboardDate?workoutState.completed.filter(w=>w.date===state.selectedDashboardDate):workoutState.completed.slice(0,4);
+      /* #273: Home's recent-4 must follow recency (completedAt-first), like the
+         Logs list and Repeat-last — raw insertion order disagrees after sync
+         merges or mid-edit-delete re-saves. */
+      const selectedWorkouts=state.selectedDashboardDate?workoutState.completed.filter(w=>w.date===state.selectedDashboardDate):workoutState.completed.slice().sort(sortByRecencyDesc).slice(0,4);
       /* #4: future dates show the upcoming program workout instead of history. */
       const selectedIsFuture=!!state.selectedDashboardDate&&state.selectedDashboardDate>localIsoDate();
       renderDashboardSummary(selectedWorkouts,selectedIsFuture);
@@ -517,8 +543,18 @@
       $('#statsCompletedWorkouts').onclick=()=>{showWorkouts(false);showWorkoutHistory();};
       wireStatToggles($('#statsGrid'));
       const muscles=muscleCounts(workouts), volumes=muscleVolumes(workouts);
-      $('#muscleHeatmap').innerHTML=muscleHeatmapMarkup(volumes,workedMuscles(workouts),false);hydrateBodyMaps();
-      $('#muscleStats').innerHTML=Object.keys(muscles).length?`<div class="tag-row">${Object.entries(muscles).sort((a,b)=>b[1]-a[1]).map(([m,n])=>musclePill(m,` · ${n} sets`)).join('')}</div>`:'<p class="section-note">Complete a workout to start building muscle-level stats.</p>';
+      /* #319 (user 2026-09-13): the muscle map has its OWN Volume|Sets toggle
+         (independent of the Volume-by-muscle list toggle below it).
+         #323: the volume option is labeled Volume, not Weight. */
+      const mapBySets=state.muscleMapMode==='sets';
+      document.querySelectorAll('#muscleMapMode [data-map-mode]').forEach(btn=>{
+        btn.setAttribute('aria-pressed',String(btn.dataset.mapMode===(mapBySets?'sets':'volume')));
+        btn.onclick=()=>{const mode=btn.dataset.mapMode;if(state.muscleMapMode===mode)return;const y=window.scrollY;state.muscleMapMode=mode;renderStats();window.scrollTo(0,y);};
+      });
+      $('#muscleHeatmap').innerHTML=muscleHeatmapMarkup(mapBySets?muscleSetCounts(workouts):volumes,workedMuscles(workouts),false,mapBySets);hydrateBodyMaps();
+      /* #322 (user 2026-09-12): the set-count chips under the stats muscle map
+         are gone — the map stands alone. */
+      $('#muscleStats').innerHTML=Object.keys(muscles).length?'':'<p class="section-note">Complete a workout to start building muscle-level stats.</p>';
       renderBlindspots(volumes,workedMuscles(workouts));
       renderMuscleAnalysis(workouts,state.statsPeriod);
       /* #126 (user 2026-09-11): Weekly volume chart removed from Stats. */

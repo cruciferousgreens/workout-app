@@ -36,11 +36,97 @@ function collectPersistable(){
    instead of a silently broken autosave. Storage-blocked contexts (private
    browsing, quota exhaustion) must never crash the app. */
 let persistFailStreak=0;
+/* #289 (user 2026-09-12): cross-tab reconciliation. Two tabs share the one
+   PERSIST_KEY; without coordination a stale tab's debounced autosave (or the
+   5s interval persist) can overwrite a newer write from another tab.
+   lastSeenSavedAt tracks the newest blob this tab has incorporated (own
+   writes, boot read, merges). persistNow() re-reads the blob first: when
+   another tab persisted newer state, it is union-merged into live memory
+   before this tab writes, so the stale tab adopts rather than clobbers.
+   The storage listener stashes the same signal for the (rare) case where
+   the re-read itself fails — the event's newValue still carries the blob. */
+let lastSeenSavedAt=0;
+let pendingExternalBlob=null;
+function noteExternalBlob(blob){
+  if(!blob||typeof blob!=='object')return;
+  const at=Number(blob.savedAt)||0;
+  if(at>lastSeenSavedAt&&blob.version===SCHEMA_VERSION)pendingExternalBlob=blob;
+}
+if(typeof window!=='undefined'&&typeof window.addEventListener==='function'){
+  window.addEventListener('storage',function(e){
+    if(!e||e.key!==PERSIST_KEY||!e.newValue)return;
+    try{noteExternalBlob(JSON.parse(e.newValue));}catch(_){}
+  });
+}
+/* Union-merge another tab's newer blob into live memory. Record collections
+   merge by id — the newer (external) version wins an id conflict, because a
+   stale tab must not clobber fresher state. Tags/favorites union. Scalars
+   adopt the newer values. The local-only draft, builder draft, and list
+   filter stay this tab's (ephemeral per-tab state, unchanged behavior). */
+function mergeExternalBlob(blob){
+  if(!blob||typeof blob!=='object'||blob.version!==SCHEMA_VERSION)return false;
+  const unionById=function(local,incoming){
+    const base=Array.isArray(local)?local:[];
+    if(!Array.isArray(incoming)||!incoming.length)return base;
+    const localIds=new Set(base.map(function(r){return r&&r.id;}));
+    const incomingById={};
+    incoming.forEach(function(r){if(r&&r.id!=null)incomingById[r.id]=r;});
+    const merged=base.map(function(r){
+      return (r&&r.id!=null&&incomingById[r.id])?incomingById[r.id]:r;
+    });
+    incoming.forEach(function(r){if(r&&r.id!=null&&!localIds.has(r.id))merged.push(r);});
+    return merged;
+  };
+  workoutState.completed=unionById(workoutState.completed,blob.completed);
+  workoutState.templates=unionById(workoutState.templates,blob.templates);
+  workoutState.archivedPrograms=unionById(workoutState.archivedPrograms,blob.archivedPrograms);
+  state.customExercises=unionById(state.customExercises,blob.customExercises);
+  if(blob.activeProgram&&typeof blob.activeProgram==='object')workoutState.activeProgram=blob.activeProgram;
+  if(Array.isArray(blob.tags))workoutState.tags=mergeTagLists(workoutState.tags,blob.tags);
+  if(Array.isArray(blob.exerciseTagPresets))workoutState.exerciseTagPresets=mergeTagLists(workoutState.exerciseTagPresets,blob.exerciseTagPresets);
+  if(Array.isArray(blob.favorites)){
+    const favs=state.favorites instanceof Set?state.favorites:new Set();
+    blob.favorites.forEach(function(f){if(typeof f==='string')favs.add(f);});
+    state.favorites=favs;
+  }
+  if(blob.progressionSetup&&typeof blob.progressionSetup==='object'){
+    try{Object.assign(progressionSetup,blob.progressionSetup);}catch(_){}
+    /* #321: migrate pre-toggle blobs (deloadEvery>0 meant "on"). */
+    try{normalizeProgression(progressionSetup);}catch(_){}
+  }
+  /* #321: same migration for stored program progressions. */
+  try{
+    if(workoutState.activeProgram&&workoutState.activeProgram.progression)normalizeProgression(workoutState.activeProgram.progression);
+    (workoutState.archivedPrograms||[]).forEach(function(ap){if(ap&&ap.progression)normalizeProgression(ap.progression);});
+  }catch(_){}
+  ['dashboardPeriod','statsPeriod','logPeriod','topExercisesMode'].forEach(function(k){
+    if(blob[k]!==undefined)state[k]=blob[k];
+  });
+  try{if(typeof mergeCustomExercises==='function')mergeCustomExercises();}catch(_){}
+  return true;
+}
 function persistNow(){
+  /* #289: read-before-write — fold in any newer cross-tab state first. */
+  let external=null;
+  try{
+    const raw=localStorage.getItem(PERSIST_KEY);
+    if(raw){
+      const current=JSON.parse(raw);
+      if(current&&current.version===SCHEMA_VERSION&&(Number(current.savedAt)||0)>lastSeenSavedAt)external=current;
+    }
+  }catch(_){}
+  if(!external&&pendingExternalBlob&&(Number(pendingExternalBlob.savedAt)||0)>lastSeenSavedAt)external=pendingExternalBlob;
+  pendingExternalBlob=null;
+  if(external){
+    mergeExternalBlob(external);
+    lastSeenSavedAt=Number(external.savedAt)||lastSeenSavedAt;
+  }
+  const payload=collectPersistable();
   let ok=false;
-  try{localStorage.setItem(PERSIST_KEY,JSON.stringify(collectPersistable()));ok=true;}catch(_){}
+  try{localStorage.setItem(PERSIST_KEY,JSON.stringify(payload));ok=true;}catch(_){}
   if(ok){
     persistFailStreak=0;
+    lastSeenSavedAt=Math.max(lastSeenSavedAt,Number(payload.savedAt)||0);
     /* Accounts sync hook: flag changed keys for the debounced background push (sync-engine.js).
        Guarded so the local-only path never breaks if the sync scripts are absent.
        Only after a SUCCESSFUL local write — a failed write has no new state to push. */
@@ -86,6 +172,21 @@ function wipeLocalUserData({removeSyncKeys=false}={}){
   if(removeSyncKeys){
     try{localStorage.removeItem('workout-sync:v1');}catch(_){}
     if(typeof ADOPTED_UID_KEY!=='undefined'){try{localStorage.removeItem(ADOPTED_UID_KEY);}catch(_){}}
+    /* #305 (user 2026-09-13): the Supabase session key must die with the rest
+       of the account state. signOutAccount() already signs out with
+       scope:'local', but if the client never loaded (sb===null) or the call
+       threw, the sb-*-auth-token key would survive and silently re-adopt the
+       cloud copy after the reload — making the wipe look like a no-op. */
+    try{
+      const dead=[];
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i);
+        /* The session itself (sb-<ref>-auth-token) plus the PKCE code-verifier
+           sibling — both are Supabase auth state and neither may survive. */
+        if(k&&/^sb-[^-]+-auth-token/.test(k))dead.push(k);
+      }
+      dead.forEach(k=>{try{localStorage.removeItem(k);}catch(_){}});
+    }catch(_){}
   }
 }
 function mergeCustomExercises(){
@@ -122,6 +223,23 @@ const MIGRATIONS=[
         inProgram:!!data.savedFilter.inProgram
       };
     }
+  }},
+  /* #315 (user 2026-09-13): shared workouts used to carry "(shared)" in the
+     name; they now carry shared:true and render a SHARED chip. Strip the
+     legacy suffix and set the flag. */
+  {id:'shared-workout-chip',from:1,migrate(data){
+    /* Pre-prod caution (user): "Leg Day (shared)" + "Leg Day (shared 2)" must
+       not collapse to two "Leg Day"s — the loser takes neutral (2)/(3). */
+    const templates=(data.templates||[]).filter(t=>t&&typeof t.name==='string');
+    const taken=new Set(templates.map(t=>t.name));
+    templates.forEach(t=>{
+      const m=/^(.*) \(shared(?: (\d+))?\)$/.exec(t.name);
+      if(!m)return;
+      taken.delete(t.name);
+      let name=m[1],n=2;
+      while(taken.has(name))name=`${m[1]} (${n++})`;
+      t.name=name;t.shared=true;taken.add(name);
+    });
   }},
 ];
 function runBlobMigrations(data){
@@ -167,6 +285,7 @@ function restorePersisted(){
   let data=null;
   try{data=JSON.parse(raw);}catch(_){quarantineCorruptBlob(raw);return;}
   if(!data||data.version!==SCHEMA_VERSION||typeof data!=='object'){quarantineCorruptBlob(raw);return;}
+  lastSeenSavedAt=Number(data.savedAt)||0; /* #289: boot read counts as seen */
   runBlobMigrations(data);
   SYNCABLE_KEYS.forEach(key=>{if(key in data)setSyncableValue(key,data[key]);});
   if(data.draft&&typeof data.draft==='object'&&data.draft!==null)workoutState.draft=data.draft;

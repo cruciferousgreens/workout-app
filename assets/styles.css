@@ -251,6 +251,9 @@
     .filter-panel { display: none; grid-template-columns: minmax(0, 1.6fr) minmax(220px, .7fr); gap: 18px; margin-bottom: 18px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
     .filter-panel.open { display: grid; }
     .filter-label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    /* #238 sub-issue (user 2026-09-12): the PROGRAM row's chip sat too close
+       to the muscle list above it. */
+    .muscle-options + .filter-label-row { margin-top: 14px; }
     .filter-group label, .filter-label { display: block; color: var(--muted); font-size: 12px; font-weight: 700; }
     .filter-clear { padding: 2px 0; border: 0; background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; }
     .muscle-options { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -346,6 +349,11 @@
     /* #145: action rows must wrap — long button labels (e.g. the review-sets
        dialog's four actions) overflowed the dialog at phone width. */
     .form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 5px; }
+    /* #244 (user 2026-09-12): share dialogs use two centered buttons, no
+       Done — centered in both the row and compact-column layouts. */
+    .form-actions.centered { justify-content: center; }
+    .compact-dialog .form-actions.centered { flex-direction: row; align-items: center; }
+    .compact-dialog .form-actions.centered .form-action { flex: 1 1 0; }
     .builder-configure-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 4px; }
     .form-action { min-height: 44px; padding: 0 15px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 700; }
     .form-action.secondary { border: 1px solid var(--line); background: var(--surface); }
@@ -532,7 +540,7 @@
        total" so a per-hand entry is visibly wrong. */
     .db-total-readout { font-size: 10.5px; line-height: 1.3; color: var(--muted); font-variant-numeric: tabular-nums; }
     .db-total-readout[hidden] { display: none; }
-    .log-input { width: 100%; min-width: 0; height: 44px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); outline: none; font-size: 16px; font-variant-numeric: tabular-nums; font-weight: 700; caret-color: transparent; }
+    .log-input { width: 100%; min-width: 0; height: 44px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); outline: none; font-size: 16px; font-variant-numeric: tabular-nums; font-weight: 700; /* #234 (user 2026-09-12): #218's caret removal looked clean, but bring the caret back very light and theme-matched — a translucent accent wash, not the default dark blink. */ caret-color: color-mix(in srgb, var(--accent) 45%, transparent); }
     .log-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
     /* #218: values render heavy like the exercise name; placeholders stay
        light so hints remain readable. */
@@ -566,6 +574,8 @@
        replaces the × when the Settings toggle is on; the × is the delete
        path when it's off. Desktop always keeps the ×. */
     .is-touch.swipe-sets .program-workout-del { display: none; }
+    /* #324: saved-workout × follows the same rule — swipe replaces it. */
+    .is-touch.swipe-sets .saved-workout-del { display: none; }
     .set-swipe { border-radius: 10px; }
     /* The delete action sits behind the row content: the row must be opaque
        (card surface), or the red rail bleeds through the row's transparent
@@ -598,6 +608,9 @@
     .picker-item .picker-state { color: var(--accent); font-size: 20px; font-weight: 800; }
     .picker-footer { position: sticky; bottom: -24px; margin: 14px -24px -24px; padding: 12px 24px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); display: flex; justify-content: flex-end; }
     .dialog-empty { padding: 28px 8px; text-align: center; color: var(--muted); }
+    /* #232 (user 2026-09-12): the empty-state "clearing the search" link —
+       subtly underlined so it reads tappable inside the muted empty copy. */
+    .dialog-empty .dialog-empty-link { color: var(--ink); font-weight: 400; text-decoration: none; font-size: inherit; }
     .tag-dialog { width: min(430px, calc(100% - 28px)); }
     .tag-picker-options { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
     .tag-picker-options .form-pill { min-height: 40px; }
@@ -612,6 +625,9 @@
     .completed-card { max-width: 760px; padding: clamp(22px, 5vw, 38px); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); scroll-margin-bottom: var(--bottom-nav-clearance); }
     .completed-card h2 { margin-bottom: 6px; font: 800 clamp(26px, 5vw, 34px)/1.08 var(--font-sans); letter-spacing: -.025em; }
     .completed-meta { color: var(--muted); font-size: 13px; }
+    /* #320 (user 2026-09-13): saved-workout detail summary renders as chips,
+       not the "N exercises · M sets" text line. */
+    .meta-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 4px; }
     /* ===== 10. Programs ===== */
     .program-setup { max-width: 700px; padding: clamp(28px, 7vw, 44px) clamp(22px, 5vw, 42px) clamp(22px, 5vw, 42px); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
     .program-setup h2, .program-cover-head h2 { margin-bottom: 10px; font: 800 clamp(26px, 5vw, 34px)/1.08 var(--font-sans); letter-spacing: -.025em; }
@@ -668,12 +684,18 @@
     @keyframes live-pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
     @media (prefers-reduced-motion: reduce) { .live-dot, .live-title-dot { animation: none; } }
     .nav-item { min-height: 50px; border: 0; border-radius: 12px; background: transparent; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer; font-size: 10px; font-weight: 700; line-height: 1.25; }
-    .nav-item.has-live-draft { position: relative; }
-    .nav-item.has-live-draft:not(.active) { color: var(--accent); }
+    /* #325 (user 2026-09-12): no accent tint on the Workout tab while a draft
+       is live — the tab reads active only when it's the current page. The
+       header Live chip remains the way back to the session. */
     /* Live-session dot next to the header title on the live editor page
        (user 2026-09-12): the chip's pill disappears there and its dot moves
-       here. Same pulse as the chip dot; hidden unless a session is live. */
-    .live-title-dot { display: inline-block; width: 8px; height: 8px; margin-left: 9px; border-radius: 50%; background: var(--accent); animation: live-pulse 1.6s ease-in-out infinite; }
+       here. Same pulse as the chip dot; hidden unless a session is live.
+       #313 (user 2026-09-12): absolutely positioned against the title text —
+       in the flex flow it nudged "Workout" left of center on the live
+       editor. The title is now dead-center on every screen, as on the
+       workout home screen. */
+    #topBarTitleText { position: relative; }
+    .live-title-dot { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; margin-left: 9px; border-radius: 50%; background: var(--accent); animation: live-pulse 1.6s ease-in-out infinite; }
     .live-title-dot[hidden] { display: none; }
     /* A dot clone flies from the chip to the title on chip tap — created and
        animated imperatively, removed when the flight ends. */
@@ -735,6 +757,7 @@
       .log-set .complete-set { grid-row: 1; grid-column: 5; }
       .selected-set-tags { grid-row: 2; grid-column: 2 / 6; }
       .log-input { padding: 0 6px; text-align: center; }
+      /* User 2026-09-13: placeholder size back to the old 10px shrink. */
       .log-input::placeholder { font-size: 10px; }
       .add-set { margin-left: 50px; }
       .workout-footer { align-items: flex-start; flex-direction: column; }
@@ -818,9 +841,6 @@
     .small-button { min-height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 750; }
     .status-note { min-height: 18px; margin: 8px 0 0; color: var(--accent); font-size: 12px; }
     .status-note.is-error { color: var(--danger); }
-    /* #243 (user 2026-09-12): the share-modal helper note is helper copy, not
-       a status — under the Rosé theme the accent reads red. Muted always. */
-    #shareSignInLinkNote { color: var(--muted); }
     .bottom-nav { grid-template-columns: repeat(5, 1fr); }
     @container (max-width: 700px) {
       .dashboard-grid { grid-template-columns: 1fr; }
@@ -885,6 +905,18 @@
     /* #8: exercise-trend picker chips + bar chart + kickers. */
     .chart-kicker { margin: 14px 0 2px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
     .chart-kicker:first-child { margin-top: 0; }
+    /* #309 (user 2026-09-12): the 1RM/Heaviest toggle sits on the chart's own
+       header, right-justified. */
+    /* #318 refinement (user 2026-09-12): the kicker + headline form one left
+       block with the toggle vertically centered against the whole block — the
+       toggle no longer floats on the kicker row alone. */
+    .chart-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0 0; }
+    .chart-head-row .chart-kicker { margin: 0; }
+    .chart-head-text { min-width: 0; }
+    .chart-head-text .chart-headline { margin: 2px 0 6px; }
+    /* #318: hairline separator between the progress chart and the
+       volume / time-under-tension chart (only when the second chart exists). */
+    #exerciseVolumeChart:not(:empty) { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
     .chart-bar { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
     /* Tappable charts (user 2026-09-12): invisible hit areas + readout. */
     .chart-hit { cursor: pointer; }
@@ -979,8 +1011,6 @@
     .heatmap-swatch { width: 10px; height: 10px; border-radius: 3px; }
     .heatmap-row span { color: var(--muted); }
     .heatmap-row strong { font-variant-numeric: tabular-nums; }
-    .heatmap-legend { display: flex; align-items: center; gap: 7px; margin-top: 12px; color: var(--muted); font-size: 10px; }
-    .heatmap-gradient { width: 110px; height: 7px; border-radius: 999px; background: linear-gradient(90deg,var(--pine-soft),var(--foam),var(--accent)); }
     .compact-heatmap { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
     .compact-heatmap .heatmap-shell { grid-template-columns: 150px minmax(0,1fr); gap: 14px; margin-top: 0; }
     .compact-heatmap .heatmap-list { gap: 5px; }
@@ -1017,7 +1047,12 @@
     .exercise-rule-controls { display: grid; grid-template-columns: 96px 72px 72px minmax(190px,1fr); gap: 8px; align-items: end; }
     .rule-field { display: grid; gap: 4px; }
     .rule-field span, .load-control-title { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-    .rule-field input, .rule-field select { width: 100%; min-height: 44px; height: 44px; margin: 0; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background-color: var(--surface); font-size: 16px; }
+    /* #316 (user 2026-09-13): Settings numeric fields follow the workout-set
+       input styling — 44px, radius-sm, surface-raised, 16px, theme caret,
+       accent border + focus ring. Pills, switches, and step controls are
+       separate components and untouched. */
+    .rule-field input, .rule-field select { width: 100%; min-width: 0; min-height: 44px; height: 44px; margin: 0; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); outline: none; font-size: 16px; caret-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+    .rule-field input:focus, .rule-field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
     .load-progression { display: grid; gap: 5px; }
     .load-progression-row { display: grid; grid-template-columns: minmax(0,1fr) 76px auto; gap: 6px; align-items: center; }
     .lp-value { position: relative; display: block; min-width: 0; }
@@ -1039,7 +1074,7 @@
        spans inside a rule-field (input wrappers, help copy) stay in normal
        flow — the old bare `.rule-field > span` selector yanked every span up
        into the notch and garbled the %1RM rows. */
-    .rule-field > span:first-child { position: absolute; top: -7px; left: 8px; z-index: 1; padding: 0 6px; background: var(--notch-bg, var(--bg)); }
+    .rule-field > span:first-child { position: absolute; top: -7px; left: 8px; z-index: 1; padding: 0 6px; background: var(--notch-bg, var(--bg)); max-width: calc(100% - 16px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* Inline unit suffix, e.g. "sec" on the time-step field, "lb"/"%" on increment. */
     .rule-field .unit { position: absolute; right: 12px; top: 0; bottom: 0; display: inline-flex; align-items: center; font-style: normal; font-size: 12px; color: var(--muted); pointer-events: none; }
     .rule-field:has(.unit) input, .rule-field:has(.unit) select { padding-right: 44px; }
@@ -1208,8 +1243,13 @@
     .compact-heatmap .anatomy-map svg { max-height: 160px; }
     /* #182: the min-height is only a pre-hydration placeholder reserve
        (anti layout-shift); once the SVG is injected the host hugs it, so
-       no dead space sits between the heatmaps and the legend list. */
-    .anatomy-map[data-hydrated] { min-height: 0; }
+       no dead space sits between the heatmaps and the legend list.
+       User 2026-09-13: the 760/614 aspect-ratio reserve must release too —
+       on the compact home map the ratio box stayed ~290px tall under the
+       160px-capped SVG, leaving dead space below the figures. The JS now
+       sets data-hydrated on inject (it never did before, so this rule was
+       dead code). */
+    .anatomy-map[data-hydrated] { min-height: 0; aspect-ratio: auto; }
     @container (max-width: 700px) {
       .week-strip { grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; }
       .day-chip { min-height: 68px; padding: 8px 2px; border-radius: 13px; }
@@ -1592,6 +1632,19 @@
     .program-next-main strong { display: block; font-size: 18px; line-height: 1.25; }
     .program-next-main small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.35; }
     .program-next-arrow { color: var(--pine); font-size: 22px; font-weight: 800; }
+    /* #254 (user 2026-09-12): under Rosé the foam/pine tokens read blue — the
+       Continue-program card's border/glow must follow the theme accent
+       (pink), not the blue foam. Scoped to Rosé; other themes keep their
+       own foam/pine treatment. */
+    [data-theme="rosepine"] .program-next-main { border-color: var(--accent); }
+    [data-theme="rosepine"] .program-next-main:hover { border-color: var(--accent); }
+    [data-theme="rosepine"] .program-next-arrow { color: var(--accent); }
+    /* Browser QA 2026-09-12: the wrap's halo also read blue — it must follow
+       the accent too, as a soft wash. */
+    [data-theme="rosepine"] .program-next-wrap { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+    /* User 2026-09-12 (phone QA): the card's shadow still read as a blue
+       glow — the lavender-gray --shadow-soft must go accent-tinted too. */
+    [data-theme="rosepine"] .program-next-main { box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 30%, transparent); }
     /* ===== #196: no-program workout home (user 2026-09-12) =====
        The blank-workout card moves into the hero slot; the Create-a-program
        card keeps the › affordance of the card it replaces. */
@@ -1660,7 +1713,6 @@
     .heat-0 { fill: var(--heat-0); background: var(--heat-0); } .heat-1 { fill: var(--heat-1); background: var(--heat-1); } .heat-2 { fill: var(--heat-2); background: var(--heat-2); } .heat-3 { fill: var(--heat-3); background: var(--heat-3); } .heat-4 { fill: var(--heat-4); background: var(--heat-4); } .heat-5 { fill: var(--heat-5); background: var(--heat-5); }
     /* Phone QA 2026-09-12: completed-workout maps highlight every worked region in one flat tone — no heat ranking. */
     .heat-worked { fill: var(--heat-4); }
-    .heatmap-gradient { background: linear-gradient(90deg,var(--heat-0),var(--heat-2),var(--heat-5)); }
     /* ===== 16. Settings ===== */
     .settings-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin-bottom: 8px; }
     .settings-actions { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -1733,7 +1785,9 @@
     .settings-pair { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
     #settingsView .rule-field { gap: 8px; }
     #settingsView .rule-field > span:first-child { font-size: 10px; letter-spacing: .06em; }
-    #settingsView .rule-field input, #settingsView .rule-field select { min-height: 48px; height: 48px; padding: 0 14px; border-radius: 12px; font-size: 16px; }
+    /* #316 (user 2026-09-13): Settings inputs follow the workout-set input
+       styling exactly — the old 48px/14px/12px ad-hoc override is gone. */
+    #settingsView .rule-field input, #settingsView .rule-field select { min-height: 44px; height: 44px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); font-size: 16px; }
     #settingsView .switch-row { margin-top: 12px; padding: 18px 0 2px; border-top: 1px solid var(--line); }
     #settingsView .switch-copy strong { font-size: 14px; }
     #settingsView .switch-copy span { font-size: 12px; line-height: 1.5; }
@@ -1812,6 +1866,12 @@
        wrapper goes transparent and the card itself takes the full radius. */
     .program-workouts .swipe-item { background: transparent; }
     .program-workouts .swipe-content { border-radius: var(--radius-md); }
+    /* #310 (user 2026-09-12): saved-workout cards had the same "missing
+       corners" iOS quirk as the program cards — the .swipe-item wrapper
+       showed its square background corners around the smaller-radius inner
+       card. Same treatment: transparent wrapper, full radius on the card. */
+    .saved-workout-cards .swipe-item { background: transparent; }
+    .saved-workout-cards .swipe-content { border-radius: var(--radius-md); }
     /* Visible delete button on each program workout card (user 2026-09-12):
        swipe-to-delete stays, but the × is discoverable. The row is a div
        holding two real buttons (open + delete) — no nested interactives. */
@@ -1822,8 +1882,19 @@
     .program-workout-open > span:first-child { min-width: 0; }
     .program-workout-open strong { display: block; margin-bottom: 4px; color: var(--ink); font-size: 14px; }
     .program-workout-open > span:first-child > span { color: var(--muted); font-size: 11px; text-transform: capitalize; }
-    .program-workout-del { flex: 0 0 46px; display: flex; align-items: center; justify-content: center; border: 0; border-left: 1px solid color-mix(in srgb, var(--line) 40%, transparent); border-radius: 0 var(--radius-md) var(--radius-md) 0; background: none; color: var(--muted); cursor: pointer; }
-    .program-workout-del:active { color: var(--danger); }
+    /* #260: saved-workout rows get the same swipe-to-delete treatment as
+       program rows — the open button is the row body, so swipes may start
+       on it (tap-vs-swipe is still decided at release). */
+    .saved-workout-row { display: flex; align-items: stretch; gap: 0; padding: 0; }
+    .saved-workout-open { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .saved-workout-open > span:first-child { min-width: 0; }
+    .saved-workout-open strong { display: block; margin-bottom: 4px; color: var(--ink); font-size: 14px; }
+    .saved-workout-open > span:first-child > span { color: var(--muted); font-size: 11px; text-transform: capitalize; }
+    .program-workout-del, .saved-workout-del { flex: 0 0 46px; display: flex; align-items: center; justify-content: center; border: 0; border-left: 1px solid color-mix(in srgb, var(--line) 40%, transparent); border-radius: 0 var(--radius-md) var(--radius-md) 0; background: none; color: var(--muted); cursor: pointer; }
+    /* #324 (user 2026-09-12): hovering the × tints that part of the card the
+       swipe-to-delete rail red — the same affordance as the swipe rail. */
+    .program-workout-del:hover, .program-workout-del:focus-visible,
+    .saved-workout-del:hover, .saved-workout-del:focus-visible { background: var(--swipe-rail-bg); color: var(--on-accent); outline: none; }
     /* Saved-workout filter (user 2026-09-12): icon-only filter button with
        an active-filter count badge in the section head. */
     .saved-filter-btn { position: relative; flex: 0 0 auto; min-width: 44px; width: 44px; height: 44px; padding: 0; }
@@ -1930,3 +2001,6 @@ body.ob-active .app,body.ob-active .top-bar,body.ob-active .bottom-nav{visibilit
 .ob-imp-toggle{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;padding:10px 0;font-size:13px;color:var(--accent);font-weight:600;cursor:pointer;text-align:left;}
 .ob-imp-tg-chev{display:inline-block;color:var(--muted);transition:transform .15s;font-size:15px;line-height:1;}
 .ob-imp-toggle.open .ob-imp-tg-chev{transform:rotate(90deg);}
+/* #286: the "Don't show again" row under the sign-in nudge actions. */
+.nudge-dont-show{display:flex;align-items:center;gap:8px;margin:12px 2px 0;font-size:13px;color:var(--muted);cursor:pointer;}
+.nudge-dont-show input{width:16px;height:16px;accent-color:var(--accent);}

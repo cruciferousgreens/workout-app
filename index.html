@@ -52,7 +52,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
     </button>
     </div>
-    <h1 class="top-bar-title" id="topBarTitle"><span id="topBarTitleText">Home</span><span class="live-title-dot" id="liveTitleDot" hidden aria-hidden="true"></span></h1>
+    <h1 class="top-bar-title" id="topBarTitle"><span id="topBarTitleText">Home<span class="live-title-dot" id="liveTitleDot" hidden aria-hidden="true"></span></span></h1>
     <div class="top-bar-right">
     <button class="live-chip" id="liveWorkoutChip" type="button" hidden aria-label="Return to live workout"><span class="live-dot" aria-hidden="true"></span>Live</button>
     <button class="top-bar-btn" id="topBarSettings" type="button" aria-label="Settings">
@@ -195,13 +195,8 @@
            <label class="rule-field"><span>Increment type</span><select id="progressionIncrementType"><option value="lb">Pounds (lb)</option><option value="percent">Percent (%)</option></select></label>
            <label class="rule-field"><span>Increment value</span><input id="progressionIncrementValue" type="number" inputmode="decimal" min="0.5" step="0.5" value="5"><em class="unit" id="programIncrementUnit">lb</em></label>
           </div>
-          <label class="rule-field" id="progressionPctRow"><span>% of 1RM</span><input id="progressionPercentOf1RM" type="number" inputmode="numeric" min="1" max="100" step="1" value="75"><em class="unit">%</em></label>
-          <p class="field-help">Training loads are set from this percent of the training max (or best estimated 1RM).</p>
-          <div class="settings-pair" id="deloadRow">
-           <label class="rule-field"><span>Deload every N weeks</span><input id="deloadEvery" type="number" inputmode="numeric" min="0" step="1" value="0"></label>
-           <label class="rule-field"><span>Deload intensity</span><input id="deloadPct" type="number" inputmode="numeric" min="40" max="80" step="1" value="60"><em class="unit">%</em></label>
-          </div>
-          <p class="field-help">E.g. 4 = every 4th week is a deload. 0 = off.</p>
+          <label class="rule-field" id="progressionPctRow" hidden><span>% of 1RM</span><input id="progressionPercentOf1RM" type="number" inputmode="numeric" min="1" max="100" step="1" value="75"><em class="unit">%</em></label>
+          <p class="field-help" hidden>Training loads are set from this percent of the training max (or best estimated 1RM).</p>
           <div class="settings-subsection">
            <span class="settings-subhead">Default rep range</span>
            <div class="rep-preset-row" id="programRepPresets" role="group" aria-label="Default rep range"><button class="rep-preset" type="button" data-rep-preset="strength" aria-pressed="false">Strength · 1–5</button><button class="rep-preset" type="button" data-rep-preset="hypertrophy" aria-pressed="true">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-rep-preset="endurance" aria-pressed="false">Endurance · 12–20</button><button class="rep-preset" type="button" data-rep-preset="open" aria-pressed="false">15+</button><button class="rep-preset" type="button" data-rep-preset="amrap" aria-pressed="false">AMRAP</button></div>
@@ -217,6 +212,13 @@
         <div class="undulating-panel" id="undulatingPanel" hidden><span class="filter-label">WEEKLY REP RANGE</span><div class="week-range-list" id="weekRangeList"></div></div>
         <div class="switch-row"><span class="switch-copy"><strong>Vary % of 1RM by week</strong><span>Optional weekly % wave for %1RM programs. Each program week can use its own percent.</span></span><button class="switch" id="pctWaveToggle" type="button" role="switch" aria-pressed="false" aria-label="Vary percent of 1RM by week off"></button></div>
         <div class="undulating-panel" id="pctWavePanel" hidden><span class="filter-label">WEEKLY % OF 1RM</span><div class="week-pct-list" id="weekPctList"></div></div>
+        <!-- #321 (user 2026-09-12): Auto Deload toggle at the bottom of the
+             program form; the every-N-weeks/intensity fields only show when on. -->
+        <div class="switch-row"><span class="switch-copy"><strong>Auto Deload</strong><span>Schedule a lighter week every N weeks at a reduced intensity.</span></span><button class="switch" id="autoDeloadToggle" type="button" role="switch" aria-pressed="false" aria-label="Auto Deload off"></button></div>
+        <div class="undulating-panel" id="autoDeloadPanel" hidden><div class="settings-pair">
+         <label class="rule-field"><span>Deload every N weeks</span><input id="deloadEvery" type="number" inputmode="numeric" min="1" step="1" value="4"></label>
+         <label class="rule-field"><span>Deload intensity</span><input id="deloadPct" type="number" inputmode="numeric" min="40" max="80" step="1" value="60"><em class="unit">%</em></label>
+        </div><p class="field-help">E.g. 4 = every 4th week is a deload week at the intensity above.</p></div>
        </section>
        <p class="form-error" id="programError" role="alert"></p>
        <button class="primary-button" id="createProgram" type="button">Create active program</button>
@@ -231,7 +233,7 @@
     <section id="statsView" class="stats-view" aria-label="Stats">
       <div class="period-tabs" id="statsPeriodTabs" aria-label="Stats period"></div>
       <div class="stats-grid" id="statsGrid"></div>
-      <section class="dashboard-card"><div class="section-head"><h2>Muscle map</h2></div><div id="muscleHeatmap"></div><div id="muscleStats"></div><div id="blindspotWrap"></div></section>
+      <section class="dashboard-card"><div class="section-head"><h2>Muscle map</h2><div class="mini-segmented" role="group" aria-label="Muscle map metric" id="muscleMapMode"><button type="button" data-map-mode="volume">Volume</button><button type="button" data-map-mode="sets">Sets</button></div></div><div id="muscleHeatmap"></div><div id="muscleStats"></div><div id="blindspotWrap"></div></section>
       <div class="muscle-analysis-grid">
        <section class="analysis-panel"><div class="section-head"><div><h2>Volume by muscle</h2><p class="section-note" id="muscleVolumeNote">Weighted volume. Secondary muscles receive 45% of the set’s volume.</p></div><div class="mini-segmented" role="group" aria-label="Volume by muscle metric" id="muscleVolumeMode"><button type="button" data-muscle-mode="volume">Volume</button><button type="button" data-muscle-mode="sets">Sets</button></div></div><div class="muscle-volume-list" id="muscleVolumeBreakdown"></div></section>
       </div>
@@ -289,10 +291,7 @@
         </div>
         <div class="settings-pair" id="settingsPctRow">
           <label class="rule-field"><span>% of 1RM default</span><input id="settingsPercentOf1RM" type="number" min="1" max="100" step="1" value="75"><em class="unit">%</em></label>
-          <label class="rule-field"><span>Deload every N weeks</span><input id="settingsDeloadEvery" type="number" min="0" step="1" value="0"></label>
         </div>
-        <p class="field-help">E.g. 4 = every 4th week is a deload. 0 = off.</p>
-        <label class="rule-field" id="settingsDeloadPctRow"><span>Deload intensity default</span><input id="settingsDeloadPct" type="number" min="40" max="80" step="1" value="60"><em class="unit">%</em></label>
         <div class="rule-field"><span>Default focus</span><div class="rep-preset-row" id="settingsRepPresets"><button class="rep-preset" type="button" data-rep-preset="strength" aria-pressed="false">Strength · 1–5</button><button class="rep-preset" type="button" data-rep-preset="hypertrophy" aria-pressed="true">Hypertrophy · 6–12</button><button class="rep-preset" type="button" data-rep-preset="endurance" aria-pressed="false">Endurance · 12–20</button><button class="rep-preset" type="button" data-rep-preset="open" aria-pressed="false">15+</button><button class="rep-preset" type="button" data-rep-preset="amrap" aria-pressed="false">AMRAP</button></div></div>
         <div class="settings-subsection">
           <span class="settings-subhead">Default rep range</span>
@@ -314,6 +313,14 @@
           <div class="week-range-list" id="settingsWeekRangeList"></div>
         </div>
        </div>
+       <!-- #321 (user 2026-09-12): Auto Deload default at the bottom of the
+            progression defaults; the every-N-weeks/intensity fields only show
+            when on. New programs inherit these defaults. -->
+       <div class="switch-row wide"><span class="switch-copy"><strong>Auto Deload</strong><span>Schedule a lighter week every N weeks at a reduced intensity for new programs.</span></span><button class="switch" id="settingsAutoDeloadToggle" type="button" role="switch" aria-pressed="false" aria-label="Auto Deload off"></button></div>
+       <div class="undulating-panel" id="settingsAutoDeloadPanel" hidden><div class="settings-pair">
+        <label class="rule-field"><span>Deload every N weeks</span><input id="settingsDeloadEvery" type="number" min="1" step="1" value="4"></label>
+        <label class="rule-field"><span>Deload intensity</span><input id="settingsDeloadPct" type="number" min="40" max="80" step="1" value="60"><em class="unit">%</em></label>
+       </div><p class="field-help">E.g. 4 = every 4th week is a deload week at the intensity above.</p></div>
       </section>
       <section class="dashboard-card">
        <div class="section-head settings-head"><h2>Units</h2></div>
@@ -366,7 +373,7 @@
            exercises auto-collapse; #202 removed the notes card;
            #203 moved similar below how-to. -->
       <section class="dashboard-card chart-card exercise-musclemap"><button class="exercise-info-button musclemap-info" id="muscleMapInfoButton" type="button" aria-label="About this movement">i</button><div class="section-head"><h2>Muscles worked</h2></div><div id="exerciseBodyMap"></div></section>
-      <section class="dashboard-card chart-card"><div class="section-head"><div><h2>Progress</h2><p class="section-note" id="progressNote">Estimated 1RM and volume per session · tap a point to inspect it</p></div><div class="mini-segmented" role="group" aria-label="Progress metric" id="progressMetricToggle"><button type="button" data-progress-metric="e1rm">1RM</button><button type="button" data-progress-metric="heaviest">Heaviest</button></div></div><div class="chart-wrap" id="exerciseProgressChart"></div><div class="chart-wrap" id="exerciseVolumeChart"></div></section>
+      <section class="dashboard-card chart-card"><div class="section-head"><div><h2>Progress</h2><p class="section-note" id="progressNote">Estimated 1RM and volume per session · tap a point to inspect it</p></div></div><div class="chart-wrap" id="exerciseProgressChart"></div><div class="chart-wrap" id="exerciseVolumeChart"></div></section>
       <section class="dashboard-card" aria-labelledby="howHeading">
         <div class="section-head"><h2 id="howHeading">How to</h2></div>
         <ol class="instructions" id="instructions"></ol>
@@ -410,10 +417,15 @@
     <div class="custom-form"><div class="custom-form-head"><div><h2 id="builderDraftExistsTitle">Saved workout draft in progress</h2><p>You have an unfinished saved workout draft.</p></div><button class="dialog-close" id="closeBuilderDraftExists" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="keepBuilderDraft" type="button">Keep draft</button><button class="primary-button danger-button" id="deleteBuilderDraft" type="button">Delete draft</button></div></div>
    </dialog>
    <dialog class="custom-dialog compact-dialog" id="reviewSetsDialog" aria-labelledby="reviewSetsTitle">
-    <div class="custom-form"><div class="custom-form-head"><div><h2 id="reviewSetsTitle">Review sets</h2><p id="reviewSetsCopy"></p></div><button class="dialog-close" id="closeReviewSets" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="reviewSetsComplete" type="button">Mark all complete</button><button class="primary-button" id="reviewSetsFinishAnyway" type="button">Finish anyway</button><button class="secondary-button" id="reviewSetsDeleteUnfinished" type="button">Delete unfinished sets</button><button class="secondary-button" id="reviewSetsDelete" type="button">Finish and delete empty sets</button><button class="text-link" id="reviewSetsCancel" type="button">Keep editing</button></div></div>
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="reviewSetsTitle">Review sets</h2><p id="reviewSetsCopy"></p></div><button class="dialog-close" id="closeReviewSets" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="reviewSetsComplete" type="button">Mark all complete</button><button class="primary-button" id="reviewSetsFinishAnyway" type="button">Finish anyway</button><button class="secondary-button" id="reviewSetsDelete" type="button">Finish and delete empty sets</button><button class="text-link" id="reviewSetsCancel" type="button">Keep editing</button></div></div>
    </dialog>
    <dialog class="custom-dialog compact-dialog" id="focusConfirmDialog" aria-labelledby="focusConfirmTitle">
     <div class="custom-form"><div class="custom-form-head"><div><h2 id="focusConfirmTitle">Apply to every exercise?</h2><p id="focusConfirmCopy"></p></div><button class="dialog-close" id="closeFocusConfirm" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="secondary-button" id="focusConfirmCancel" type="button">Cancel</button><button class="primary-button" id="focusConfirmApply" type="button">Apply</button></div></div>
+   </dialog>
+   <!-- #286: post-workout signed-out nudge — sync/backup explainer with
+        Sign in / Dismiss and a persisted "Don't show again". -->
+   <dialog class="custom-dialog compact-dialog" id="signinNudgeDialog" aria-labelledby="signinNudgeTitle">
+    <div class="custom-form"><div class="custom-form-head"><div><h2 id="signinNudgeTitle">Back up this workout</h2><p>You&rsquo;re signed out, so this workout lives only on this device. Sign in to sync it across your devices and keep it safe.</p></div><button class="dialog-close" id="closeSigninNudge" type="button" aria-label="Close">×</button></div><div class="form-actions"><button class="primary-button" id="signinNudgeSignIn" type="button">Sign in</button><button class="secondary-button" id="signinNudgeDismiss" type="button">Dismiss</button></div><label class="nudge-dont-show"><input type="checkbox" id="signinNudgeDontShow"> Don&rsquo;t show again</label></div>
    </dialog>
 
    <dialog class="custom-dialog" id="customExerciseDialog" aria-labelledby="customExerciseTitle">
@@ -536,21 +548,20 @@
    <dialog class="custom-dialog" id="shareLinkDialog" aria-labelledby="shareLinkTitle">
     <div class="custom-form">
      <div class="custom-form-head">
-      <div><h2 id="shareLinkTitle">Share link</h2><p id="shareLinkNote">Copy this link and send it to a friend.</p></div>
+      <div><h2 id="shareLinkTitle">Share link</h2><p>Send this shared workout with the link below.</p></div>
       <button class="dialog-close" id="closeShareLinkDialog" type="button" aria-label="Close">×</button>
      </div>
      <input id="shareLinkField" class="share-link-field" readonly autocomplete="off" spellcheck="false" aria-label="Share link">
-     <div class="form-actions">
-      <button class="form-action secondary" id="closeShareLinkDone" type="button">Done</button>
-      <button class="form-action secondary" id="nativeShareLinkBtn" type="button" hidden>Share…</button>
+     <div class="form-actions centered">
       <button class="form-action primary" id="copyShareLinkBtn" type="button">Copy link</button>
+      <button class="form-action secondary" id="nativeShareLinkBtn" type="button" hidden>Share…</button>
      </div>
     </div>
    </dialog>
    <dialog class="custom-dialog compact-dialog" id="shareSignInDialog" aria-labelledby="shareSignInTitle">
     <div class="custom-form">
      <div class="custom-form-head">
-      <div><h2 id="shareSignInTitle">Sign in to share</h2><p>Sharing needs an account — sign in and your links stay tied to you on any device.</p></div>
+      <div><h2 id="shareSignInTitle">Sign in to share</h2><p id="shareSignInDesc">Sharing needs an account. It’s free to sign up.</p></div>
       <button class="dialog-close" id="closeShareSignInDialog" type="button" aria-label="Close">×</button>
      </div>
      <div id="shareSignInStep1">
@@ -573,11 +584,9 @@
      </div>
      <div id="shareSignInStep3" hidden>
       <input id="shareSignInLinkField" class="share-link-field" readonly autocomplete="off" spellcheck="false" aria-label="Share link">
-      <p class="status-note" id="shareSignInLinkNote"></p>
-      <div class="form-actions share-info-actions">
+      <div class="form-actions centered share-info-actions">
        <button class="form-action primary" id="shareSignInCopyBtn" type="button">Copy link</button>
        <button class="form-action secondary share-with-icon" id="shareSignInNativeBtn" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>Share…</button>
-       <button class="text-link" id="shareSignInDone" type="button">Done</button>
       </div>
      </div>
     </div>
@@ -591,6 +600,18 @@
       <div class="form-actions">
        <button class="form-action secondary" id="keepExercise" type="button">Keep</button>
        <button class="form-action danger" id="confirmRemoveExercise" type="button">Remove</button>
+      </div>
+    </div>
+   </dialog>
+   <dialog class="custom-dialog" id="removeSetDialog" aria-labelledby="removeSetTitle">
+    <div class="custom-form">
+      <div class="custom-form-head">
+       <div><h2 id="removeSetTitle">Delete set?</h2><p id="removeSetDesc">This removes the set from your workout.</p></div>
+       <button class="dialog-close" id="cancelRemoveSet" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="form-actions">
+       <button class="form-action secondary" id="keepSet" type="button">Keep</button>
+       <button class="form-action danger" id="confirmRemoveSet" type="button">Delete</button>
       </div>
     </div>
    </dialog>

@@ -10,9 +10,9 @@ const {loadRole}=require('./harness');
 const catalog=require('./fixtures/catalog');
 const {
   levenshtein, normalize, tokenize, setVolume,
-  detectExercisePRs, PR_E1RM_TOLERANCE,
+  detectExercisePRs, detectTimedPRs, PR_E1RM_TOLERANCE, priorSetsForPR,
   escapeHtml, localIsoDate, formatLogDate, formatPrettyDate,
-  rankedExerciseMatches,
+  rankedExerciseMatches, workoutState, cloneSetFields,
 }=loadRole('utilities',{globals:{exercises:catalog}});
 
 describe('levenshtein / normalize / tokenize',()=>{
@@ -91,5 +91,89 @@ describe('rankedExerciseMatches (fixture catalog)',()=>{
   });
   it('empty query returns the catalog head',()=>{
     assert.equal(rankedExerciseMatches('').length,6);
+  });
+});
+
+describe('detectTimedPRs (#282)',()=>{
+  const t=(seconds,w)=>({seconds,w:w??null});
+  it('longer hold at the same load → PR',()=>{
+    assert.equal(detectTimedPRs([t(75)],[t(60)]),true);
+  });
+  it('shorter hold → no PR',()=>{
+    assert.equal(detectTimedPRs([t(45)],[t(60)]),false);
+  });
+  it('tie → no PR',()=>{
+    assert.equal(detectTimedPRs([t(60)],[t(60)]),false);
+  });
+  it('first hold at a new load is a PR (new territory)',()=>{
+    assert.equal(detectTimedPRs([t(30,25)],[t(90)]),true);
+  });
+  it('a heavier-loaded hold does not PR against a lighter load best',()=>{
+    assert.equal(detectTimedPRs([t(30,25)],[t(60,25)]),false);
+  });
+  it('no prior → no PR',()=>{
+    assert.equal(detectTimedPRs([t(75)],[]),false);
+  });
+  it('no current → no PR',()=>{
+    assert.equal(detectTimedPRs([],[t(60)]),false);
+  });
+  it('zero-second sets are ignored on both sides',()=>{
+    assert.equal(detectTimedPRs([t(0)],[t(60)]),false);
+    assert.equal(detectTimedPRs([t(75)],[t(0)]),false);
+  });
+});
+
+describe('priorSetsForPR (#277 — same-day chronology survives sync reorder)',()=>{
+  const set=(w,r)=>({w,r,seconds:null,rpe:null,tags:[]});
+  const log=(id,date,completedAt,w)=>({id,date,completedAt,name:'W',
+    exercises:[{exerciseId:'bench-press',tracking:'reps',sets:[set(w,8)]}]});
+  const morning=log('am','2026-09-12','2026-09-12T08:00:00.000Z',135);
+  const evening=log('pm','2026-09-12','2026-09-12T20:00:00.000Z',145);
+  it('evening session sees the morning session as prior',()=>{
+    workoutState.completed=[evening,morning];
+    assert.deepEqual(priorSetsForPR(evening,'bench-press'),[set(135,8)]);
+  });
+  it('morning session does NOT see the evening session as prior',()=>{
+    workoutState.completed=[evening,morning];
+    assert.deepEqual(priorSetsForPR(morning,'bench-press'),[]);
+  });
+  it('result is identical when the array order is reversed (sync reorder)',()=>{
+    workoutState.completed=[morning,evening]; /* oldest-first: a reorder */
+    assert.deepEqual(priorSetsForPR(evening,'bench-press'),[set(135,8)]);
+    assert.deepEqual(priorSetsForPR(morning,'bench-press'),[]);
+  });
+  it('earlier dates still count as prior regardless of order',()=>{
+    const older=log('old','2026-09-10','2026-09-10T08:00:00.000Z',125);
+    workoutState.completed=[morning,older];
+    assert.deepEqual(priorSetsForPR(morning,'bench-press'),[set(125,8)]);
+  });
+  it('stamp-less legacy rows keep the index-based same-day rule',()=>{
+    const am={...morning,completedAt:undefined},pm={...evening,completedAt:undefined};
+    workoutState.completed=[pm,am]; /* newest-first assumed */
+    assert.deepEqual(priorSetsForPR(pm,'bench-press'),[set(135,8)]);
+    assert.deepEqual(priorSetsForPR(am,'bench-press'),[]);
+  });
+});
+
+describe('cloneSetFields forNewSession (#267 — repeat blanks performance)',()=>{
+  const logged={w:135,r:8,seconds:null,rpe:9,targetRpe:'',tags:['warmup']};
+  it('blanks r and seconds so the ghost suggestion shows',()=>{
+    const c=cloneSetFields(logged,'forNewSession');
+    assert.equal(c.r,'');
+    assert.equal(c.seconds,'');
+  });
+  it('keeps weight as a real value (#175) and clears actual RPE (A7)',()=>{
+    const c=cloneSetFields(logged,'forNewSession');
+    assert.equal(c.w,'135');
+    assert.equal(c.rpe,'');
+  });
+  it('keeps tags and stored targetRpe',()=>{
+    const c=cloneSetFields({...logged,targetRpe:'8'},'forNewSession');
+    assert.deepEqual(c.tags,['warmup']);
+    assert.equal(c.targetRpe,'8');
+  });
+  it('forTemplate still carries r (template prescriptions are targets)',()=>{
+    const c=cloneSetFields(logged,'forTemplate');
+    assert.equal(c.r,'8');
   });
 });

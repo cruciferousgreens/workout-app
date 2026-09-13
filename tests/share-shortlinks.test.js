@@ -16,6 +16,7 @@ const {
   shareSlugFromBytes, isValidShareSlug, newShareSlug,
   buildShortShareUrl, tryShortShareLink,
   shortSlugFromPath, shortLinkAttemptFromPath, resolveShortShareLink, clearShortSharePath,
+  restoreShortSharePath,
   spaBaseForPath, takeSpaRedirectSlug,
   shareEncodeV2,
 }=loadRole('share-shortlinks');
@@ -269,5 +270,38 @@ describe('shortLinkAttemptFromPath (#177 follow-up: bad slugs still count as att
     assert.ok(attempt,'attempt detected');
     assert.equal(shortSlugFromPath('/s/doesnotexist1'),null,'not a parseable slug');
     assert.equal(isValidShareSlug(attempt),false,'fails slug validation');
+  });
+});
+
+describe('restoreShortSharePath (#303: keep the /s/<slug> deep link)',()=>{
+  it('restores /s/<slug> from the app root via replaceState (no navigation)',()=>{
+    globalThis.location={pathname:'/',search:'',hash:''};
+    let replaced=null,replacedState='unset';
+    globalThis.history={state:{view:'workout',sub:'share'},
+      replaceState:(s,t,u)=>{replacedState=s;replaced=u;}};
+    restoreShortSharePath('Ab3xYz12');
+    assert.equal(replaced,'/s/Ab3xYz12');
+    assert.deepEqual(replacedState,{view:'workout',sub:'share'},'history state preserved');
+  });
+  it('restores under the project base on Pages',()=>{
+    globalThis.location={pathname:'/workout-app-accounts/',search:'',hash:''};
+    let replaced=null;
+    globalThis.history={state:null,replaceState:(s,t,u)=>{replaced=u;}};
+    restoreShortSharePath('Ab3xYz12');
+    assert.equal(replaced,'/workout-app-accounts/s/Ab3xYz12');
+  });
+  it('no-op when the path already carries the slug (direct serve)',()=>{
+    globalThis.location={pathname:'/s/Ab3xYz12',search:'',hash:''};
+    let replaced='untouched';
+    globalThis.history={state:null,replaceState:(s,t,u)=>{replaced=u;}};
+    restoreShortSharePath('Ab3xYz12');
+    assert.equal(replaced,'untouched');
+  });
+  it('keeps the query string',()=>{
+    globalThis.location={pathname:'/',search:'?x=1',hash:''};
+    let replaced=null;
+    globalThis.history={state:null,replaceState:(s,t,u)=>{replaced=u;}};
+    restoreShortSharePath('Ab3xYz12');
+    assert.equal(replaced,'/s/Ab3xYz12?x=1');
   });
 });

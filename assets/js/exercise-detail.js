@@ -89,23 +89,38 @@
       const short=String(session.date).replace(/, \d{4}/,'');
       return session.dayOrdinal>1?`${short} (${session.dayOrdinal})`:short;
     }
-    /* #8: per-session e1RM + heaviest set + volume for one exercise, oldest session first. */
+    /* #8: per-session e1RM + heaviest set + volume for one exercise, oldest session first.
+       #278: seconds-tracked sessions get their own trend series (longest
+       hold per session + time under tension) — the e1RM/heaviest filters
+       exclude them, which used to leave timed-only history chartless. */
     function exerciseTrendData(exerciseId) {
       const logs=annotateSessionOrdinals(getExerciseLogs(exerciseId)).reverse();
-      const e1rm=[], volume=[], heaviest=[];
+      const e1rm=[], volume=[], heaviest=[], hold=[], timeVolume=[];
+      /* #308 (user 2026-09-12): the bar charts are about the weight/volume,
+         not the session — like #249's heaviest labels, they use the plain
+         date with no day ordinal ("Sep 2 (2)"). */
+      const plainLabelOf=session=>session.date, plainShortOf=session=>String(session.date).replace(/, \d{4}/,'');
       logs.forEach(session=>{
         const label=ordinalDateLabel(session), shortLabel=ordinalShortLabel(session);
+        const plainLabel=plainLabelOf(session), plainShort=plainShortOf(session);
         const sets=session.sets.filter(s=>Number(s.w)>0&&Number(s.r)>0);
         if(sets.length){
           e1rm.push({label,shortLabel,value:Math.round(Math.max(...sets.map(estimate1RM)))});
           /* Heaviest set per session (user 2026-09-12): the Progress headline
-             toggles between this and e1RM, so both series share sessions. */
-          heaviest.push({label,shortLabel,value:Math.max(...sets.map(s=>Number(s.w)))});
+             toggles between this and e1RM, so both series share sessions.
+             #249: this chart is about the weight, not the session — drop the
+             day ordinal ("Sep 2 (2)") from its labels. */
+          heaviest.push({label:plainLabel,shortLabel:plainShort,value:Math.max(...sets.map(s=>Number(s.w)))});
+        }
+        const timed=session.sets.filter(s=>Number(s.seconds)>0);
+        if(timed.length){
+          hold.push({label,shortLabel,value:Math.max(...timed.map(s=>Number(s.seconds)))});
+          timeVolume.push({label:plainLabel,shortLabel:plainShort,value:timed.reduce((sum,s)=>sum+(Number(s.seconds)||0),0)});
         }
         const vol=session.sets.reduce((sum,s)=>sum+setVolume(s),0);
-        if(vol>0)volume.push({label,shortLabel,value:vol});
+        if(vol>0)volume.push({label:plainLabel,shortLabel:plainShort,value:vol});
       });
-      return {e1rm,volume,heaviest};
+      return {e1rm,volume,heaviest,hold,timeVolume};
     }
     /* #125 (user 2026-09-11): charts cleaned up — soft area fill under the
        line, light horizontal gridlines instead of bare axes, tabular-nums
@@ -164,16 +179,22 @@
 
     /* A12 (#99): sessions and rep bests come from valid REP sets regardless
        of added load — bodyweight training has no load. e1RM and heaviest-set
-       stay reserved for sets with load. */
+       stay reserved for sets with load.
+       #278: seconds-tracked sets are completed sets too — a timed-only
+       history must not read "No completed sets yet". Timed bests surface
+       as longestHold; rep-derived metrics stay rep-only. */
     function statsFor(id) {
       const logs = getExerciseLogs(id);
-      const repSets = allSets(logs).filter(set => Number(set.r) > 0);
-      if (!repSets.length) return null;
+      const validSets = allSets(logs).filter(set => Number(set.r) > 0 || Number(set.seconds) > 0);
+      if (!validSets.length) return null;
+      const repSets = validSets.filter(set => Number(set.r) > 0);
+      const timedSets = validSets.filter(set => Number(set.seconds) > 0);
       const loaded = repSets.filter(set => Number(set.w) > 0);
       const bestEst = loaded.length ? loaded.reduce((a,b) => estimate1RM(a) > estimate1RM(b) ? a : b) : null;
       const heaviest = loaded.length ? loaded.reduce((a,b) => Number(a.w) > Number(b.w) ? a : b) : null;
-      return {sessions:logs.length, sets:repSets.length,
-        bestRepSet:Math.max(...repSets.map(s => Number(s.r) || 0)),
+      return {sessions:logs.length, sets:validSets.length,
+        bestRepSet:repSets.length?Math.max(...repSets.map(s => Number(s.r) || 0)):0,
+        longestHold:timedSets.length?Math.max(...timedSets.map(s => Number(s.seconds) || 0)):0,
         bestEst, heaviest, projected:bestEst ? Math.round(estimate1RM(bestEst)) : null};
     }
 
@@ -186,6 +207,19 @@
     function similarTo(ex) {
       /* A8 (#99): soft-deleted customs don't surface as similar either. */
       return exercises.filter(x => x.id !== ex.id && !exerciseDeleted(x)).map(x => ({...x, score:similarity(ex,x)})).filter(x => x.score > 0).sort((a,b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0,4);
+    }
+
+    /* #281: the per-session headline metric. Seconds-tracked sessions have
+       no 1RM estimate — they show the longest hold instead of a misleading
+       "Best estimate 0 lb". Unweighted rep sessions hide the estimate rather
+       than showing 0. Returns '' when there is nothing meaningful to show. */
+    function sessionBestLabel(session){
+      if(session.tracking==='time'){
+        const best=Math.max(0,...session.sets.map(s=>Number(s.seconds)||0));
+        return best>0?`Longest hold ${best} sec`:'';
+      }
+      const top=Math.round(Math.max(0,...session.sets.map(estimate1RM)));
+      return top>0?`Best estimate ${displayWeight(top)} ${weightUnit()}`:'';
     }
 
     function renderHistory(id) {
@@ -217,10 +251,14 @@
         (s.tags||[]).forEach(t=>metaBits.push(`<span class="set-tag">${escapeHtml(t)}</span>`));
         return `<div class="set-row"><span class="set-num">${i+1}</span><span class="set-main">${main}</span><span class="set-meta">${metaBits.join(' ')||'—'}</span></div>`;
       };
+    /* #281: the per-session headline metric. Seconds-tracked sessions have
+       no 1RM estimate — they show the longest hold instead of a misleading
+       "Best estimate 0 lb". Unweighted rep sessions hide the estimate rather
+       than showing 0. Returns '' when there is nothing meaningful to show. */
       $('#historyList').innerHTML = logs.length ? logs.map(session => {
-        const top = Math.round(Math.max(...session.sets.map(estimate1RM)));
+        const best = sessionBestLabel(session);
         return `<div class="history-session">
-          <div class="session-head"><span class="session-date">${escapeHtml(ordinalDateLabel(session))}</span><span class="session-est">Best estimate ${displayWeight(top)} ${weightUnit()} · <button class="filter-clear" type="button" data-history-workout="${escapeHtml(session.workoutId)}">View workout</button></span></div>
+          <div class="session-head"><span class="session-date">${escapeHtml(ordinalDateLabel(session))}</span><span class="session-est">${best?escapeHtml(best)+' · ':''}<button class="filter-clear" type="button" data-history-workout="${escapeHtml(session.workoutId)}">View workout</button></span></div>
           ${session.exerciseTags?.length?`<div class="exercise-tag-row">${session.exerciseTags.map(tag=>`<span class="exercise-tag-chip ${workoutState.exerciseTagPresets.includes(tag)?'preset':''}">${escapeHtml(tag)}</span>`).join('')}</div>`:''}
           <div class="sets">${session.sets.map((s,i) => setRow(s,i,session)).join('')}</div>
         </div>`;
@@ -270,11 +308,17 @@
          unweighted history get rep-based cards, with the "complete a
          weighted set" messaging kept only on the load-derived metrics. */
       const sessionsSub = `Across ${st?st.sessions:0} workout${st&&st.sessions===1?'':'s'}`;
+      /* #278: timed-only history (no rep sets at all) gets its own card set —
+         the longest hold is the headline metric, not "No completed sets yet". */
+      const timedOnly = !!(st && st.longestHold>0 && !st.bestRepSet);
       $('#stats').innerHTML = st && !isBodyweight && st.bestEst ? `
         <div class="stat"><span class="stat-label">PROJECTED 1RM</span><span class="stat-value">${displayWeight(st.projected)} ${weightUnit()}</span><span class="stat-sub">RPE-adjusted · ${displayWeight(st.bestEst.w)} × ${st.bestEst.r} @ ${st.bestEst.rpe ?? '—'}</span></div>
         <div class="stat"><span class="stat-label">HEAVIEST SET PR</span><span class="stat-value">${displayWeight(st.heaviest.w)} ${weightUnit()}</span><span class="stat-sub">${st.heaviest.r} reps · ${st.heaviest.date}</span></div>
-        <div class="stat"><span class="stat-label">VOLUME LOGGED</span><span class="stat-value">${st.sets} sets</span><span class="stat-sub">${sessionsSub}</span></div>` : st && isBodyweight ? `
-        <div class="stat"><span class="stat-label">BODYWEIGHT MOVEMENT</span><span class="stat-value">${st.sets} sets</span><span class="stat-sub">Added weight is optional</span></div>
+        <div class="stat"><span class="stat-label">VOLUME LOGGED</span><span class="stat-value">${st.sets} set${st.sets===1?'':'s'}</span><span class="stat-sub">${sessionsSub}</span></div>` : timedOnly ? `
+        <div class="stat"><span class="stat-label">LONGEST HOLD</span><span class="stat-value">${st.longestHold} sec</span><span class="stat-sub">${sessionsSub}</span></div>
+        <div class="stat"><span class="stat-label">PROJECTED 1RM</span><span class="stat-value">—</span><span class="stat-sub">Timed sets don't project a 1RM</span></div>
+        <div class="stat"><span class="stat-label">SESSIONS</span><span class="stat-value">${st.sessions}</span><span class="stat-sub">Completed workouts</span></div>` : st && isBodyweight ? `
+        <div class="stat"><span class="stat-label">BODYWEIGHT MOVEMENT</span><span class="stat-value">${st.sets} set${st.sets===1?'':'s'}</span><span class="stat-sub">Added weight is optional</span></div>
         <div class="stat"><span class="stat-label">BEST REP SET</span><span class="stat-value">${st.bestRepSet} reps</span><span class="stat-sub">${sessionsSub}</span></div>
         <div class="stat"><span class="stat-label">SESSIONS</span><span class="stat-value">${st.sessions}</span><span class="stat-sub">Completed workouts</span></div>` : st ? `
         <div class="stat"><span class="stat-label">PROJECTED 1RM</span><span class="stat-value">—</span><span class="stat-sub">Complete a weighted set to calculate it</span></div>
@@ -297,24 +341,29 @@
          weight. Dot-tap inspection keeps working — it listens on the svg,
          the toggle listens on the headline, so they never fight. */
       /* #200 (user 2026-09-12): explicit 1RM | Heaviest segmented toggle — the
-         headline-tap flip was undiscoverable. Hidden when there is no metric
-         to switch (bodyweight exercises, or no completed sessions yet). */
-      const metricToggle=$('#progressMetricToggle');
-      function syncMetricToggle(){
-        if(!metricToggle)return;
-        metricToggle.style.display=(!isBodyweight&&trendData.e1rm.length)?'':'none';
-        metricToggle.querySelectorAll('[data-progress-metric]').forEach(btn=>{
-          btn.setAttribute('aria-pressed',String(btn.dataset.progressMetric===progressMetric));
-        });
+         headline-tap flip was undiscoverable.
+         #309 (user 2026-09-12): the toggle sits inline with the chart's own
+         header ("Estimated 1RM" / "Heaviest weight"), right-justified — not
+         up in the section head. It renders with the chart, so it only exists
+         when there is a metric to switch (never for bodyweight / no data). */
+      function progressChartBlock(kicker,svg,points,valueLabel){
+        const latest=points[points.length-1];
+        const val=escapeHtml(valueLabel(latest.value)),when=escapeHtml(latest.shortLabel||latest.label);
+        const seg=['e1rm','heaviest'].map(m=>`<button type="button" data-progress-metric="${m}" aria-pressed="${m===progressMetric}">${m==='e1rm'?'1RM':'Heaviest'}</button>`).join('');
+        /* #318 refinement (user 2026-09-12): kicker + headline form one left
+           block with the toggle vertically centered against the whole block.
+           The header stays inside .chart-tappable so dot-tap inspection keeps
+           working. */
+        return `<div class="chart-tappable"><div class="chart-head-row"><div class="chart-head-text"><p class="chart-kicker">${escapeHtml(kicker)}</p><p class="chart-headline"><strong>${val}</strong><span>${when}</span></p></div><div class="mini-segmented" role="group" aria-label="Progress metric">${seg}</div></div>${svg}</div>`;
       }
-      if(metricToggle)metricToggle.querySelectorAll('[data-progress-metric]').forEach(btn=>{
-        btn.onclick=()=>{const mode=btn.dataset.progressMetric;if(isProgressMetric(mode)&&mode!==progressMetric){progressMetric=mode;paintProgressMetric();}};
-      });
       function paintProgressMetric(){
         const heavy=progressMetric==='heaviest';
         const points=heavy?trendData.heaviest:trendData.e1rm;
-        progressHost.innerHTML=chartBlock(heavy?'Heaviest weight':'Estimated 1RM',lineChart(points,e1rmLabel),points,e1rmLabel);
+        progressHost.innerHTML=progressChartBlock(heavy?'Heaviest weight':'Estimated 1RM',lineChart(points,e1rmLabel),points,e1rmLabel);
         wireChartTaps(progressHost.querySelector('.chart-tappable'),points,e1rmLabel);
+        progressHost.querySelectorAll('[data-progress-metric]').forEach(btn=>{
+          btn.onclick=()=>{const mode=btn.dataset.progressMetric;if(isProgressMetric(mode)&&mode!==progressMetric){progressMetric=mode;paintProgressMetric();}};
+        });
         const head=progressHost.querySelector('.chart-headline');
         head.classList.add('metric-toggle');
         head.setAttribute('role','button');
@@ -324,12 +373,18 @@
         head.addEventListener('click',flip);
         head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();flip();}});
         if(progressNote)progressNote.textContent=`${heavy?'Heaviest weight':'Estimated 1RM'} and volume per session · tap a point to inspect it`;
-        syncMetricToggle();
       }
-      if(isBodyweight){
+      /* #278: timed-only history paints a longest-hold line instead of the
+         e1RM/heaviest chart (which has no points for timed sets). */
+      const timedTrend=!trendData.e1rm.length&&trendData.hold.length>0;
+      const secLabel=v=>`${Math.round(v)} sec`;
+      if(timedTrend){
+        progressHost.innerHTML=chartBlock('Longest hold',lineChart(trendData.hold,secLabel),trendData.hold,secLabel);
+        wireChartTaps(progressHost.querySelector('.chart-tappable'),trendData.hold,secLabel);
+        if(progressNote)progressNote.textContent='Longest hold per session · tap a point to inspect it';
+      }else if(isBodyweight){
         progressHost.innerHTML='<div class="chart-empty">Bodyweight progress will use reps and added load from your workouts.</div>';
         if(progressNote)progressNote.textContent='Estimated 1RM and volume per session · tap a point to inspect it';
-        syncMetricToggle();
       }else if(trendData.e1rm.length){
         paintProgressMetric();
         /* #169: with exactly one session the chart is a single dot — the
@@ -339,13 +394,19 @@
       }else{
         progressHost.innerHTML='<div class="chart-empty">Complete a workout to start this chart.</div>';
         if(progressNote)progressNote.textContent='Estimated 1RM and volume per session · tap a point to inspect it';
-        syncMetricToggle();
       }
       const volumeHost=$('#exerciseVolumeChart');
-      volumeHost.innerHTML=trendData.volume.length
-        ? chartBlock('Volume per session',barChart(trendData.volume,volLabel),trendData.volume,volLabel)
+      /* #278: timed-only history bars time under tension instead of
+         (meaningless, all-zero) lb volume. */
+      const volSeries=trendData.volume.length
+        ? {points:trendData.volume,kicker:'Volume per session',label:volLabel}
+        : (timedTrend&&trendData.timeVolume.length
+          ? {points:trendData.timeVolume,kicker:'Time under tension',label:secLabel}
+          : null);
+      volumeHost.innerHTML=volSeries
+        ? chartBlock(volSeries.kicker,barChart(volSeries.points,volSeries.label),volSeries.points,volSeries.label)
         : '';
-      wireChartTaps(volumeHost.querySelector('.chart-tappable'),trendData.volume,volLabel);
+      wireChartTaps(volumeHost.querySelector('.chart-tappable'),volSeries?volSeries.points:[],volSeries?volSeries.label:volLabel);
       renderHistory(id);
       /* #202 (user 2026-09-12): the exercise-specific Notes card is removed
          from this page for now (may return as a future feature). Per-exercise

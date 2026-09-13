@@ -136,6 +136,24 @@ module.exports={
     'assets/js/share-codec.js',
     'assets/js/share.js',
   ]},
+  /* Timed PR label (#282, user 2026-09-12): livePRLabel over timed history.
+     workout-editor rides on exercise-library's real getExerciseLogs. */
+  'pr-label-logic':{files:[
+    'assets/js/state.js',
+    'assets/js/utilities.js',
+    'assets/js/exercise-detail.js',
+    'assets/js/exercise-library.js',
+    'assets/js/workout-editor.js',
+  ]},
+  /* Exercise-detail timed logic (#278/#281, user 2026-09-12): statsFor,
+     exerciseTrendData, and sessionBestLabel over timed-only history.
+     Needs exercise-library for the real getExerciseLogs. */
+  'exercise-detail-logic':{files:[
+    'assets/js/state.js',
+    'assets/js/utilities.js',
+    'assets/js/exercise-detail.js',
+    'assets/js/exercise-library.js',
+  ]},
   /* Set tags in saved workout templates (#210, user 2026-09-12): the
      template clone chain must carry set tags (builder persist +
      template start), and the builder UI must route the shared tag dialog

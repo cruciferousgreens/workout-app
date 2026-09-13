@@ -183,15 +183,14 @@
       const target=returnRouteKey(state.workoutDetailReturn)||ROUTES.DETAIL_RETURN.WORKOUT;
       (WORKOUT_DETAIL_RETURNS[target]||WORKOUT_DETAIL_RETURNS[ROUTES.DETAIL_RETURN.WORKOUT])();
     }
-    /** Tints the Workout tab while a draft is live. Called on every render of
+    /** Updates the live-workout indicator state. Called on every render of
      *  the workout screen, after finish/discard, on tab switches, and once at
-     *  boot (restored drafts). */
+     *  boot (restored drafts). #325: the Workout tab itself gets no accent
+     *  tint while a draft is live — it reads active only when it's the
+     *  current page. */
     function updateLiveWorkoutIndicator() {
       const nav = $('#workoutsNav'); if (!nav) return;
       const live = !!workoutState.draft;
-      /* The tab keeps only its accent tint now (user 2026-09-12): the dot
-         badge was duplicative once the header owned the live dot. */
-      nav.classList.toggle('has-live-draft', live);
       nav.setAttribute('aria-label', live ? 'Workout — session in progress' : 'Workout');
       /* Live-workout chip (user 2026-09-11): top-right header shortcut, visible
          whenever a session is live and we're not on the live editor page.

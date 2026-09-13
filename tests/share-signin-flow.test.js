@@ -100,23 +100,24 @@ describe('#215 step-1 markup: Sign in is the first, primary button',()=>{
     assert.ok(html.includes('id="shareSignInVerify"'),'verify Sign in button present');
     assert.ok(html.includes('id="shareSignInStatus"'),'status line present');
   });
-  it('step 3 holds the share-info content (link field + actions)',()=>{
+  it('step 3 holds the share-info content (link field + two centered actions)',()=>{
     assert.ok(html.includes('id="shareSignInLinkField"'),'link field present');
     assert.ok(html.includes('id="shareSignInCopyBtn"'),'Copy link present');
     assert.ok(html.includes('id="shareSignInNativeBtn"'),'Share… present');
-    assert.ok(html.includes('id="shareSignInDone"'),'Done present');
+    /* #244 (user 2026-09-12): no copy and no Done on the share screen. */
+    assert.ok(!html.includes('id="shareSignInLinkNote"'),'no link note');
+    assert.ok(!html.includes('id="shareSignInDone"'),'no Done button');
   });
-  it('#225: step 3 order is Copy link (primary) → Share… (icon) → Done (text link)',()=>{
+  it('#244: step 3 order is Copy link (primary) → Share… (icon), centered',()=>{
     const step3=html.slice(html.indexOf('id="shareSignInStep3"'));
     const actions=step3.slice(0,step3.indexOf('</div>\n     </div>'));
     const iCopy=actions.indexOf('id="shareSignInCopyBtn"');
     const iShare=actions.indexOf('id="shareSignInNativeBtn"');
-    const iDone=actions.indexOf('id="shareSignInDone"');
-    assert.ok(iCopy!==-1&&iShare!==-1&&iDone!==-1,'all three actions present');
-    assert.ok(iCopy<iShare&&iShare<iDone,'order: Copy link, Share…, Done');
-    assert.ok(/id="shareSignInCopyBtn"[^>]*class="[^"]*primary/.test(actions)||/class="form-action primary"[^>]*id="shareSignInCopyBtn"/.test(actions),'Copy link is primary');
+    assert.ok(iCopy!==-1&&iShare!==-1,'both actions present');
+    assert.ok(iCopy<iShare,'order: Copy link, Share…');
+    assert.ok(/class="form-action primary"[^>]*id="shareSignInCopyBtn"/.test(actions),'Copy link is primary');
     assert.ok(/id="shareSignInNativeBtn"[^]*?<svg[^>]*viewBox="0 0 24 24"[^]*?<\/svg>/.test(actions),'Share… carries the share glyph');
-    assert.ok(/class="text-link"[^>]*id="shareSignInDone"|id="shareSignInDone"[^>]*class="[^"]*text-link/.test(actions),'Done is a quiet text link, not a pill');
+    assert.ok(actions.includes('form-actions centered'),'actions are centered');
   });
 });
 

@@ -55,3 +55,25 @@ describe('#209 saved-workout editor delete × is danger red',()=>{
     assert.match(m[1],/border[^:;]*:\s*[^;]*var\(--danger\)/,'.builder-x border uses var(--danger)');
   });
 });
+
+describe('user 2026-09-13: workout set-input placeholders stay at the old 10px shrink (mobile)',()=>{
+  it('.log-input::placeholder is 10px on small screens',()=>{
+    const rules=[...css.matchAll(/\.log-input::placeholder\s*\{([^}]*)\}/g)];
+    assert.ok(rules.length>0,'.log-input::placeholder rule(s) present');
+    const sized=rules.filter(r=>/font-size\s*:\s*10px/.test(r[1]));
+    assert.ok(sized.length>0,'a 10px placeholder rule exists (the mobile shrink)');
+  });
+});
+
+describe('user 2026-09-13: home muscle-map hugs the SVG after hydration',()=>{
+  const dashStats=fs.readFileSync(path.join(ROOT,'assets/js/dashboard-stats.js'),'utf8');
+  it('hydrateBodyMaps sets data-hydrated on the host after injecting the SVG',()=>{
+    assert.ok(dashStats.includes("setAttribute('data-hydrated'"),'dashboard-stats.js sets data-hydrated');
+  });
+  it('.anatomy-map[data-hydrated] releases the pre-hydration reserves',()=>{
+    const m=css.match(/\.anatomy-map\[data-hydrated\]\s*\{([^}]*)\}/);
+    assert.ok(m,'.anatomy-map[data-hydrated] rule found in styles.css');
+    assert.match(m[1],/min-height\s*:\s*0/,'min-height reserve released');
+    assert.match(m[1],/aspect-ratio\s*:\s*auto/,'aspect-ratio reserve released (the 760/614 box kept dead space under the 160px-capped compact SVG)');
+  });
+});

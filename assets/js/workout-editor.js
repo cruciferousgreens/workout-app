@@ -11,6 +11,10 @@
     function doRemoveExercise(){
       const draft=workoutState.draft; if(!draft||!pendingRemoveExerciseUid)return;
       draft.exercises=draft.exercises.filter(item=>item.uid!==pendingRemoveExerciseUid);
+      /* #272: clear any supersetId orphaned by the removal — the survivor's
+         band hides (grouping needs 2+), but the stale id would serialize into
+         logs and repeats. */
+      normalizeSupersets();
       prepareDraftProgression(draft, workoutState.activeProgram?.id===draft.programId?workoutState.activeProgram.progression:freeformProgressionConfig());
       renderWorkoutExercises(); renderWorkoutProgression(); markDraftSaved();
       pendingRemoveExerciseUid=null;
@@ -108,11 +112,24 @@
       const v = tracking === 'time' ? top.seconds : top.r;
       return v == null || v === '' ? '' : String(v);
     }
+    /* #266: one PR toast per exercise per session — several sets at a PR load
+       (or an uncheck/re-check) must not re-fire it. Reset when the draft
+       changes. */
+    let prToastedDraft=null;const prToastedExercises=new Set();
     function livePRLabel(item,set) {
-      if(!item||!set||exerciseTracking(item,exercises.find(ex=>ex.id===item.exerciseId))!=='reps'||Number(set.w)<=0)return '';
+      if(!item||!set)return '';
+      const tracking=exerciseTracking(item,exercises.find(ex=>ex.id===item.exerciseId));
+      const ex=exercises.find(row=>row.id===item.exerciseId);
+      /* #282: timed PRs — a longest hold at the set's load fires the same
+         celebration path as a rep PR. */
+      if(tracking==='time'){
+        const prior=getExerciseLogs(item.exerciseId).flatMap(log=>log.sets);
+        if(detectTimedPRs([set],prior))return `${ex?.name||'Exercise'} · new longest hold PR`;
+        return '';
+      }
+      if(tracking!=='reps'||Number(set.w)<=0)return '';
       const prior=getExerciseLogs(item.exerciseId).flatMap(log=>log.sets).filter(row=>Number(row.w)>0);
       if(!prior.length)return '';
-      const ex=exercises.find(row=>row.id===item.exerciseId);
       const kind=detectExercisePRs([set],prior);
       if(kind==='e1rm')return `${ex?.name||'Exercise'} · new estimated 1RM PR`;
       if(kind==='heaviest')return `${ex?.name||'Exercise'} · new heaviest set PR`;
@@ -160,7 +177,9 @@
     /* #99: single canonical recent-workout row — replaces three duplicated
        button markups (dashboard recent, workout-tab recent, history list). */
     function recentWorkoutButton(workout, dataAttr, smallText) {
-      const summary = smallText || (()=>{const s=workoutSummary(workout);return `${formatLogDate(workout.date)} · ${s.sets} sets · ${formatVolume(s.volume)}`;})();
+      /* #301 (user 2026-09-12): singular "1 set", not "1 sets".
+         #302: timed-only lists show total time, not "0 lb". */
+      const summary = smallText || (()=>{const s=workoutSummary(workout);const vol=s.timedOnly?`${s.totalSeconds} sec`:formatVolume(s.volume);return `${formatLogDate(workout.date)} · ${s.sets} set${s.sets===1?'':'s'} · ${vol}`;})();
       return `<button class="recent-workout" type="button" ${dataAttr}="${escapeHtml(workout.id)}"><span><strong>${escapeHtml(workout.name)}${programNameChip(workout)}</strong><small>${escapeHtml(summary)}</small></span><span aria-hidden="true">›</span></button>`;
     }
     /* #18: full workout history with search + month grouping. */
@@ -211,9 +230,9 @@
       let list=workoutsForPeriod(state.logPeriod||'all').slice().sort(sortByRecencyDesc); /* #99 A13: latest by completion */
       if(query) list=list.filter(w=>(w.name||'').toLowerCase().includes(query)||exerciseNamesForSearch(w).some(name=>name.toLowerCase().includes(query)));
       const countNote=$('#historyCountNote');
-      if(countNote)countNote.textContent=list.length===workoutState.completed.length
-        ? `${list.length} completed session${list.length===1?'':'s'}`
-        : `${list.length} of ${workoutState.completed.length} sessions`;
+      /* #311 (user 2026-09-12): just the count for the period — never
+         "# of N". */
+      if(countNote)countNote.textContent=`${list.length} completed session${list.length===1?'':'s'}`;
       if(!list.length){
         host.innerHTML=`<p class="section-note">${query?'No workouts match your search.':'No completed workouts in this period.'}</p>`;
         return;
@@ -386,9 +405,18 @@
       const exCount = (draft.exercises || []).length;
       const totalSets = (draft.exercises || []).reduce((n, x) => n + (x.sets || []).length, 0);
       const doneSets = (draft.exercises || []).reduce((n, x) => n + (x.sets || []).filter(s => s.complete).length, 0);
-      wrap.innerHTML = `<button class="continue-workout-card" id="continueWorkoutCard" type="button" aria-label="Continue ${escapeHtml(draft.name || 'workout')}"><span><span class="continue-kicker">Workout in progress</span><strong>${escapeHtml(draft.name || 'Workout')}</strong>${programLine}<small>${exCount} exercise${exCount === 1 ? '' : 's'} · ${doneSets}/${totalSets} sets done</small></span><span class="continue-arrow" aria-hidden="true">›</span></button>`;
+      wrap.innerHTML = `<button class="continue-workout-card" id="continueWorkoutCard" type="button" aria-label="Continue ${escapeHtml(draft.name || 'workout')}"><span><span class="continue-kicker">Workout in progress</span><strong>${escapeHtml(draft.name || 'Workout')}</strong>${programLine}<small>${exCount} exercise${exCount === 1 ? '' : 's'} · ${doneSets}/${totalSets} set${totalSets === 1 ? '' : 's'} done</small></span><span class="continue-arrow" aria-hidden="true">›</span></button>`;
       $('#continueWorkoutCard').addEventListener('click', () => { state.workoutEditorOpen = true; renderWorkoutScreen(); });
     }
+
+    /* #317 BEGIN swipeGestureShouldLock (pure — unit-tested via eval in tests/swipe-weight-label-317.test.js) */
+    function swipeGestureShouldLock(ax, ay) {
+      ax = Math.abs(ax); ay = Math.abs(ay);
+      if (ax < 7 && ay < 7) return false;                /* dead zone: undecided, keep waiting */
+      if (ay > ax && (ay >= 12 || ax < 7)) return false; /* vertical wins: yield to native scroll */
+      return true;                                      /* horizontal intent: engage the swipe */
+    }
+    /* #317 END swipeGestureShouldLock */
 
     /* Swipe-to-delete helpers (user 2026-09-11): iOS-Mail style — swipe left
        reveals a 72px red rail at the row's trailing end, tap the icon to
@@ -409,11 +437,14 @@
          translateX from a pointermove whose finish() never ran (iOS can
          swallow pointerup or deliver it with a mismatched pointerId). The
          class toggle alone can't repair that — the rail would stay visibly
-         open with no is-open class for the #86 close to find. */
-      if (!open) {
-        const content = item.querySelector(':scope > .swipe-content');
-        if (content) { content.style.transition = ''; content.style.transform = ''; }
-      }
+         open with no is-open class for the #86 close to find.
+         #317 (experts 2026-09-13): clear on BOTH paths. On open, the inline
+         `transition:none` + `translateX(deltaX)` left by the drag would
+         otherwise beat the .is-open rule — the rail would freeze wherever
+         the finger released instead of snapping to -72px with the CSS
+         transition. */
+      const content = item.querySelector(':scope > .swipe-content');
+      if (content) { content.style.transition = ''; content.style.transform = ''; }
     }
     function installSwipeOutsideCloser() {
       if (swipeOutsideCloserInstalled) return;
@@ -464,7 +495,7 @@
              the × was the only visible delete path. The open button IS the row
              body, so swipes may start on it (tap-vs-swipe is still decided at
              release); the × keeps the interactive exemption. */
-          const rowBodyStart = !isSetSwipe && !!event.target.closest('.program-workout-open');
+          const rowBodyStart = !isSetSwipe && !!event.target.closest('.program-workout-open,.saved-workout-open');
           interactiveStart = isSetSwipe
             ? false
             : (!rowBodyStart && !!event.target.closest('input, button, textarea, select, a, summary'));
@@ -475,24 +506,32 @@
              later and fire lostpointercapture, which cancels the drag. */
         });
         content.addEventListener('pointermove', event => {
-          if (!tracking || event.pointerId !== pointerId || interactiveStart) return;
+          if (!tracking || event.pointerId !== pointerId || interactiveStart || startedOnCheckbox) return;
           /* #93 (user 2026-09-11): checked rows never visually slide — the
-             rail can't even flash red during the drag. Gated only on
-             is-complete (stable mid-gesture; toggled on click after the gesture
-             ends), never on where the gesture started, so normal swiping from
-             the checkbox still works. */
+             rail can't even flash red during the drag. (v1.045: also gates on
+             startedOnCheckbox — a gesture that begins on the completion
+             checkbox never visually slides; finish() forces it back to a tap
+             so the checkbox rule from the #93 era is preserved. v1.046 tried
+             letting the row slide from the checkbox like prod — the user
+             reported it still didn't slide, so this is reverted and filed
+             for a later release.) */
           if (isSetSwipe && content.classList.contains('is-complete')) return;
           const dx = event.clientX - startX, dy = event.clientY - startY;
-          if (!horizontal && Math.abs(dx) < 7 && Math.abs(dy) < 7) return;
-          /* Vertical wins: hand the gesture back untouched so page scroll
-             stays native and never fights the row. Not decided until the
-             finger has moved ~12px — real swipes often arc a few px downward
-             in their first samples and must not be killed for it. */
-          if (!horizontal && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) >= 12) { tracking = false; return; }
-          /* Swipe starting in a text field: dismiss the keyboard as the
-             horizontal intent locks, so the row slides instead of fighting
-             the focused input. */
-          if (!horizontal && isSetSwipe && document.activeElement && document.activeElement.blur) document.activeElement.blur();
+          const ax = Math.abs(dx), ay = Math.abs(dy);
+          /* #317: the lock/abort decision lives in swipeGestureShouldLock
+             (pure, unit-tested) — the touchmove claim layer below mirrors it
+             exactly. Inside the 7px dead zone the finger hasn't decided yet:
+             keep tracking and wait. Past the dead zone, a vertical-dominant
+             move kills the gesture so page scroll stays native; anything else
+             locks horizontal. */
+          if (!horizontal && ax < 7 && ay < 7) return;
+          if (!horizontal && !swipeGestureShouldLock(ax, ay)) { tracking = false; return; }
+          /* #317 (both experts 2026-09-13): NO blur here — never mutate focus
+             during an active touch sequence. The v1.041 lock-time blur
+             dismissed the keyboard, iOS resized the viewport mid-gesture, and
+             WebKit answered with pointercancel (the row slid back). The
+             v1.042 pointerdown blur was the same poison, earlier. A
+             translateX works identically with a focused input. */
           horizontal = true;
           event.preventDefault();
           const base = startedOpen ? -72 : 0;
@@ -503,6 +542,40 @@
              added synchronously with transform so no first-frame flash. */
           item.classList.toggle('is-swiping', deltaX < 0);
         });
+        /* #317 (experts 2026-09-13): iOS claim layer. WebKit's native
+           recognizers — scroll AND the caret-drag/text-interaction claim on
+           focused inputs — are default touch behaviors. preventDefault() on
+           the PointerEvent (above) does NOT stop them on iOS; only a
+           touch-level preventDefault() or touch-action does. A focused
+           input's caret-drag recognizer was reclaiming horizontal drags ~10px
+           in, firing pointercancel before the 24px commit — the row visibly
+           slid back. This non-passive touchmove mirrors the lock predicate
+           read-only and claims the gesture the moment OUR swipe would engage.
+           Taps (dead zone) and vertical scrolls are never prevented, so
+           tap-to-type, click, and native scrolling are untouched. touchmove
+           fires before pointermove per sample, so the lock sample itself is
+           claimed with no one-event lag. (v1.045: gestures starting on the
+           completion checkbox are NOT claimed — they stay tap-only, matching
+           finish()'s checkbox rule. v1.046 tried claiming them so the row
+           would slide like prod — the user reported it still didn't slide,
+           so this is reverted and filed for a later release.) */
+        const claimSwipeTouch = event => {
+          if (!tracking || horizontal || interactiveStart || startedOnCheckbox) return;
+          if (isSetSwipe && content.classList.contains('is-complete')) return;
+          if (event.touches.length !== 1) return; /* leave pinch/multi-touch alone */
+          const t = event.changedTouches[0];
+          if (swipeGestureShouldLock(Math.abs(t.clientX - startX), Math.abs(t.clientY - startY))) {
+            event.preventDefault();
+          }
+        };
+        const holdSwipeTouch = event => {
+          /* Once locked, keep preventing so WebKit can't reclaim mid-drag. */
+          if (!tracking || !horizontal) return;
+          if (event.touches.length !== 1) return;
+          event.preventDefault();
+        };
+        content.addEventListener('touchmove', claimSwipeTouch, { passive: false });
+        content.addEventListener('touchmove', holdSwipeTouch, { passive: false });
         const finish = event => {
           if (event.pointerId !== pointerId) return;
           tracking = false;
@@ -522,7 +595,8 @@
              smaller is a tap, so the click goes through untouched. */
           if (horizontal && Math.abs(deltaX - (startedOpen ? -72 : 0)) >= 24) {
             event.preventDefault();
-            setSwipeOpen(item, deltaX < -36);
+            const willOpen = deltaX < -36;
+            setSwipeOpen(item, willOpen);
             item.classList.remove('is-swiping'); /* #107: is-open now owns the red */
             suppressClick = true;
           } else {
@@ -548,6 +622,22 @@
         content.addEventListener('click', () => {
           if (!suppressClick && item.classList.contains('is-open')) setSwipeOpen(item, false);
         });
+        /* #317 F1 (experts 2026-09-13): a swipe whose pointerup lands over the
+           exposed rail fires click on the delete button — the capture-phase
+           suppressor above sits on content (a sibling) and never sees it, so
+           the set would delete instantly with no confirmation. The
+           discriminator: a genuine tap always has a pointerdown on the
+           button first; the swipe's own click doesn't. So the button's
+           pointerdown clears suppressClick (a new gesture is starting here),
+           and its capture click swallows only a click with no preceding
+           pointerdown — the swipe-ending one. */
+        const delBtn = item.querySelector(':scope > .swipe-delete-action');
+        if (delBtn) {
+          delBtn.addEventListener('pointerdown', () => { suppressClick = false; });
+          delBtn.addEventListener('click', event => {
+            if (suppressClick) { event.preventDefault(); event.stopImmediatePropagation(); suppressClick = false; }
+          }, true);
+        }
       });
     }
 
@@ -600,7 +690,11 @@
                 <button class="swipe-delete-action delete-set-swipe" type="button" data-exercise-uid="${escapeHtml(item.uid)}" data-set-uid="${escapeHtml(set.uid)}" aria-label="Delete set ${index + 1}" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/></svg></button>
               <div class="log-set swipe-content ${set.complete ? 'is-complete' : ''}" data-set-uid="${escapeHtml(set.uid)}">
                 <button class="log-set-number ${set.tags.length ? 'has-tags' : ''}" type="button" data-tag-exercise-uid="${escapeHtml(item.uid)}" data-tag-set-uid="${escapeHtml(set.uid)}"${setIsFrozen(set)?' data-uncomplete="1"':''} aria-label="${setIsFrozen(set)?`Mark set ${index + 1} incomplete`:`Choose tags for set ${index + 1}`}" aria-haspopup="dialog">${index + 1}</button>
-                <label class="weight-entry"><input class="log-input weight-input" data-field="w"${setIsFrozen(set)?' readonly aria-disabled="true"':''} data-placeholder-weight="${escapeHtml(weightHint)}" type="number" min="0" step="${isMetric()?'0.1':'0.5'}" inputmode="decimal" value="${escapeHtml(displayWeight(set.w))}" placeholder="${weightHint?escapeHtml(displayWeight(weightHint)):(isBodyweight?'Optional':'Weight')}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : isDumbbell ? 'total dumbbell weight' : 'weight'} in ${isMetric()?'kilograms':'pounds'}${weightHint ? (target.w ? `; suggested ${escapeHtml(displayWeight(weightHint))}` : `; last used ${escapeHtml(displayWeight(weightHint))}`) : ''}" />${isDumbbell?`<span class="db-total-readout" data-db-readout${dbTotalReadout(set.w)?'':' hidden'}>${escapeHtml(dbTotalReadout(set.w))}</span>`:""}</label>
+                <!-- #317: this wrapper was a <label> until v1.040 (the
+                     label-activation theory didn't pan out — the span stays
+                     because it's harmless and the input's aria-label already
+                     names it). -->
+                <span class="weight-entry"><input class="log-input weight-input" data-field="w"${setIsFrozen(set)?' readonly aria-disabled="true"':''} data-placeholder-weight="${escapeHtml(weightHint)}" type="number" min="0" step="${isMetric()?'0.1':'0.5'}" inputmode="decimal" value="${escapeHtml(displayWeight(set.w))}" placeholder="${weightHint?escapeHtml(displayWeight(weightHint)):((isBodyweight||tracking==='time')?'Optional':'Weight')}" aria-label="Set ${index + 1} ${isBodyweight ? 'optional added weight' : isDumbbell ? 'total dumbbell weight' : 'weight'} in ${isMetric()?'kilograms':'pounds'}${weightHint ? (target.w ? `; suggested ${escapeHtml(displayWeight(weightHint))}` : `; last used ${escapeHtml(displayWeight(weightHint))}`) : ''}" />${isDumbbell?`<span class="db-total-readout" data-db-readout${dbTotalReadout(set.w)?'':' hidden'}>${escapeHtml(dbTotalReadout(set.w))}</span>`:""}</span>
                 <input class="log-input reps-input" data-field="${tracking === 'time' ? 'seconds' : 'r'}"${setIsFrozen(set)?' readonly aria-disabled="true"':''} data-placeholder-perf="${escapeHtml(perfFallback)}" type="number" min="1" step="1" inputmode="numeric" value="${escapeHtml(tracking === 'time' ? (set.seconds ?? '') : (set.r ?? ''))}" placeholder="${tracking === 'time' ? (perfHint || 'Seconds') : (perfHint || 'Reps')}" aria-label="Set ${index + 1} ${tracking === 'time' ? 'seconds' : 'reps'}${perfHint ? `; target ${escapeHtml(perfHint)}` : ''}" />
                 <input class="log-input rpe-input" data-field="rpe"${setIsFrozen(set)?' readonly aria-disabled="true"':''} type="number" min="1" max="10" step="0.5" inputmode="decimal" value="${escapeHtml(set.rpe)}" placeholder="${set.targetRpe!==''&&set.targetRpe!=null?('Target '+escapeHtml(String(set.targetRpe))):'RPE'}" aria-label="Set ${index + 1} optional RPE${set.targetRpe!==''&&set.targetRpe!=null?`; target RPE ${escapeHtml(String(set.targetRpe))}`:''}" />
                 <div class="set-actions">
@@ -712,6 +806,10 @@
         });
         const copyBtn=card.querySelector('[data-copy-first-set]');
         if(copyBtn)copyBtn.disabled=item.sets.length<2;
+        /* (b) user 2026-09-13: if the DOM and the data disagree after the
+           surgical removal, the in-place numbers above would lie — fall back
+           to a full render, which rebuilds the numbers from the data. */
+        if(card.querySelectorAll('[data-set-swipe]').length!==item.sets.length){fullRender();return;}
       }
       markDraftSaved();
     }
@@ -763,8 +861,20 @@
         requestAnimationFrame(()=>{const feedback=document.querySelector(`[data-copy-feedback="${CSS.escape(item.uid)}"]`);if(feedback)feedback.textContent='Applied';});
       }));
     }
+    /* #270: the inline × sits in the same action column as the checkbox — a
+       mis-tap trap. It gets the standard confirmation dialog; the deliberate
+       swipe-rail delete stays instant. */
+    let pendingDeleteSet=null;
+    function requestDeleteSet(exerciseUid,setUid){
+      pendingDeleteSet={exerciseUid,setUid};
+      $('#removeSetDialog')?.showModal();
+    }
+    $('#cancelRemoveSet')?.addEventListener('click',()=>$('#removeSetDialog').close());
+    $('#keepSet')?.addEventListener('click',()=>$('#removeSetDialog').close());
+    $('#confirmRemoveSet')?.addEventListener('click',()=>{ $('#removeSetDialog').close(); if(pendingDeleteSet)deleteWorkoutSet(pendingDeleteSet.exerciseUid,pendingDeleteSet.setUid); pendingDeleteSet=null; });
     function wireLiveDeleteSet(scope=document){
-      scope.querySelectorAll('.delete-set,.delete-set-swipe').forEach(button => button.addEventListener('click', () => deleteWorkoutSet(button.dataset.exerciseUid,button.dataset.setUid)));
+      scope.querySelectorAll('.delete-set-swipe').forEach(button => button.addEventListener('click', () => deleteWorkoutSet(button.dataset.exerciseUid,button.dataset.setUid)));
+      scope.querySelectorAll('.delete-set-inline').forEach(button => button.addEventListener('click', () => requestDeleteSet(button.dataset.exerciseUid,button.dataset.setUid)));
     }
     function wireLiveSetInputs(scope=document){
       scope.querySelectorAll('.log-input').forEach(input => input.addEventListener('input', () => { const row=input.closest('.log-set'); const exerciseUid = input.closest('.workout-exercise').dataset.workoutExercise; const setUid = row.dataset.setUid; const set = findDraftExercise(exerciseUid)?.sets.find(itemSet => itemSet.uid === setUid); if (set) { set[input.dataset.field] = input.dataset.field==='w' ? storageWeight(input.value) : input.value; } /* #146: keep the dumbbell-total readout live as the user types. The field holds display units — convert back to canonical lb so the readout formats through the same displayWeight path. */ if(input.dataset.field==='w'){const readout=row.querySelector('[data-db-readout]');if(readout){const txt=dbTotalReadout(storageWeight(input.value));readout.hidden=!txt;readout.textContent=txt;}} /* #161: editing a value no longer silently un-completes the set — the old flip shrank completed-set counts on every keystroke. The checkbox stays the one explicit complete/incomplete control. */ $('#workoutError').textContent = ''; markDraftSaved(); }));
@@ -813,7 +923,7 @@
         const set = findDraftSet(button.dataset.exerciseUid, button.dataset.setUid);
         const item=findDraftExercise(button.dataset.exerciseUid);
         const ex=exercises.find(row=>row.id===item?.exerciseId);
-        const tracking=exerciseTracking(item,ex), weightOptional=ex?.equipment==='body only';
+        const tracking=exerciseTracking(item,ex), weightOptional=ex?.equipment==='body only'||tracking==='time'; /* #279: weight is optional for timed tracking regardless of equipment (machine cardio) */
         if (!set) return;
         const setRow=button.closest('.log-set');
         const weightInput=setRow.querySelector('.weight-input');
@@ -838,7 +948,9 @@
           showToast(weightOptional ? `Enter ${perfWord} to complete the set.` : `Enter weight and ${perfWord} to complete this set. RPE is optional.`);
           setRow.querySelector((!weightOptional&&set.w==='')?'.weight-input':'.reps-input')?.focus(); return;
         }
-        const pr=!set.complete?livePRLabel(item,set):'';
+        if(prToastedDraft!==workoutState.draft){prToastedDraft=workoutState.draft;prToastedExercises.clear();}
+        const pr=!set.complete&&!prToastedExercises.has(item.exerciseId)?livePRLabel(item,set):'';
+        if(pr)prToastedExercises.add(item.exerciseId);
         set.complete = !set.complete; /* #161/#242: freeze the set's other inputs once it is complete (they stay readonly while complete). The checkbox itself stays tappable so the set can be unchecked; the set-number button is a secondary deliberate unlock ("Mark set N incomplete") via syncFrozenSetRow. */ {const numBtn=setRow.querySelector('.log-set-number');syncFrozenSetRow(setRow,set,numBtn?numBtn.textContent.trim():'?');} $('#workoutError').textContent = ''; if(pr)showToast(`PR · ${pr}`,'pr-toast'); markDraftSaved();
       }));
     }

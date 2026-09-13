@@ -144,17 +144,31 @@
       }
       async function signOutAccount(){
         const sb=await Sync.getSupabase();
-        try{if(sb)await sb.auth.signOut();}catch(_){}
+        /* #305 (user 2026-09-13): the local session must die even when the
+           network is down. The default global signOut() calls /auth/v1/logout
+           first — a failed call left the sb-*-auth-token session key in place,
+           and after the reload the live session silently re-adopted the whole
+           cloud copy, so the wipe appeared to do nothing. scope:'local'
+           clears the session from storage with no network call at all; the
+           server-side revocation is irrelevant to wiping this device. */
+        try{if(sb)await sb.auth.signOut({scope:'local'});}catch(_){}
         setAuthIdentity(null,'');
         Sync.lastAuthProfile={display_name:'',account_type:'free'};
         /* The next sign-in for any account re-runs the adopt-vs-upload
            transition (the adopted marker must not survive sign-out). */
         clearAdoptedUid();
-        Sync.setAccountStatus('Signed out. Your data stays on this device.');
+        /* User 2026-09-12 (major bug): signing out actually signs out — the
+           device is wiped clean of workout data instead of keeping it. The
+           cloud copy re-adopts on the next sign-in, so nothing is lost. */
+        if(typeof wipeLocalUserData==='function')wipeLocalUserData({removeSyncKeys:true});
+        if(Sync.resetSyncMeta)Sync.resetSyncMeta();
+        Sync.setAccountStatus('Signed out.');
         Sync.renderAccount();
         /* A share preview paints before auth resolves — let it re-render so
            the primary action matches the account state (user 2026-09-12). */
         if(typeof noteShareAuthChanged==='function'){try{noteShareAuthChanged();}catch(_){}}
+        /* Reload into the clean, signed-out state (mirrors delete-account). */
+        setTimeout(()=>location.reload(),1200);
       }
       async function syncNowManual(){
         Sync.setAccountStatus('Syncing\u2026');

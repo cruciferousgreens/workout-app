@@ -104,3 +104,29 @@ describe('signed-in sharing keeps the existing behavior',()=>{
     assert.ok(gate<build,'sign-in check runs before any link is built');
   });
 });
+
+describe('#326 share dialog header copy follows the sign-in state',()=>{
+  const {openShareSignInPrompt,shareSignInMintShare}=role;
+  it('opening the prompt shows the signed-out copy',()=>{
+    openShareSignInPrompt(PAYLOAD);
+    assert.strictEqual(els['#shareSignInTitle'].textContent,'Sign in to share');
+    assert.strictEqual(els['#shareSignInDesc'].textContent,'Sharing needs an account. It’s free to sign up.');
+  });
+  it('minting after sign-in switches to the share copy',async()=>{
+    globalThis.lastAuthUid='user-123';
+    openShareSignInPrompt(PAYLOAD);
+    await shareSignInMintShare();
+    assert.strictEqual(els['#shareSignInTitle'].textContent,'Share link');
+    assert.strictEqual(els['#shareSignInDesc'].textContent,'Send this shared workout with the link below.');
+    assert.strictEqual(els['#shareSignInStep3'].hidden,false,'step 3 visible');
+  });
+  it('reopening the prompt resets to the signed-out copy',async()=>{
+    globalThis.lastAuthUid='user-123';
+    openShareSignInPrompt(PAYLOAD);
+    await shareSignInMintShare();
+    globalThis.lastAuthUid=null;
+    openShareSignInPrompt(PAYLOAD);
+    assert.strictEqual(els['#shareSignInTitle'].textContent,'Sign in to share');
+    assert.strictEqual(els['#shareSignInDesc'].textContent,'Sharing needs an account. It’s free to sign up.');
+  });
+});

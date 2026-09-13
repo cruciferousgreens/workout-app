@@ -249,7 +249,11 @@
     function suggestionCardMarkup(suggestion,index,interactive=true) {
       const ex=exercises.find(x=>x.id===suggestion.exerciseId);
       const formatTarget=(weight,performance)=>`${weight ? `${displayWeight(weight)} ${weightUnit()} · ` : ''}${performance} ${suggestion.mode==='time'?'sec':'reps'}`;
-      const oldTarget=suggestion.latest?formatTarget(suggestion.latest.weight,suggestion.mode==='time'?suggestion.latest.seconds:suggestion.latest.reps):`1RM ${displayWeight(suggestion.estimated1RM)} ${weightUnit()}`;
+      /* #285: flipping a reps-history exercise to time tracking leaves
+         latest.seconds at 0 — "0 sec" as the old target is nonsense. Suppress
+         the seconds when there is no timed history. */
+      const oldPerf=suggestion.mode==='time'?(suggestion.latest.seconds>0?suggestion.latest.seconds:null):suggestion.latest.reps;
+      const oldTarget=suggestion.latest?(oldPerf==null?(suggestion.latest.weight?`${displayWeight(suggestion.latest.weight)} ${weightUnit()}`:'—'):formatTarget(suggestion.latest.weight,oldPerf)):`1RM ${displayWeight(suggestion.estimated1RM)} ${weightUnit()}`;
       const nextTarget=suggestion.amrap&&suggestion.mode!=='time'?`${suggestion.nextWeight?`${displayWeight(suggestion.nextWeight)} ${weightUnit()} · `:''}AMRAP`:formatTarget(suggestion.nextWeight,suggestion.mode==='time'?suggestion.nextSeconds:suggestion.nextReps);
       const label=suggestion.applied?'Applied ✓':suggestion.kind==='hold'?'Hold':suggestion.kind==='load'?'Load +':suggestion.kind==='onerm'?'%1RM':suggestion.kind==='deload'?'Deload':suggestion.kind==='range'?(suggestion.freeform?'New range':'Week range'):suggestion.kind==='time'?'Time +':'Rep +';
       // user 2026-09-11 (#44): cards stay lean — name, kind, and the target

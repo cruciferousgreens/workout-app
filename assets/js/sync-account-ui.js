@@ -131,7 +131,40 @@
         setAccountStatus(msg,true);
       }
       /* ===== wiring ===== */
+      /* #286 (user 2026-09-12): post-workout signed-out nudge. Finishing a
+         workout while signed out pops a dialog explaining sync/backup, with
+         Sign in / Dismiss and a persisted "Don't show again". The flag is a
+         local-only localStorage key — the user is signed out, so there is
+         nothing to sync it to. */
+      const SIGNIN_NUDGE_DISMISSED_KEY='workout-signin-nudge-dismissed';
+      function signinNudgeDismissed(){try{return localStorage.getItem(SIGNIN_NUDGE_DISMISSED_KEY)==='1';}catch(_){return false;}}
+      function setSigninNudgeDismissed(){try{localStorage.setItem(SIGNIN_NUDGE_DISMISSED_KEY,'1');}catch(_){}}
+      function maybeShowSigninNudge(){
+        try{if(Sync&&Sync.lastAuthUid)return;}catch(_){} /* signed in: nothing to nudge */
+        if(signinNudgeDismissed())return;
+        const d=$('#signinNudgeDialog');if(!d)return;
+        const cb=$('#signinNudgeDontShow');if(cb)cb.checked=false;
+        try{d.showModal();}catch(_){}
+      }
+      function wireSigninNudge(){
+        const closeNudge=()=>{
+          if($('#signinNudgeDontShow')?.checked)setSigninNudgeDismissed();
+          $('#signinNudgeDialog')?.close();
+        };
+        $('#closeSigninNudge')?.addEventListener('click',closeNudge);
+        $('#signinNudgeDismiss')?.addEventListener('click',closeNudge);
+        $('#signinNudgeSignIn')?.addEventListener('click',()=>{
+          if($('#signinNudgeDontShow')?.checked)setSigninNudgeDismissed();
+          $('#signinNudgeDialog')?.close();
+          /* Take the user to the Settings account section to sign in. */
+          try{if(typeof showSettings==='function')showSettings();}catch(_){}
+          const card=$('#accountSignedOut');
+          if(card){try{card.scrollIntoView({block:'start'});}catch(_){}try{$('#accountEmail')?.focus({preventScroll:true});}catch(_){}}
+        });
+      }
+      Sync.maybeShowSigninNudge=maybeShowSigninNudge;
       function wireAccountUI(){
+        wireSigninNudge(); /* #286 */
         const send=$('#sendMagicLinkButton');
         if(send)send.addEventListener('click',()=>{Sync.sendSignInLink().catch(()=>{});});
         const verify=$('#verifyOtpButton');

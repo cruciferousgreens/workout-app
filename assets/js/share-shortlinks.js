@@ -139,6 +139,22 @@
         history.replaceState(null,'',base+location.search);
       }catch(_){}
     }
+    function restoreShortSharePath(slug){
+      /* #303 (user 2026-09-12): a cold-opened /s/<slug> arrives via the
+         404.html handoff, which normalizes the address bar to the app root.
+         Put the deep link back (replaceState — no navigation, no extra
+         history entry) so the URL stays shareable while the preview is open.
+         No-op when the path already carries the slug (direct serve). The
+         #265 Back-to-Home flow is untouched: Back pops to the root entry,
+         backOutOfSharePreview clears the preview, and clearShortSharePath
+         (on dismiss) still strips the slug. */
+      try{
+        if(typeof location==='undefined'||!location||!slug)return;
+        if(shortLinkAttemptFromPath(location.pathname)===slug)return;
+        const base=spaBaseForPath(location.pathname);
+        history.replaceState(history.state||null,'',base+'s/'+slug+location.search);
+      }catch(_){}
+    }
 
     /* ---- 404.html SPA-fallback handoff ---- */
     function spaBaseForPath(pathname){

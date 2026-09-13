@@ -218,6 +218,18 @@
             const num=raw===''?null:Math.max(1,parseInt(raw,10)||1);
             if(field==='min'){profile.min=num??1;}
             else{profile.max=num;profile.amrap=num==null;if(profile.amrap)profile.openTop=false;}
+          }else if(field==='timeMin'||field==='timeMax'){
+            /* #283: never allow an inverted range — the engine would clamp it
+               and the suggestion copy reads "inside the 60–30s range". The
+               field being edited wins; the other adjusts to keep at least 1s
+               of range. */
+            const val=Math.max(1,Number(control.value)||1);
+            profile[field]=val;
+            if((profile.timeMin??30)>=(profile.timeMax??60)){
+              if(field==='timeMin')profile.timeMax=profile.timeMin+1;
+              else profile.timeMin=Math.max(1,profile.timeMax-1);
+            }
+            control.value=profile[field];
           }else{
             profile[field]=Number(control.value);
           }
@@ -318,7 +330,15 @@
         button.setAttribute('aria-pressed',String(nowChosen));
         const stateEl=button.querySelector('.picker-state');if(stateEl)stateEl.textContent=nowChosen?'✓':'+';
         updatePickerHint();
+        /* #314 (user 2026-09-13): scroll anchoring — renderPickerRules() inserts
+           or removes the rules block ABOVE the list, so restoring the raw
+           scrollTop lets the tapped row visibly jump. Pin the tapped row's
+           viewport position instead: measure before, re-render, then shift the
+           dialog scroll by the row's displacement. */
+        const dialog=$('#exercisePickerDialog');
+        const anchorTop=dialog?button.getBoundingClientRect().top:0;
         renderPickerRules();
+        if(dialog){dialog.scrollTop+=button.getBoundingClientRect().top-anchorTop;}
       }));
     }
     function renderExercisePicker(){renderPickerRules();renderPickerList();}
@@ -329,10 +349,11 @@
       const hint=$('#exercisePickerHint');
       /* #142: swap mode is single-choice — the hint names the action instead
          of implying multi-select. */
-      if(workoutState.pickerSwapUid){if(hint)hint.textContent='Tap an exercise to swap it in';return;}
-      const templateMode=workoutState.pickerMode==='template',editTemplate=pickerTemplate();
-      const n=(templateMode?editTemplate?.exercises:workoutState.draft.exercises)?.length||0;
-      if(hint)hint.innerHTML=`Tap to add \u00b7 <strong>${n}</strong> selected`;
+      if(workoutState.pickerSwapUid){if(hint){hint.hidden=false;hint.textContent='Tap an exercise to swap it in';}return;}
+      /* #314 (user 2026-09-13): the "Tap to add · N selected" line is gone —
+         the picker no longer needs the running count. Hide the element so no
+         empty paragraph keeps its layout space. */
+      if(hint){hint.hidden=true;hint.textContent='';}
     }
 
     

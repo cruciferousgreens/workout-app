@@ -63,6 +63,17 @@
     $('#closeAddSavedToProgram')?.addEventListener('click',()=>$('#addSavedToProgramDialog').close());
     function cloneProgression(src){const base=src||{};return {...base,defaultRange:{...(base.defaultRange||{})},weeklyRanges:[...(base.weeklyRanges||[])],weeklyPcts:[...(base.weeklyPcts||[])],weeklyDeloads:[...(base.weeklyDeloads||[])] };}
     function programFormProgression(){if(!programDraftProgression)programDraftProgression=cloneProgression(progressionSetup);return programDraftProgression;}
+    /* #295 (user 2026-09-12): the "% of 1RM" row and its help text show ONLY
+       for the %1RM scheme — hidden for RPE-based and Linear. Factored out so
+       the per-scheme visibility is unit-testable. The markup also defaults
+       the row to hidden (matching the default RPE scheme), so the first
+       paint is correct even on a path that never re-syncs the form. */
+    function syncPctRowForScheme(scheme){
+      const pctRow=$('#progressionPctRow'); if(!pctRow)return;
+      pctRow.hidden=scheme!=='onerm';
+      const help=pctRow.nextElementSibling;
+      if(help&&help.classList.contains('field-help'))help.hidden=pctRow.hidden;
+    }
     function syncProgramForm(){
       const p=programFormProgression(), range=p.defaultRange||{};
       /* #99 H6: null-guard every direct DOM write. */
@@ -75,8 +86,13 @@
       const incType=$('#progressionIncrementType'); if(incType)incType.value=p.incrementType||'lb';
       // %1RM prescribes load as a percentage of 1RM, so fixed increments don't apply.
       const incPair=incType&&incType.closest('.settings-pair'); if(incPair)incPair.hidden=scheme==='onerm';
-      const pctField=$('#progressionPercent1RMField'); if(pctField)pctField.hidden=scheme!=='onerm';
-      const pctInput=$('#progressionPercent1RM'); if(pctInput)pctInput.value=clampPct1RM(Number(p.percentOf1RM)||75);
+      syncPctRowForScheme(scheme);
+      const pctInput=$('#progressionPercentOf1RM'); if(pctInput)pctInput.value=clampPct1RM(Number(p.percentOf1RM)||75);
+      /* #321: Auto Deload toggle + its panel live at the bottom of the
+         progression section; the N-weeks/intensity fields only show when on. */
+      const adToggle=$('#autoDeloadToggle');
+      if(adToggle){const on=!!p.autoDeload;adToggle.setAttribute('aria-pressed',String(on));adToggle.setAttribute('aria-label',`Auto Deload ${on?'on':'off'}`);}
+      const adPanel=$('#autoDeloadPanel'); if(adPanel)adPanel.hidden=!p.autoDeload;
       const deloadEvery=$('#deloadEvery'); if(deloadEvery)deloadEvery.value=String(Math.max(0,Math.min(12,Number(p.deloadEvery)||0)));
       const deloadPct=$('#deloadPct'); if(deloadPct)deloadPct.value=clampDeloadPct(Number(p.deloadPct)||60);
       const waveToggle=$('#pctWaveToggle');
@@ -167,14 +183,16 @@
       const v=Number(arr[(w-1)%arr.length]);
       return Number.isFinite(v)&&v>0?v:null;
     }
-    /* A week is a deload week only when the user scheduled it: every-N-weeks,
-       or flagged in the % wave panel. Deloads are never inferred — the
+    /* A week is a deload week only when the user scheduled it: every-N-weeks
+       (gated by the #321 Auto Deload toggle — only an explicit false
+       disables it, so pre-toggle blobs keep their legacy behavior), or
+       flagged in the % wave panel. Deloads are never inferred — the
        "engine never auto-deloads" rule stands. */
     function isDeloadWeek(programOrConfig,week){
       const progression=programOrConfig?.progression||programOrConfig||progressionSetup;
       const w=Math.max(1,Number(week)||0);
       if(!(w>0))return false;
-      const every=Number(progression.deloadEvery)||0;
+      const every=progression.autoDeload===false?0:(Number(progression.deloadEvery)||0);
       if(every>0&&w%every===0)return true;
       const flags=progression.weeklyDeloads;
       return Array.isArray(flags)&&flags.length>0&&!!flags[(w-1)%flags.length];
@@ -282,7 +300,7 @@
       $('#programSetup').hidden = !!program && !editing;
       $('#programCover').hidden = !program || editing;
       renderArchivedPrograms();
-      if (!program) { state.programWorkoutUid=null; if(!programDraftProgression)seedProgramForm(null); updateTopBar('program'); return; }
+      if (!program) { state.programWorkoutUid=null; if(!programDraftProgression)seedProgramForm(null); else syncProgramForm(); updateTopBar('program'); return; }
       /* Program-workout page (user 2026-09-12): a workout's own view/edit/start
          page, mirroring the saved-workout editor page. */
       if(state.programWorkoutUid){
@@ -292,7 +310,7 @@
       }
       const week=programWeek(program), completedThisWeek=workoutState.completed.filter(w=>w.programId===program.id&&programWeekAtDate(program,w.date)===week).length;
       const muscleRows=programMuscles(program),muscleMax=Math.max(1,...muscleRows.map(([,count])=>count));
-      $('#programCover').innerHTML = `<div class="program-cover-head"><div class="program-cover-kicker">ACTIVE PROGRAM · WEEK ${week} OF ${program.length}</div><h2>${escapeHtml(program.name)}</h2>${program.schedule?`<p class="program-cover-meta">${escapeHtml(program.schedule)} · ${program.workouts.length} session${program.workouts.length===1?'':'s'} per week</p>`:''}</div><div class="program-body">${program.notice?`<p class="program-notice">${escapeHtml(program.notice)}</p>`:''}<div class="program-progress"><span>${program.workouts.length} workout${program.workouts.length === 1 ? '' : 's'} in rotation</span><span>${completedThisWeek} completed this week</span></div><div class="week-progress" style="--program-weeks:${program.length}" aria-label="Week ${week} of ${program.length}">${Array.from({length:program.length},(_,i)=>`<span class="week-segment ${i+1<week?'past':i+1===week?'current':''}${isDeloadWeek(program,i+1)?' deload':''}"></span>`).join('')}</div><div class="program-cover-actions"><button class="secondary-button" id="editProgram" type="button">Edit program</button></div><section class="program-muscles"><h3>Muscles in this program</h3>${muscleRows.length?`<div class="program-muscle-bars">${muscleRows.slice(0,8).map(([muscle,count])=>`<div class="program-muscle-bar"><span>${escapeHtml(titleCase(muscle))}</span><i style="--fill:${Math.max(8,count/muscleMax*100)}%"></i></div>`).join('')}</div>`:'<p class="section-note">Add exercises to a program workout to see its muscle coverage.</p>'}</section><div class="program-progression-summary"><h3>Progression engine</h3><div class="program-progression-meta">${program.progression?.scheme==='linear'?'<span class="tag primary">Linear progression</span>':program.progression?.scheme==='onerm'?'<span class="tag primary">%1RM-based</span>':`<span class="tag primary">Top set ≤ RPE ${program.progression?.threshold??8}</span>`}${program.progression?.scheme==='onerm'?'':`<span class="tag">${program.progression?.incrementType==='percent'?(program.progression.incrementValue+'%'):(program.progression?.incrementValue??5)+' '+weightUnit()} ${program.progression?.scheme==='linear'?'every session':'default jump'}</span>`}${Number(program.progression?.deloadEvery)>0?`<span class="tag">Deloads every ${program.progression.deloadEvery} wks</span>`:''}<span class="tag">Auto-applied on start</span><span class="tag">${escapeHtml(titleCase(program.progression?.defaultRange?.preset||'hypertrophy'))} · ${programRangeLabel(program.progression?.defaultRange)}</span>${program.progression?.undulating?'<span class="tag primary">Varies by week</span>':''}${program.progression?.pctWave&&program.progression?.weeklyPcts?.length?'<span class="tag primary">% varies by week</span>':''}</div></div><div class="workout-toolbar"><h2>Workouts</h2><button class="exercise-info-button plain-glyph" id="addProgramWorkoutBtn" type="button" aria-label="Add workout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div><div class="program-workouts" id="programWorkouts">${program.workouts.length ? program.workouts.map((workout) => {const exerciseCount=workout.template?.exercises?.length||0;
+      $('#programCover').innerHTML = `<div class="program-cover-head"><div class="program-cover-kicker">ACTIVE PROGRAM · WEEK ${week} OF ${program.length}</div><h2>${escapeHtml(program.name)}</h2>${program.schedule?`<p class="program-cover-meta">${escapeHtml(program.schedule)} · ${program.workouts.length} session${program.workouts.length===1?'':'s'} per week</p>`:''}</div><div class="program-body">${program.notice?`<p class="program-notice">${escapeHtml(program.notice)}</p>`:''}<div class="program-progress"><span>${program.workouts.length} workout${program.workouts.length === 1 ? '' : 's'} in rotation</span><span>${completedThisWeek} completed this week</span></div><div class="week-progress" style="--program-weeks:${program.length}" aria-label="Week ${week} of ${program.length}">${Array.from({length:program.length},(_,i)=>`<span class="week-segment ${i+1<week?'past':i+1===week?'current':''}${isDeloadWeek(program,i+1)?' deload':''}"></span>`).join('')}</div><div class="program-cover-actions"><button class="secondary-button" id="editProgram" type="button">Edit program</button></div><section class="program-muscles"><h3>Muscles in this program</h3>${muscleRows.length?`<div class="program-muscle-bars">${muscleRows.slice(0,8).map(([muscle,count])=>`<div class="program-muscle-bar"><span>${escapeHtml(titleCase(muscle))}</span><i style="--fill:${Math.max(8,count/muscleMax*100)}%"></i></div>`).join('')}</div>`:'<p class="section-note">Add exercises to a program workout to see its muscle coverage.</p>'}</section><div class="program-progression-summary"><h3>Progression engine</h3><div class="program-progression-meta">${program.progression?.scheme==='linear'?'<span class="tag primary">Linear progression</span>':program.progression?.scheme==='onerm'?'<span class="tag primary">%1RM-based</span>':`<span class="tag primary">Top set ≤ RPE ${program.progression?.threshold??8}</span>`}${program.progression?.scheme==='onerm'?'':`<span class="tag">${program.progression?.incrementType==='percent'?(program.progression.incrementValue+'%'):(program.progression?.incrementValue??5)+' '+weightUnit()} ${program.progression?.scheme==='linear'?'every session':'default jump'}</span>`}${program.progression?.autoDeload!==false&&Number(program.progression?.deloadEvery)>0?`<span class="tag">Deloads every ${program.progression.deloadEvery} wks</span>`:''}<span class="tag">Auto-applied on start</span><span class="tag">${escapeHtml(titleCase(program.progression?.defaultRange?.preset||'hypertrophy'))} · ${programRangeLabel(program.progression?.defaultRange)}</span>${program.progression?.undulating?'<span class="tag primary">Varies by week</span>':''}${program.progression?.pctWave&&program.progression?.weeklyPcts?.length?'<span class="tag primary">% varies by week</span>':''}</div></div><div class="workout-toolbar"><h2>Workouts</h2><button class="exercise-info-button plain-glyph" id="addProgramWorkoutBtn" type="button" aria-label="Add workout"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div><div class="program-workouts" id="programWorkouts">${program.workouts.length ? program.workouts.map((workout) => {const exerciseCount=workout.template?.exercises?.length||0;
         /* #159: exactly one remove affordance per row — the swipe rail when swipe-to-delete is on, the visible x-button when it is off. */
         const swipeOn=typeof swipeDeleteSetsEnabled==='function'?swipeDeleteSetsEnabled():true;
         return `<div class="swipe-item program-swipe">${swipeOn?`<button class="swipe-delete-action delete-program-workout" type="button" data-uid="${escapeHtml(workout.uid)}" aria-label="Remove ${escapeHtml(workout.name)}" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/></svg></button>`:''}<div class="picker-item saved-workout-card swipe-content program-workout-row"><button class="program-workout-open" type="button" data-program-workout="${escapeHtml(workout.uid)}" aria-label="Open ${escapeHtml(workout.name)}"><span><strong>${escapeHtml(workout.name)}</strong><span>${exerciseCount?`${exerciseCount} exercise${exerciseCount===1?'':'s'}`:'Empty shell · tap to add exercises'}</span></span><span class="picker-state" aria-hidden="true">›</span></button>${swipeOn?'':`<button class="program-workout-del" type="button" data-del-program-workout="${escapeHtml(workout.uid)}" aria-label="Delete ${escapeHtml(workout.name)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`}</div></div>`;}).join('') : '<div class="history-empty">No workouts yet. Tap + to add the first one.</div>'}</div><button class="new-template-button" id="addSavedToProgramBtn" type="button">+ Add saved workout</button><div class="program-actions"><button class="secondary-button" id="endProgram" type="button">Archive program</button></div><p class="session-note">Weeks advance with calendar time; workout order is flexible.</p></div>`;

@@ -14,6 +14,7 @@ const {
   clampPct1RM, clampDeloadPct,
   programPctForWeek, isDeloadWeek,
   progressionForExercise, workoutState, progressionSetup,
+  normalizeProgression,
 }=loadRole('progression-logic');
 
 const CFG=()=>({threshold:8,incrementType:'lb',incrementValue:5,timeStep:5});
@@ -287,6 +288,31 @@ describe('programPctForWeek / isDeloadWeek',()=>{
     assert.equal(isDeloadWeek({weeklyDeloads:[false,true]},2),true);
     assert.equal(isDeloadWeek({},2),false);
     assert.equal(isDeloadWeek({deloadEvery:4},0),false);
+  });
+  it('isDeloadWeek: the Auto Deload toggle gates every-N (#321)',()=>{
+    assert.equal(isDeloadWeek({deloadEvery:4,autoDeload:true},4),true);
+    assert.equal(isDeloadWeek({deloadEvery:4,autoDeload:false},4),false);
+    assert.equal(isDeloadWeek({deloadEvery:4},4),true); // pre-toggle blob: legacy on
+    assert.equal(isDeloadWeek({deloadEvery:0,autoDeload:true},4),false);
+  });
+  it('isDeloadWeek: per-week flags still fire when the toggle is off',()=>{
+    assert.equal(isDeloadWeek({deloadEvery:4,autoDeload:false,weeklyDeloads:[false,true]},2),true);
+  });
+});
+
+describe('normalizeProgression — #321 Auto Deload migration',()=>{
+  it('pre-toggle blobs: deloadEvery>0 migrates to autoDeload true',()=>{
+    assert.equal(normalizeProgression({deloadEvery:4}).autoDeload,true);
+  });
+  it('pre-toggle blobs: deloadEvery 0 migrates to autoDeload false',()=>{
+    assert.equal(normalizeProgression({deloadEvery:0}).autoDeload,false);
+  });
+  it('explicit toggle values are never overwritten',()=>{
+    assert.equal(normalizeProgression({deloadEvery:4,autoDeload:false}).autoDeload,false);
+    assert.equal(normalizeProgression({deloadEvery:0,autoDeload:true}).autoDeload,true);
+  });
+  it('defaults ship with the toggle off',()=>{
+    assert.equal(progressionSetup.autoDeload,false);
   });
 });
 

@@ -29,11 +29,14 @@ assert.ok(cardStart!==-1,'sharePreviewCardHtml found');
 const card=shareSrc.slice(cardStart);
 
 describe('header actions (#297: green Start button, not a play icon)',()=>{
-  it('green Start button + bookmark icon sit next to the dismiss ×',()=>{
+  it('header actions row renders the buttons plus the conditional dismiss',()=>{
     const h=card.indexOf('share-header-actions');
     assert.ok(h!==-1,'share-header-actions present');
-    const dismiss=card.indexOf('data-share-act="dismiss"',h);
-    assert.ok(dismiss!==-1&&dismiss<h+2000,'× follows the header actions');
+    assert.ok(card.includes('${headerBtns}${dismissBtn}'),'header renders buttons + dismiss slot');
+  });
+  it('the dismiss × only renders for signed-in recipients',()=>{
+    assert.ok(card.includes('const dismissBtn=signedIn?'),
+      '× is signed-in-only — signed-out first-run has no ×');
   });
   it('bookmark wires Add to my library, the Start button wires Start workout',()=>{
     assert.ok(card.includes('class="share-icon-button" data-share-act="add"'),'bookmark icon adds to library');
@@ -44,12 +47,12 @@ describe('header actions (#297: green Start button, not a play icon)',()=>{
   it('no bare play icon remains in the header',()=>{
     assert.ok(!card.includes('aria-label="Start workout"><svg'),'no icon-only play button');
   });
-  it('order follows the #180 action order per state',()=>{
-    assert.ok(card.includes('signedIn?bookmarkBtn+playBtn:playBtn+bookmarkBtn'),
-      'signed-in: bookmark first; signed-out: Start first');
+  it('order follows the #180 action order per state; signed-out is Start-only',()=>{
+    assert.ok(card.includes('signedIn?bookmarkBtn+playBtn:playBtn'),
+      'signed-in: bookmark first; signed-out: Start alone (no ribbon by it)');
   });
-  it('program landings get the bookmark icon (no start action)',()=>{
-    assert.ok(card.includes(':bookmarkBtn;'),'program header is bookmark-only');
+  it('program landings get the bookmark icon for signed-in only',()=>{
+    assert.ok(card.includes("(signedIn?bookmarkBtn:'')"),'program header is signed-in bookmark-only');
   });
 });
 
@@ -103,11 +106,11 @@ describe('#214: the landing is always the full page',()=>{
     const h=bootstrapSrc.indexOf("window.addEventListener('hashchange'");
     assert.ok(h!==-1,'hashchange handler present');
     const handler=bootstrapSrc.slice(h,h+600);
-    assert.ok(handler.includes('if(payload)openSharePreview(payload);'),'hashchange opens the full-page landing');
+    assert.ok(handler.includes('if(payload)openSharePreview(payload,{push:false});'),'hashchange opens the full-page landing without a second history push (#265)');
     assert.ok(!handler.includes('openShareModal'),'hashchange never opens the modal');
   });
   it('openSharePreview leaves the live editor flag alone (draft opens underneath)',()=>{
-    const fn=shareSrc.match(/function openSharePreview\(payload\)\{([\s\S]*?)\n    \}/)[1];
+    const fn=shareSrc.match(/function openSharePreview\(payload(?:,opts=\{\})?\)\{([\s\S]*?)\n    \}/)[1];
     assert.ok(!fn.includes('workoutEditorOpen'),'openSharePreview does not touch workoutEditorOpen');
     assert.ok(fn.includes('showWorkouts(false,true)'),'landing renders on the workout tab');
   });
@@ -183,11 +186,10 @@ describe('#256: program sharing is out of the build (no short links for programs
   });
 });
 
-describe('#243: the share-modal sign-in helper note is muted, not red',()=>{
-  it('#shareSignInLinkNote uses --muted',()=>{
-    assert.ok(css.includes('#shareSignInLinkNote'),'the helper note has a rule');
-    assert.ok(/#shareSignInLinkNote\s*\{\s*color:\s*var\(--muted\)/.test(css),
-      'helper copy is muted — under Rosé the accent reads red');
+describe('#243 superseded by #244: no helper note on the share screen',()=>{
+  it('the share-link note element is gone entirely',()=>{
+    assert.ok(!html.includes('shareSignInLinkNote'),'note element removed per #244');
+    assert.ok(!css.includes('#shareSignInLinkNote'),'dead CSS rule removed');
   });
 });
 

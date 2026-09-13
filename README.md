@@ -29,7 +29,6 @@ Preview first: push `staging` to `cruciferousgreens/workout-app-preview` (no `CN
 ## Key conventions
 
 - Dumbbell weight is always the **combined total** (both dumbbells); never auto-double.
-- Suggested weights are **exact** — no plate snapping. No rest timers, no auto-deload, no mid-workout auto-adjustments.
+- Suggested weights are **exact** — no plate snapping. No rest timers, no mid-workout auto-adjustments. Deloads are opt-in via the Auto Deload toggle (program setup / Settings → progression defaults).
 - Progression suggestions use **real logged history only**, labeled with their basis.
-- Sample data is **opt-in** (Settings → Data), clearly labeled, and isolated from the progression engine.
 - No AI-generated imagery anywhere — standard emoji / system assets only.

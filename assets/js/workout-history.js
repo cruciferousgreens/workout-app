@@ -36,13 +36,14 @@
       const rows=[];
       (draft?.exercises||[]).forEach(item=>{
         const ex=exercises.find(row=>row.id===item.exerciseId);
-        const weightOptional=ex?.equipment==='body only', tracking=exerciseTracking(item,ex);
+        /* #279: weight is optional for timed tracking regardless of equipment (machine cardio logs seconds, not load). */
+        const tracking=exerciseTracking(item,ex), weightOptional=ex?.equipment==='body only'||tracking==='time';
         if(!item.sets.length){rows.push({item,set:null});return;}
         item.sets.forEach(set=>{
           /* A10 (#99): Number('garbage') is NaN and NaN comparisons are
              false, so non-numeric input used to pass as valid. */
           const perf=tracking==='time'?set.seconds:set.r;
-          const bad=(!weightOptional&&set.w==='')||perf===''||!Number.isFinite(Number(set.w||0))||Number(set.w||0)<0||!Number.isFinite(Number(perf))||Number(perf)<1||(set.rpe!==''&&(!Number.isFinite(Number(set.rpe))||Number(set.rpe)<1||Number(set.rpe)>10));
+          const bad=(!weightOptional&&set.w==='')||perf===''||!Number.isFinite(Number(set.w||0))||Number(set.w||0)<0||!Number.isFinite(Number(perf))||Number(perf)<1||/* #268: legacy/imported sets may carry rpe:null — treat null/undefined like '' (RPE is optional). */(set.rpe!==''&&set.rpe!=null&&(!Number.isFinite(Number(set.rpe))||Number(set.rpe)<1||Number(set.rpe)>10));
           if(bad)rows.push({item,set});
         });
       });
@@ -71,40 +72,33 @@
          unmarked) — never-nulls (user 2026-09-11).
        - "Delete N empty sets" / "Remove N empty exercises": only fully-empty
          targets (#43 — never partial values, never silent).
-       - "Delete unfinished sets" (v1.025, user 2026-09-12): the middle
-         option. Deletes every unfinished set (empty AND incomplete) and
+       - "Finish anyway" (user 2026-09-13, #262): the primary whenever sets
+         need review. Deletes every unfinished set (empty AND incomplete) and
          finishes in one tap — it never re-prompts or returns to editing.
-         It replaces "Finish anyway" (identical operation, vaguer label).
-         Secondary always, never primary.
-       - "Keep editing": quiet text link, always last.
+         Partial values are dropped, never saved half-filled. The old middle
+         "Delete N unfinished sets" button ran this same operation and is gone.
+       - "Keep editing": a real secondary button next to "Finish anyway" when
+         sets need review; a quiet text link in the other variants.
        Exactly one dialog is ever shown (#189). */
     function reviewSetsActions(draft){
       const invalid=invalidSetsIn(draft);
       const badSets=new Set(invalid.map(row=>row.set).filter(Boolean));
       const emptyCount=invalid.filter(row=>!row.set).length;
-      const emptySets=[...badSets].filter(isEmptySet).length;
-      const incompleteSets=badSets.size-emptySets; /* partial values — dropping them destroys user-entered data */
       const showComplete=badSets.size===0&&draft.exercises.some(item=>item.sets.some(set=>!set.complete));
-      /* User 2026-09-12 (phone QA): whenever sets need review the dialog
-         ALWAYS shows three actions — primary "Finish anyway", secondary
-         "Delete N unfinished sets", and Keep editing. No variant hides the
-         middle button, and the primary never carries an appended clause. */
+      /* User 2026-09-13 (#262): whenever sets need review the dialog shows
+         exactly two actions — primary "Finish anyway" and "Keep editing". The
+         old middle "Delete N unfinished sets" button ran the identical
+         operation under a vaguer label, so it is gone. */
       const showFinishAnyway=badSets.size>0;
-      const showDeleteUnfinished=badSets.size>0;
       const showDeleteEmptyExercises=badSets.size===0&&emptyCount>0;
       return {
         badCount:badSets.size,
-        emptySetsCount:emptySets,
-        incompleteSets,
         showComplete,
         showFinishAnyway,
-        showDeleteUnfinished,
-        dropsIncomplete:incompleteSets>0,
         showDeleteEmptyExercises,
         deleteEmptyExercisesCount:emptyCount,
-        /* User 2026-09-12: exactly one primary button. "Finish anyway" is the
-           primary whenever sets need review; "Delete unfinished sets" is
-           never primary. */
+        /* Exactly one primary button. "Finish anyway" is the primary whenever
+           sets need review. */
         primaryAction:showComplete?'complete':showFinishAnyway?'finish':showDeleteEmptyExercises?'delete':null,
       };
     }
@@ -126,22 +120,17 @@
       draft.exercises=draft.exercises.filter(item=>item.sets.length);
       return {droppedSets,droppedEmptySets,droppedExercises:beforeEx-draft.exercises.length};
     }
-    /* User 2026-09-12 (phone QA): plain-language explanation, kept short.
-       States what's missing; the three actions speak for themselves. The
-       "they'll be dropped, nothing is saved half-filled" sentence is gone.
-       Pure so tests pin the wording. */
+    /* User 2026-09-13 (#262): the user's copy. The count covers every
+       unfinished set; "Finish anyway" deletes them and finishes — nothing is
+       ever saved half-filled. Pure so tests pin the wording. */
     function reviewSetsCopy(draft,actions){
-      const n=actions.badCount, exN=actions.deleteEmptyExercisesCount, emptySetsN=actions.emptySetsCount;
+      const n=actions.badCount, exN=actions.deleteEmptyExercisesCount;
       if(actions.showComplete){
         const unmarked=draft.exercises.flatMap(item=>item.sets).filter(set=>!set.complete).length;
         return `${unmarked} set${unmarked===1?'':'s'} ${unmarked===1?"isn't":"aren't"} marked complete yet.`;
       }
       const parts=[];
-      if(n>0){
-        if(emptySetsN===n)parts.push(`${n} set${n===1?' is':'s are'} completely empty.`);
-        else if(emptySetsN>0)parts.push(`Some sets are empty and others are missing reps, seconds, or weight.`);
-        else parts.push(`${n} set${n===1?' is':'s are'} missing reps, seconds, or weight.`);
-      }
+      if(n>0)parts.push(`${n} set${n===1?' is':'s are'} missing… Clicking Finish will delete your sets.`);
       if(exN>0)parts.push(`${exN} exercise${exN===1?' has':'s have'} no sets.`);
       return parts.join(' ');
     }
@@ -149,11 +138,10 @@
       const actions=reviewSetsActions(draft);
       $('#reviewSetsCopy').textContent=reviewSetsCopy(draft,actions);
       const primary=actions.primaryAction;
-      /* User 2026-09-12 (phone QA): whenever sets need review the dialog
-         shows exactly three actions — one primary button, the secondary
-         middle button, and Keep editing as a quiet text link last. Classes
-         are set fresh on every open so no stale visibility or styling
-         survives between openings. */
+      /* User 2026-09-13 (#262): whenever sets need review the dialog shows
+         exactly two actions — primary "Finish anyway" and "Keep editing" as a
+         real secondary button. Classes are set fresh on every open so no
+         stale visibility or styling survives between openings. */
       /* user 2026-09-11: never save null data. "Mark all complete" is only
          offered when every set has valid values (just unmarked) — if any set
          is missing values, the button hides so the user must fix or delete
@@ -169,17 +157,6 @@
         finishBtn.textContent='Finish anyway';
         finishBtn.className=primary==='finish'?'primary-button':'secondary-button';
       }
-      /* "Delete unfinished sets" — the middle option. Secondary always, never primary. Deletes every unfinished
-         set (empty AND incomplete) and finishes in one tap — no re-prompt,
-         no return to editing. The label carries the count so the
-         consequence is explicit; danger styling flags that dropping
-         partial sets destroys user-entered values. */
-      const unfinishedBtn=$('#reviewSetsDeleteUnfinished');
-      unfinishedBtn.hidden=!actions.showDeleteUnfinished;
-      if(actions.showDeleteUnfinished){
-        unfinishedBtn.textContent=`Delete ${actions.badCount} unfinished set${actions.badCount===1?'':'s'}`;
-        unfinishedBtn.className='secondary-button'+(actions.dropsIncomplete?' danger-button':'');
-      }
       /* The delete action only survives for the empty-exercise case (no bad
          sets, just an exercise with no sets) — never sets with partial
          values, so no user-entered data is silently lost. It carries no
@@ -191,7 +168,10 @@
         deleteBtn.textContent=`Remove ${actions.deleteEmptyExercisesCount} empty exercise${actions.deleteEmptyExercisesCount===1?'':'s'}`;
         deleteBtn.className=primary==='delete'?'primary-button':'secondary-button';
       }
-      $('#reviewSetsCancel').className='text-link';
+      /* User 2026-09-13 (#262): "Keep editing" is a real secondary button next
+         to "Finish anyway" when sets need review; a quiet text link in the
+         other variants. */
+      $('#reviewSetsCancel').className=actions.showFinishAnyway?'secondary-button':'text-link';
       $('#reviewSetsDialog').showModal();
     }
     /* #189 (user 2026-09-12): after "Finish and delete empty sets", the
@@ -247,7 +227,7 @@
         }
       } else workoutState.completed.unshift(completed);
       const finishedProgram=workoutState.activeProgram&&completed.programId===workoutState.activeProgram.id?workoutState.activeProgram:null;
-      workoutState.draft = null; state.workoutDetailReturn=ROUTES.DETAIL_RETURN.WORKOUT; persistNow(); renderCompletedWorkout(completed); renderProgram(); renderLibrary(); renderDashboard(); renderStats();
+      workoutState.draft = null; /* #275: an edit-finish keeps the return recorded when the log was opened (e.g. the Logs list) instead of forcing the Workout page — only brand-new finishes reset to WORKOUT. */ if(!draft.editingId)state.workoutDetailReturn=ROUTES.DETAIL_RETURN.WORKOUT; persistNow(); renderCompletedWorkout(completed); renderProgram(); renderLibrary(); renderDashboard(); renderStats();
       /* #153: renderProgram() unconditionally calls updateTopBar('program'),
          which flashed "Program" over the just-finished log. The log's title
          is "Log" (workoutSubScreen is 'complete' now) — restore it last. */
@@ -259,6 +239,9 @@
          log with the Program page the instant it rendered. The notice is
          still set, so the program cover shows it whenever the user visits. */
       if(finishedProgram){finishedProgram.notice=`${completed.name} logged.`;}
+      /* #286: finishing while signed out nudges toward sign-in (sync/backup),
+         unless permanently dismissed. Fires after the completed log renders. */
+      try{if(typeof Sync!=='undefined'&&Sync&&typeof Sync.maybeShowSigninNudge==='function')Sync.maybeShowSigninNudge();}catch(_){}
     }
     function editCompletedWorkout(id) {
       const workout=workoutState.completed.find(x=>x.id===id); if(!workout) return;
@@ -288,12 +271,23 @@
       const sets=workout.exercises.flatMap(item=>item.sets);
       const volume=sets.reduce((total,set)=>total+setVolume(set),0);
       const muscles=[...new Set(workout.exercises.flatMap(item=>{const ex=exercises.find(row=>row.id===item.exerciseId);return [...(ex?.primary||[]),...(ex?.secondary||[])];}))];
-      return {sets:sets.length,volume,muscles};
+      /* #302 (user 2026-09-12): timed-only work has no meaningful volume —
+         report total time instead of "0 lb". */
+      const totalSeconds=sets.reduce((total,set)=>total+(Number(set.seconds)||0),0);
+      const timedOnly=sets.length>0&&sets.every(set=>Number(set.seconds)>0);
+      return {sets:sets.length,volume,muscles,totalSeconds,timedOnly};
     }
     function workoutPRs(workout) {
       const prs=[];
       workout.exercises.forEach(item=>{
         const ex=exercises.find(row=>row.id===item.exerciseId);
+        /* #282: timed PRs — longest hold at a given load joins the PR summary. */
+        if((item.tracking||'reps')==='time'){
+          if(!ex)return;
+          const priorSets=priorSetsForPR(workout,item.exerciseId);
+          if(detectTimedPRs(item.sets,priorSets))prs.push(`${ex.name} · longest hold PR`);
+          return;
+        }
         const currentWeighted=item.sets.filter(set=>Number(set.w)>0);
         if(!ex||!currentWeighted.length)return;
         /* #99 A15 + #158: compare against prior sessions — all other records
@@ -344,11 +338,14 @@
       /* Coherent history (user 2026-09-12): drilling into a log pushes a page,
          so system back returns to the list instead of skipping it. */
       if (opts.push) history.pushState({view:'workout', sub:'complete', completedId: workout.id, returnTo: returnRouteKey(state.workoutDetailReturn)||ROUTES.DETAIL_RETURN.HISTORY}, '', '#log-' + workout.id);
-      $('#workoutComplete').innerHTML = `<div class="completed-card"><div class="detail-title-row"><h2>${escapeHtml(workout.name)}</h2><button class="start-inline-button" id="saveCompletedWorkoutTop" type="button">${existingTemplate?'Start':'Save as template'}</button></div><p class="completed-meta">Completed ${escapeHtml(formatLogDate(workout.date))}</p>${workout.finishedAnyway?'<p class="section-note">Finished with unlogged sets.</p>':''}<div class="workout-detail-metrics"><div class="workout-detail-metric"><strong>${workout.exercises.length}</strong><span>exercises</span></div><div class="workout-detail-metric"><strong>${summary.sets}</strong><span>completed sets</span></div><div class="workout-detail-metric"><strong>${formatVolume(summary.volume)}</strong><span>total volume</span></div></div><div class="section-head"><h3>Muscles worked</h3><p class="section-note">Primary and secondary</p></div>${summary.muscles.length?workoutBodyMapMarkup(summary.muscles):''}<div class="workout-muscles">${summary.muscles.length?summary.muscles.map(muscle=>musclePill(muscle)).join(''):'<span class="section-note">No muscle data</span>'}</div>${prs.length?`<div class="section-head"><h3>PRs hit</h3></div><div class="workout-prs">${prs.map(pr=>`<span class="workout-pr">${escapeHtml(pr)}</span>`).join('')}</div>`:''}<div class="section-head"><h3>Set-by-set</h3><p class="section-note">Reps × weight @ RPE</p></div><div class="completed-exercise-details">${workout.exercises.map(item=>completedExerciseMarkup(item,workout.id)).join('')}</div><div class="detail-action-buttons"><button class="primary-button detail-action-primary" id="repeatCompletedWorkout" type="button">Repeat this workout</button><div class="detail-action-row"><button class="secondary-button" id="editCompletedWorkout" type="button">Edit workout</button><button class="secondary-button danger-button" id="deleteCompletedWorkout" type="button">Delete workout</button></div></div><p class="status-note" id="completedSaveStatus" role="status"></p></div>`;
+      $('#workoutComplete').innerHTML = `<div class="completed-card"><div class="detail-title-row"><h2>${escapeHtml(workout.name)}</h2><button class="start-inline-button" id="saveCompletedWorkoutTop" type="button">${existingTemplate?'Start':'Save as template'}</button></div><p class="completed-meta">Completed ${escapeHtml(formatLogDate(workout.date))}</p>${workout.finishedAnyway?'<p class="section-note">Finished with unlogged sets.</p>':''}<div class="workout-detail-metrics"><div class="workout-detail-metric"><strong>${workout.exercises.length}</strong><span>exercise${workout.exercises.length===1?'':'s'}</span></div><div class="workout-detail-metric"><strong>${summary.sets}</strong><span>completed set${summary.sets===1?'':'s'}</span></div><div class="workout-detail-metric"><strong>${summary.timedOnly?`${summary.totalSeconds} sec`:formatVolume(summary.volume)}</strong><span>${summary.timedOnly?'total time':'total volume'}</span></div></div><div class="section-head"><h3>Muscles worked</h3><p class="section-note">Primary and secondary</p></div>${summary.muscles.length?workoutBodyMapMarkup(summary.muscles):''}<div class="workout-muscles">${summary.muscles.length?summary.muscles.map(muscle=>musclePill(muscle)).join(''):'<span class="section-note">No muscle data</span>'}</div>${prs.length?`<div class="section-head"><h3>PRs hit</h3></div><div class="workout-prs">${prs.map(pr=>`<span class="workout-pr">${escapeHtml(pr)}</span>`).join('')}</div>`:''}<div class="section-head"><h3>Set-by-set</h3><p class="section-note">Reps × weight @ RPE</p></div><div class="completed-exercise-details">${workout.exercises.map(item=>completedExerciseMarkup(item,workout.id)).join('')}</div><div class="detail-action-buttons"><button class="primary-button detail-action-primary" id="repeatCompletedWorkout" type="button">Repeat this workout</button><div class="detail-action-row"><button class="secondary-button" id="editCompletedWorkout" type="button">Edit workout</button><button class="secondary-button danger-button" id="deleteCompletedWorkout" type="button">Delete workout</button></div></div><p class="status-note" id="completedSaveStatus" role="status"></p></div>`;
       document.querySelectorAll('.completed-exercise-link').forEach(button => button.addEventListener('click', () => openExercise(button.dataset.id, true, button.dataset.returnWorkout ? {view:'completed-workout', workoutId:button.dataset.returnWorkout} : undefined)));
       $('#editCompletedWorkout').addEventListener('click',()=>editCompletedWorkout(workout.id));
       $('#repeatCompletedWorkout').addEventListener('click',()=>repeatWorkout(workout));
-      $('#saveCompletedWorkoutTop').addEventListener('click',()=>existingTemplate?startWorkoutFromTemplate(existingTemplate.id):saveCompletedAsTemplate(workout,$('#completedSaveStatus')));
+      /* #269 (user 2026-09-12): the completed view's Start must never silently
+         replace a live draft — route through the same conflict guard the
+         saved editor's Start uses. */
+      $('#saveCompletedWorkoutTop').addEventListener('click',()=>existingTemplate?requestStartWithConflict(existingTemplate.name,()=>startWorkoutFromTemplate(existingTemplate.id)):saveCompletedAsTemplate(workout,$('#completedSaveStatus')));
       $('#deleteCompletedWorkout').addEventListener('click',()=>{
         pendingDeleteCompletedWorkoutId=workout.id;
         $('#deleteCompletedWorkoutDesc').textContent=`Delete "${workout.name}" from ${formatLogDate(workout.date)}? This cannot be undone.`;

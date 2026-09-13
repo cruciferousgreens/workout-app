@@ -68,8 +68,6 @@
     function openShareLinkDialog(url){
       const field=$('#shareLinkField');
       if(field){field.value=url;}
-      const note=$('#shareLinkNote');
-      if(note)note.textContent='Send this link to a friend. Opening it shows the full workout — they can start it right away or save it.';
       const sysBtn=$('#nativeShareLinkBtn');
       if(sysBtn)sysBtn.hidden=!navigator.share;
       const dlg=$('#shareLinkDialog');
@@ -111,6 +109,17 @@
     function shareSignInShowStep(n){
       for(let i=1;i<=3;i++){const el=$('#shareSignInStep'+i);if(el)el.hidden=(i!==n);}
     }
+    /* #326 (user 2026-09-12): the dialog header must follow the sign-in
+       state. Step 3 renders after a successful sign-in, so it gets the
+       regular share-dialog copy — otherwise the link sits under a stale
+       "Sign in to share" header. Reopening the prompt resets to the
+       signed-out copy. */
+    function setShareSignInCopy(signedIn){
+      const title=$('#shareSignInTitle');
+      const desc=$('#shareSignInDesc');
+      if(title)title.textContent=signedIn?'Share link':'Sign in to share';
+      if(desc)desc.textContent=signedIn?'Send this shared workout with the link below.':'Sharing needs an account. It\u2019s free to sign up.';
+    }
     function setShareSignInStatus(msg,isError){
       const el=$('#shareSignInStatus');
       if(el){el.textContent=msg||'';el.classList.toggle('is-error',!!isError);}
@@ -123,6 +132,7 @@
       if(otpStep)otpStep.hidden=true;
       setShareSignInStatus('');
       shareSignInShowStep(1);
+      setShareSignInCopy(false);
       const dlg=$('#shareSignInDialog');
       if(dlg&&!dlg.open)dlg.showModal();
       else showToast('Sign in to share workouts.');
@@ -189,13 +199,12 @@
       const field=$('#shareSignInLinkField');
       if(field)field.value='Building link\u2026';
       shareSignInShowStep(3);
+      setShareSignInCopy(true);
       try{
         const code=await shareCode(pendingSharePayload);
         const short=(typeof tryShortShareLink==='function')?await tryShortShareLink(pendingSharePayload,code):null;
         const url=short||(location.origin+location.pathname+'#share='+code);
         if(field)field.value=url;
-        const note=$('#shareSignInLinkNote');
-        if(note)note.textContent='Send this link to a friend. Opening it shows the full workout \u2014 they can start it right away or save it.';
         const sysBtn=$('#shareSignInNativeBtn');
         if(sysBtn)sysBtn.hidden=!(typeof navigator!=='undefined'&&navigator&&navigator.share);
       }catch(e){
@@ -213,11 +222,19 @@
        workoutEditorOpen is left alone and the pane selector yields to the
        share preview while it's set; dismissing restores whatever was
        underneath (same principle as #187's logs-over-draft). */
-    function openSharePreview(payload){
+    function openSharePreview(payload,opts={}){
       state.sharePreview=payload;
       state.savedWorkoutId=null;state.builderOpen=false;
       state.workoutHistoryOpen=false;$('#workoutComplete').hidden=true;
       showWorkouts(false,true);
+      /* #265: one history entry per preview — system Back dismisses it
+         (popstate clears the preview state via backOutOfSharePreview)
+         instead of exiting the app (cold open) or leaving a stale preview
+         cached (in-app). The boot loading state already pushed; the in-app
+         hashchange entry covers its own Back. */
+      if(opts.push!==false){
+        try{if(!history.state||history.state.sub!=='share')history.pushState({view:'workout',sub:'share'},'',location.href);}catch(_){}
+      }
       window.scrollTo(0,0);
     }
     /* #296 (user 2026-09-12): a cold-opened share link must land directly on
@@ -230,6 +247,10 @@
       state.savedWorkoutId=null;state.builderOpen=false;
       state.workoutHistoryOpen=false;$('#workoutComplete').hidden=true;
       showWorkouts(false,true);
+      /* #265: a cold-opened preview is the only history entry — without a
+         push, system Back exits the app instead of dismissing the preview.
+         Pushing gives Back a popstate to fire within the app. */
+      try{if(!history.state||history.state.sub!=='share')history.pushState({view:'workout',sub:'share'},'',location.href);}catch(_){}
       window.scrollTo(0,0);
     }
     function dismissSharePreview(){
@@ -237,6 +258,20 @@
       clearShareHash();
       /* #177: also drop a /s/<slug> path so a reload doesn't re-offer it. */
       try{if(typeof clearShortSharePath==='function')clearShortSharePath();}catch(_){}
+    }
+    /* #265: system Back out of a share preview. Clears the preview state so
+       the destination can't render with a stale preview cached, and strips
+       a share hash / short path left on the destination entry so a reload
+       can't re-offer a dismissed preview. The caller (popstate) then routes
+       the destination normally — cold-open Back lands on Home. */
+    function backOutOfSharePreview(){
+      if(!state.sharePreview)return false;
+      state.sharePreview=null;
+      try{
+        if(/^#share=/.test(location.hash||''))history.replaceState(null,'',location.pathname+location.search);
+        if(typeof clearShortSharePath==='function')clearShortSharePath();
+      }catch(_){}
+      return true;
     }
     /* Exercise names resolve against the payload's own custom exercises
        first — they aren't in the recipient's library until imported. */
@@ -290,9 +325,13 @@
          glance. */
       const playBtn=`<button class="primary-button share-start-btn" data-share-act="start" type="button">Start</button>`;
       /* Header icon order follows the #180 action order per state. */
+      /* User 2026-09-12: signed-out recipients get the clean first-run
+         header — just Start. No bookmark ribbon by it and no × (a new user
+         has no app to dismiss back to; system Back still exits). */
       const headerBtns=isTemplate
-        ?(signedIn?bookmarkBtn+playBtn:playBtn+bookmarkBtn)
-        :bookmarkBtn;
+        ?(signedIn?bookmarkBtn+playBtn:playBtn)
+        :(signedIn?bookmarkBtn:'');
+      const dismissBtn=signedIn?'<button class="dialog-close" data-share-act="dismiss" type="button" aria-label="Dismiss">×</button>':'';
       const primaryBtn=isTemplate
         ?(signedIn
           ?`<button class="primary-button" data-share-act="add" type="button">Add to my library</button><button class="share-alt-action" data-share-act="start" type="button">or start the workout</button>`
@@ -303,7 +342,7 @@
         ?`<p class="section-note">Starting also saves it to your library.</p>`
         :'<p class="section-note">Programs save to your library — open one of its workouts to train it.</p>';
       const context=`You opened a shared ${isTemplate?'workout':'program'} link.`; /* #179: landing context */
-      return `<div class="completed-card"><span class="continue-kicker">${isTemplate?'Shared workout':'Shared program'}</span><div class="detail-title-row"><h2>${escapeHtml(payload.name||'Shared')}</h2><div class="share-header-actions">${headerBtns}<button class="dialog-close" data-share-act="dismiss" type="button" aria-label="Dismiss">×</button></div></div><p class="share-context">${context}</p><p class="completed-meta">${escapeHtml(meta)}</p>
+      return `<div class="completed-card"><span class="continue-kicker">${isTemplate?'Shared workout':'Shared program'}</span><div class="detail-title-row"><h2>${escapeHtml(payload.name||'Shared')}</h2><div class="share-header-actions">${headerBtns}${dismissBtn}</div></div><p class="share-context">${context}</p><p class="completed-meta">${escapeHtml(meta)}</p>
       ${muscles.length?`<div class="section-head"><h3>Muscles worked</h3></div>${workoutBodyMapMarkup(muscles)}<div class="workout-muscles">${muscles.map(m=>musclePill(m)).join('')}</div>`:''}
       <div class="section-head"><h3>${isTemplate?'Exercises':'Workouts'}</h3></div>${body}
       <div class="share-footer-actions">${actions}${note}</div></div>`;
@@ -345,9 +384,17 @@
     function addSharedTemplateToLibrary(payload){
       const importedCustom=importShareCustomExercises(payload);
       const src=payload.template||{};
-      let name=src.name||'Shared workout';
-      if((workoutState.templates||[]).some(t=>t.name===name))name=`${name} (shared)`;
-      const template={id:newTemplateId(),name,
+      /* #263: suffixes stay unique across re-accepts.
+         #315 (user 2026-09-13): no parenthetical suffix in the name — the
+         template carries shared:true and the library renders a SHARED chip. */
+      const name=uniqueSuffixedName(src.name||'Shared workout',(workoutState.templates||[]).map(t=>t.name),true);
+      /* #290: the id derives from the payload content — the same share
+         accepted on another device mints the same id, so sync dedups it.
+         An id already present means an explicit re-accept on this device:
+         mint a fresh id for the second copy (ids must stay unique). */
+      const stableId=stableTemplateId(JSON.stringify({k:payload.kind,n:payload.name,t:src,c:payload.customExercises||[]}));
+      const id=(workoutState.templates||[]).some(t=>t.id===stableId)?newTemplateId():stableId;
+      const template={id:id,name,shared:true,
         exercises:JSON.parse(JSON.stringify(src.exercises||[]))};
       workoutState.templates.unshift(template);
       schedulePersist();refreshTemplateViews();
@@ -356,12 +403,17 @@
     function addSharedProgramToLibrary(payload){
       const importedCustom=importShareCustomExercises(payload);
       const src=payload.program||{};
-      let name=src.name||'Shared program';
+      /* #263: suffixes stay unique across re-accepts. */
       const existing=[workoutState.activeProgram,...(workoutState.archivedPrograms||[])].filter(Boolean);
-      if(existing.some(p=>p.name===name))name=`${name} (shared)`;
+      const name=uniqueSuffixedName(src.name||'Shared program',existing.map(p=>p.name));
+      /* #290: stable content-derived id — the same share accepted on another
+         device mints the same id, so sync dedups it. Re-accept on this
+         device (id already present) gets a fresh id for the second copy. */
+      const stableId=stableProgramId(JSON.stringify({k:payload.kind,n:payload.name,p:src,c:payload.customExercises||[]}));
+      const id=existing.some(p=>p.id===stableId)?newProgramId():stableId;
       /* Shared programs land in the archived list — restoring one to active
          is an explicit user action, never a surprise. */
-      const program={id:newProgramId(),name,length:src.length||4,startWeek:src.startWeek||1,
+      const program={id:id,name,length:src.length||4,startWeek:src.startWeek||1,
         focus:src.focus||'',startedAt:localIsoDate(),archivedAt:localIsoDate(),
         progression:src.progression||null,
         workouts:(src.workouts||[]).map(w=>({uid:newProgramWorkoutUid(),name:w.name,
@@ -409,7 +461,6 @@
     (function wireShareLink(){
       const closeShareDlg=()=>$('#shareLinkDialog').close();
       $('#closeShareLinkDialog')?.addEventListener('click',closeShareDlg);
-      $('#closeShareLinkDone')?.addEventListener('click',closeShareDlg);
       $('#copyShareLinkBtn')?.addEventListener('click',async()=>{
         const field=$('#shareLinkField');
         try{await navigator.clipboard.writeText(field?field.value:'');showToast('Share link copied.');}
@@ -434,7 +485,10 @@
       $('#goShareSignIn')?.addEventListener('click',goShareSignInInline);
       $('#shareSignInSendCode')?.addEventListener('click',()=>{shareSignInSendCode().catch(()=>{});});
       $('#shareSignInVerify')?.addEventListener('click',()=>{shareSignInVerifyCode().catch(()=>{});});
-      $('#shareSignInDone')?.addEventListener('click',closeSignInPrompt);
+      /* #264: Esc (or any non-button dismiss) fires 'close' without going
+         through closeSignInPrompt — stop the cooldown on the dialog's close
+         event too, or the interval leaks. */
+      $('#shareSignInDialog')?.addEventListener('close',stopShareSignInCooldown);
       $('#shareSignInCopyBtn')?.addEventListener('click',async()=>{
         const field=$('#shareSignInLinkField');
         try{await navigator.clipboard.writeText(field?field.value:'');showToast('Share link copied.');}

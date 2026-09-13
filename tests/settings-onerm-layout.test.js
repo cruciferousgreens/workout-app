@@ -6,7 +6,10 @@
    inputs over truncated labels ("LT", "TY DEFAULT", "0 = NO SCHEDULED
    DELOADS."). The rows now use the standard label-span + input + em.unit
    pattern (like "Increment value"), and the notch selector only targets the
-   label span. Layout-only: ids, values, and wiring are untouched. */
+   label span. Layout-only: ids, values, and wiring are untouched.
+   #321 (user 2026-09-12): the deload defaults moved out of the %1RM-only rows
+   into an Auto Deload toggle + panel at the bottom of the progression
+   defaults (and the program form), visible for every scheme. */
 const {describe,it}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -34,7 +37,7 @@ function ruleFieldInners(){
 
 describe('%1RM settings rows use the standard label + input + unit pattern',()=>{
   it('full label texts are present and readable',()=>{
-    for(const label of ['% of 1RM default','Deload every N weeks','Deload intensity default']){
+    for(const label of ['% of 1RM default','Deload every N weeks','Deload intensity']){
       assert.ok(html.includes(`<span>${label}</span>`),`label "${label}" present`);
     }
   });
@@ -52,7 +55,7 @@ describe('%1RM settings rows use the standard label + input + unit pattern',()=>
   });
   it('settings inputs keep their ids, rows keep their ids',()=>{
     for(const id of ['settingsPercentOf1RM','settingsDeloadEvery','settingsDeloadPct',
-                     'settingsPctRow','settingsDeloadPctRow']){
+                     'settingsPctRow','settingsAutoDeloadToggle','settingsAutoDeloadPanel']){
       assert.ok(html.includes(`id="${id}"`),`#${id} present`);
     }
   });
@@ -61,7 +64,7 @@ describe('%1RM settings rows use the standard label + input + unit pattern',()=>
       assert.ok(bootstrap.includes(`$('#${id}')`),`app-bootstrap references #${id}`);
     }
     assert.ok(bootstrap.includes("$('#settingsPctRow')"),'visibility toggle for #settingsPctRow intact');
-    assert.ok(bootstrap.includes("$('#settingsDeloadPctRow')"),'visibility toggle for #settingsDeloadPctRow intact');
+    assert.ok(bootstrap.includes("$('#settingsAutoDeloadToggle')"),'Auto Deload toggle wiring intact');
   });
 });
 
@@ -84,7 +87,7 @@ describe('program-builder %1RM rows share the same fix',()=>{
     }
   });
   it('program inputs and rows keep their ids',()=>{
-    for(const id of ['progressionPercentOf1RM','deloadEvery','deloadPct','progressionPctRow','deloadRow']){
+    for(const id of ['progressionPercentOf1RM','deloadEvery','deloadPct','progressionPctRow','autoDeloadToggle','autoDeloadPanel']){
       assert.ok(html.includes(`id="${id}"`),`#${id} present`);
     }
   });

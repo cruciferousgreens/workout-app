@@ -15,7 +15,7 @@ const DEFAULT_EXERCISE_TAG_PRESETS=['Main lift','Accessory','Unilateral','Straig
 function freshLibraryState(){return {query:'',muscles:new Set(),equipment:'',favorites:new Set(),onlyFavorites:false,onlyCustom:false,selected:null,customExercises:[]};}
 /* Navigation + routing-adjacent UI state (navigation.js, workout-history.js,
    app-bootstrap.js own these). */
-function freshNavState(){return {activeView:'dashboard',workoutDetailReturn:'workout',workoutHistoryOpen:false,workoutEditorOpen:false,exerciseDetailReturn:null,workoutDetailExerciseId:undefined,workoutDetailExerciseReturn:undefined,dashboardPeriod:'week',statsPeriod:'week',logPeriod:'all',topExercisesMode:'volume',muscleVolumeMode:'volume',selectedDashboardDate:null,calendarWeekOffset:0,workoutSubScreen:null,programWorkoutUid:null,returnTo:undefined,settingsPushed:undefined,settingsReturn:undefined,builderReturn:null,sharePreview:null,scroll:{dashboard:0,library:0,'workout:start':0,'workout:editor':0,'workout:complete':0,'workout:history':0,program:0,stats:0,settings:0,detail:0}};}
+function freshNavState(){return {activeView:'dashboard',workoutDetailReturn:'workout',workoutHistoryOpen:false,workoutEditorOpen:false,exerciseDetailReturn:null,workoutDetailExerciseId:undefined,workoutDetailExerciseReturn:undefined,dashboardPeriod:'week',statsPeriod:'week',logPeriod:'all',topExercisesMode:'volume',muscleVolumeMode:'volume',muscleMapMode:'volume',selectedDashboardDate:null,calendarWeekOffset:0,workoutSubScreen:null,programWorkoutUid:null,returnTo:undefined,settingsPushed:undefined,settingsReturn:undefined,builderReturn:null,sharePreview:null,scroll:{dashboard:0,library:0,'workout:start':0,'workout:editor':0,'workout:complete':0,'workout:history':0,program:0,stats:0,settings:0,detail:0}};}
 /* Saved-workout builder draft state (programs.js owns these). */
 function freshBuilderState(){return {builderOpen:undefined,savedBuilder:undefined,savedWorkoutId:undefined,savedFilter:undefined};}
 const state=Object.assign(freshLibraryState(),freshNavState(),freshBuilderState());
@@ -43,8 +43,17 @@ const workoutState=freshWorkoutData();
 /* Canonical progression defaults (efficiency pass 2026-09-12): one
    deep-copyable source. The live object is const (never reassigned), so
    resets copy fresh values INTO it — every reset path shares this. */
-const DEFAULT_PROGRESSION_SETUP={threshold:8,incrementType:'lb',incrementValue:5,timeStep:5,treatment:'suggestions',scheme:'rpe',percentOf1RM:75,deloadEvery:0,deloadPct:60,pctWave:false,weeklyPcts:[],weeklyDeloads:[],defaultRange:{preset:'hypertrophy',min:6,max:12,openTop:false,amrap:false},undulating:false,weeklyRanges:[],units:'imperial',statsDefaultMetric:'volume'};
+const DEFAULT_PROGRESSION_SETUP={threshold:8,incrementType:'lb',incrementValue:5,timeStep:5,treatment:'suggestions',scheme:'rpe',percentOf1RM:75,autoDeload:false,deloadEvery:0,deloadPct:60,pctWave:false,weeklyPcts:[],weeklyDeloads:[],defaultRange:{preset:'hypertrophy',min:6,max:12,openTop:false,amrap:false},undulating:false,weeklyRanges:[],units:'imperial',statsDefaultMetric:'volume'};
 function freshProgressionSetup(){return JSON.parse(JSON.stringify(DEFAULT_PROGRESSION_SETUP));}
+/* #321 (user 2026-09-12): "Auto Deload" toggle replaced the "Deload every N
+   weeks / 0 = off" pattern. Migration for stored blobs written before the
+   toggle existed: an explicit deloadEvery>0 means the user had it on. */
+function normalizeProgression(p){
+  if(p&&typeof p==='object'&&typeof p.autoDeload!=='boolean'){
+    p.autoDeload=Number(p.deloadEvery)>0;
+  }
+  return p;
+}
 function resetProgressionSetup(){
   const fresh=freshProgressionSetup();
   Object.keys(progressionSetup).forEach(k=>delete progressionSetup[k]);

@@ -162,6 +162,38 @@ describe('#170 workedMuscles: bodyweight sets light the map, volume math untouch
     assert.ok(html.includes('Bodyweight work only'),'bodyweight-only note shown in compact mode');
     assert.ok(!html.includes('No weighted training volume'),'no empty-state when sets were done (compact)');
   });
+  it('#238: no Less/More legend — swatches and volume numbers carry the scale',()=>{
+    for(const compact of [false,true]){
+      const html=muscleHeatmapMarkup({chest:1000,back:500},new Set(),compact);
+      assert.ok(!html.includes('heatmap-legend'),'no legend element');
+      assert.ok(!html.includes('heatmap-gradient'),'no legend gradient');
+      assert.ok(!html.includes('More volume'),'no "More volume" text');
+      assert.ok(html.includes('heatmap-swatch'),'swatches still render');
+    }
+  });
+  it('#319: bySets renders set counts instead of volume',()=>{
+    const html=muscleHeatmapMarkup({chest:12,back:8},new Set(),false,true);
+    assert.ok(html.includes('data-metric="sets"'),'sets metric rides in data-metric');
+    assert.ok(html.includes('12 sets'),'set count label shown');
+    assert.ok(html.includes('8 sets'),'second set count label shown');
+    assert.ok(!html.includes(' lb'),'no volume unit in sets mode');
+    assert.ok(!html.includes('Bodyweight work only'),'no bodyweight-volume note in sets mode');
+  });
+  it('#319: bySets singular "1 set" label',()=>{
+    const html=muscleHeatmapMarkup({chest:1},new Set(),false,true);
+    assert.ok(html.includes('1 set<'),'singular set label');
+    assert.ok(!html.includes('1 sets'),'no plural for one');
+  });
+  it('#319: bySets empty-state names sets, not volume',()=>{
+    const html=muscleHeatmapMarkup({},new Set(),false,true);
+    assert.ok(html.includes('No completed sets in this period.'),'sets empty-state');
+    assert.ok(!html.includes('No weighted training volume'),'no volume empty-state in sets mode');
+  });
+  it('#319: volume mode unchanged (no data-metric attr, volume labels)',()=>{
+    const html=muscleHeatmapMarkup({chest:1000},new Set(),false,false);
+    assert.ok(!html.includes('data-metric='),'no metric attr in volume mode');
+    assert.ok(html.includes('lb'),'volume unit shown');
+  });
 });
 
 describe('#194 blindspotMuscles: bodyweight work is not a blind spot',()=>{

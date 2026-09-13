@@ -119,6 +119,42 @@
        exports/debugging), with a random suffix so two same-named customs
        can never share an id. */
     function newCustomExerciseId(name){return `${ID_KIND.custom}-${normalize(name)||'exercise'}-${randomCore().slice(0,8)}`;}
+    /* #290: stable content-derived ids for imports. Accepting the same share
+       (or importing the same file) on two devices must mint the SAME id, so
+       the sync id-union dedups instead of surfacing two copies. cyrb53:
+       deterministic, compact, no async crypto needed. The caller decides the
+       content key — it must be stable across devices for the same payload
+       (so: payload/file content, never a per-device resolved id). */
+    function contentHash53(str){
+      let h1=0xdeadbeef,h2=0x41c6ce57;
+      for(let i=0;i<str.length;i++){
+        const ch=str.charCodeAt(i);
+        h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677);
+      }
+      h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+      h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+      return (h2>>>0).toString(16).padStart(8,'0')+(h1>>>0).toString(16).padStart(8,'0');
+    }
+    function stableImportUid(kind,key){return `${kind}-import-${contentHash53(String(key))}`;}
+    function stableTemplateId(key){return stableImportUid(ID_KIND.template,key);}
+    function stableProgramId(key){return stableImportUid(ID_KIND.program,key);}
+    /* #263: re-accepting a share must not stack identical "(shared)" names —
+       keep suffixing until the name is unique. */
+    function uniqueSuffixedName(base,existingNames,numbered){
+      if(!existingNames.includes(base))return base;
+      /* #315 (user 2026-09-13): shared workouts render a SHARED chip instead
+         of a "(shared)" name suffix, so re-accept collisions dedupe with a
+         neutral (2)/(3). Programs keep the legacy " (shared)" suffix. */
+      let n=1,candidate;
+      if(numbered){
+        candidate=`${base} (2)`;
+        while(existingNames.includes(candidate)){n++;candidate=`${base} (${n+1})`;}
+      }else{
+        candidate=`${base} (shared)`;
+        while(existingNames.includes(candidate)){n++;candidate=`${base} (shared ${n})`;}
+      }
+      return candidate;
+    }
     /* #99 L12: single canonical local-date formatter. Accepts an optional Date
        (defaults to now) — replaces the dashboard-stats isoForDate duplicate. */
     function localIsoDate(date) {
@@ -164,6 +200,18 @@
       if(weight>priorWeight)return 'heaviest';
       return '';
     }
+    /* #282: timed-PR detection — longest hold at a given load. A hold beats
+       the prior best at the SAME load (unweighted = load 0); a load with no
+       prior hold is new territory, so any hold there is a PR — mirroring how
+       'heaviest' treats a new top weight. Callers own the "prior" definition,
+       same contract as detectExercisePRs. */
+    function detectTimedPRs(currentSets,priorSets){
+      const current=(currentSets||[]).filter(s=>Number(s.seconds)>0),prior=(priorSets||[]).filter(s=>Number(s.seconds)>0);
+      if(!current.length||!prior.length)return false;
+      const load=s=>Number(s.w)||0;
+      const bestAt=target=>{const pool=prior.filter(s=>load(s)===target);return pool.length?Math.max(...pool.map(s=>Number(s.seconds))):-Infinity;};
+      return current.some(s=>Number(s.seconds)>bestAt(load(s)));
+    }
     /* #158: the shared "prior" definition for PR detection. Matches the live
        PR banner (which compares against all of getExerciseLogs): earlier
        sessions from the SAME date count, because they completed before this
@@ -172,8 +220,20 @@
        row.date<workout.date gate silently dropped those. */
     function priorSetsForPR(workout,exerciseId){
       const ordered=workoutState.completed||[],selfIdx=ordered.findIndex(row=>row.id===workout.id);
+      const stamp=row=>row&&row.completedAt?Date.parse(row.completedAt):NaN;
+      const selfStamp=stamp(workout);
       return ordered
-        .filter((row,i)=>row.id!==workout.id&&(row.date<workout.date||(row.date===workout.date&&selfIdx>=0&&i>selfIdx)))
+        .filter((row,i)=>{
+          if(row.id===workout.id)return false;
+          if(row.date<workout.date)return true;
+          if(row.date>workout.date)return false;
+          /* #277: same-day chronology comes from completedAt, not array order —
+             a sync reorder must not flip which session counts as "prior".
+             Stamp-less legacy rows keep the index comparison. */
+          const rowStamp=stamp(row);
+          if(!isNaN(selfStamp)&&!isNaN(rowStamp))return rowStamp<selfStamp;
+          return selfIdx>=0&&i>selfIdx;
+        })
         .flatMap(row=>row.exercises.filter(entry=>entry.exerciseId===exerciseId).flatMap(entry=>entry.sets));
     }
     /* Units (2026-09-10): weights are stored canonically in pounds; the metric
@@ -320,6 +380,14 @@
     /** Slim persistent top bar: title per view, back chevron only on non-root screens,
      *  settings gear everywhere except on Settings itself. */
     const TOP_BAR_TITLES = { dashboard: 'Home', library: 'Exercises', workout: 'Workout', program: 'Program', stats: 'Stats', settings: 'Settings' };
+    /* #313: the live-session dot lives inside the title-text span
+       (absolutely positioned, so it never shifts the centered title) —
+       every title update re-appends it instead of wiping it. */
+    function setTopBarTitle(el, html){
+      const dot=$('#liveTitleDot');
+      el.innerHTML=html;
+      if(dot)el.appendChild(dot);
+    }
     function updateTopBar(view, customTitle) {
       const titleEl = $('#topBarTitle'); if (!titleEl) return;
       /* The title text lives in its own span so the live-session dot next to
@@ -345,10 +413,10 @@
            affordance. */
         const ret = state.exerciseDetailReturn && state.exerciseDetailReturn.view;
         const parentKey = { library: 'library', workout: 'workout', program: 'program', dashboard: 'dashboard', stats: 'stats', 'completed-workout': 'workout' }[ret] || 'library';
-        titleText.textContent = TOP_BAR_TITLES[parentKey];
+        setTopBarTitle(titleText, escapeHtml(TOP_BAR_TITLES[parentKey]));
       } else if (view === 'settings') {
         // Settings is its own page, not a breadcrumb (user 2026-09-10).
-        titleText.textContent = 'Settings';
+        setTopBarTitle(titleText, 'Settings');
       } else if (view === 'workout' && (state.workoutSubScreen === 'history' || state.workoutSubScreen === 'complete')) {
         /* User 2026-09-12: the log list and a completed workout are "Logs",
            not "Workout" — these are completed sessions. The title is a hidden
@@ -356,7 +424,7 @@
            log list. The chevron was removed per user feedback: it doesn't
            fit the design and the title tap is a shortcut, not navigation. */
         const logLabel = customTitle || 'Logs';
-        titleText.innerHTML = `<button type="button" class="title-tap" id="topBarTitleTap" aria-label="View all workout logs">${escapeHtml(logLabel)}</button>`;
+        setTopBarTitle(titleText, `<button type="button" class="title-tap" id="topBarTitleTap" aria-label="View all workout logs">${escapeHtml(logLabel)}</button>`);
         const titleTap = $('#topBarTitleTap');
         if (titleTap) titleTap.addEventListener('click', () => {
           /* Already on the list: don't push a duplicate history entry. */
@@ -364,7 +432,7 @@
           showWorkoutHistory();
         });
       } else {
-        titleText.textContent = customTitle || TOP_BAR_TITLES[view] || '';
+        setTopBarTitle(titleText, escapeHtml(customTitle || TOP_BAR_TITLES[view] || ''));
       }
     }
 
@@ -410,6 +478,7 @@
          prescribed target; 'forTemplate' converts a completed set's ACTUAL
          rpe into a suggested targetRpe.
        - #175: 'forNewSession' carries the previous weight as a real value.
+       - #267: 'forNewSession' blanks r/seconds so the ghost suggestion shows.
        - Legacy templates stored prescribed targets in `rpe`; 'fromTemplate'
          and 'fromProgram' prefer `targetRpe` over `rpe`.
        - 'forEdit' is the full-fidelity round trip (actual RPE kept,
@@ -422,7 +491,11 @@
     function cloneSetFields(set,mode){
       const s=set||{};
       switch(mode){
-        case 'forNewSession':return {w:s.w==null?'':String(s.w),r:s.r==null?'':String(s.r),seconds:s.seconds==null?'':String(s.seconds),rpe:'',targetRpe:cleanTargetRpe(s.targetRpe),tags:[...(s.tags||[])]};
+        /* #267 (user 2026-09-12): repeat-as-new blanks performance (r/seconds)
+           so the Rep+ ghost suggestion shows — carrying last session's reps
+           as real values hid the ghost. Weight still carries (#175), RPE
+           still clears (A7). */
+        case 'forNewSession':return {w:s.w==null?'':String(s.w),r:'',seconds:'',rpe:'',targetRpe:cleanTargetRpe(s.targetRpe),tags:[...(s.tags||[])]};
         case 'forTemplate':return {w:s.w==null?'':String(s.w),r:s.r==null?'':String(s.r),seconds:s.seconds==null?'':String(s.seconds),rpe:'',targetRpe:cleanTargetRpe(s.rpe),tags:[...(s.tags||[])]};
         case 'fromTemplate':return {w:'',r:s.r??'',seconds:s.seconds??'',rpe:'',targetRpe:cleanTargetRpe(s.targetRpe??s.rpe),tags:[...(s.tags||[])]};
         case 'fromProgram':return {w:'',r:'',seconds:'',rpe:'',targetRpe:cleanTargetRpe(s.targetRpe??s.rpe),tags:[...(s.tags||[])]};

@@ -2,13 +2,124 @@
 
 Newest first. Only user-facing milestones.
 
-## v1.1.1 (2026-09-12)
-Hotfix for two share-link regressions (user-approved):
+## v1.47 (2026-09-13)
+- #315 (pre-prod caution, resolved): the shared-workout-chip boot migration no longer collapses legacy names — "Leg Day (shared)" + "Leg Day (shared 2)" become "Leg Day" + "Leg Day (2)" instead of two "Leg Day"s. Version renumbered from 1.047 → 1.47 for the production push.
+
+## v1.047 (2026-09-13)
+- #317 (user): reverted the v1.046 checkbox-slide attempt — it didn't fix the report, so checkbox-start gestures are tap-only again (v1.045 behavior). The checkbox-origin swipe is filed as #331 for a later release. The ?swipediag=1 diagnostic overlay stays deleted.
+
+## v1.046 (2026-09-13)
+- #317 (user): a drag starting on the checkbox slides the row again like prod (v1.045 wrongly killed the visual slide; the rail still never opens from the checkbox — release snaps back to a tap, per the standing rule). Also deleted the ?swipediag=1 diagnostic overlay outright — it never worked on the phone.
+
+## v1.045 (2026-09-13)
+- #317 (user): swipe-to-delete fixed for real. Two frontend experts converged on the mechanism: the mid-gesture keyboard blur (v1.041's lock-time blur, v1.042's pointerdown blur) dismissed the keyboard, iOS resized the viewport mid-touch, and WebKit killed the gesture with pointercancel — and separately, iOS Safari's caret-drag recognizer reclaims horizontal drags that start on a focused input, which a PointerEvent preventDefault can't stop. The fix: no focus changes anywhere near the gesture, plus a non-passive touchmove claim layer that takes the gesture from WebKit the moment the swipe locks. Also tightened: the vertical-abort predicate (diagonal drifts no longer hijack the row), the rail now snaps fully open with animation, and a swipe ending over the rail can't instant-delete anymore.
+
+## v1.044 (2026-09-13)
+- #317 (user): REVERTED the v1.042 swipe changes — the touch-down keyboard dismiss and the pinned set number are gone, back to the v1.041 baseline. The v1.042 swipe work made things actively worse on the phone, so the keyboard-race theory is under re-evaluation by frontend experts before anything new ships. The swipe diagnostics (?swipediag=1) and the delete renumber guard stay.
+
+## v1.043 (2026-09-13)
+- #329 (user): toggling set tags no longer re-renders the exercise list behind the open tag dialog — the jumping/expanding animations are gone. Tag changes save immediately; the list does one catch-up render when the dialog closes. Same fix applied to the exercise-tag dialog.
+
+## v1.042 (2026-09-13)
+- #320 (user): the saved-workout detail header shows the summary as chips ("3 exercises", "9 sets", "Focus: Legs") instead of the old "N exercises · M sets" text line.
+- #316 (user): the Settings numeric fields actually match the workout set-input styling now — a more-specific Settings override (48px/14px/12px) was silently winning over the v1.040 fix; it's corrected to 44px / 9px padding / radius-sm / raised surface.
+- #317 (user): swipe-to-delete — the keyboard now dismisses the instant the finger touches down (touch only) instead of at horizontal lock, so iOS can't take the gesture over with its text-drag; taps still focus normally. The ?swipediag=1 diagnostic button works through the hash routes too. Also, the set number stays pinned at the left while the delete rail opens (it used to slide off with the row), and deleting a middle set renumbers the survivors.
+- (user): workout set-input placeholders are back to the old 10px shrink on mobile.
+
+## v1.041 (2026-09-13)
+- (user): reverted the v1.039 all-caps set-row placeholders — back to "Weight", "Reps", "Seconds", "Optional" (the caps read too big). RPE stays uppercase.
+
+## v1.040 (2026-09-13)
+- #315 (user): shared workouts no longer carry "(shared)" in the name — they render a SHARED chip in the saved-workout list and detail header, matching the existing Built-in/Program badges. Existing "(shared)" names are migrated to the chip.
+- #316 (user): Settings numeric fields now match the workout set-input styling — 44px, radius-sm, raised surface, 16px text, theme-matched caret, accent border and focus ring. Pills, switches, and step controls are untouched.
+- #317 (user): swipe-to-delete regression — the weight field wrapper is now a span instead of a label (iOS was swallowing the gesture when the swipe started on the label-wrapped field). A hidden gesture-event log (?swipediag=1) is available if the repro persists.
+
+## v1.039 (2026-09-13)
+- (user): the workout set-row fallback placeholders are now all caps — "WEIGHT", "REPS", "SECONDS", "OPTIONAL" — matching the existing "RPE" placeholder and the column headers.
+
+## v1.038 (2026-09-13)
+- (user): workout set-input placeholders now render at the same 16px size as entered values — the old 10px shrink on touch made hints like "100" and "RPE" unreadably tiny next to real text.
+- (user): fixed the dead space under the home muscle map — the pre-hydration aspect-ratio reserve never released because `data-hydrated` was never set on inject; the host now hugs the SVG on every map (home, stats, exercise, workout).
+
+## v1.037 (2026-09-13)
+- #262 (user): the review-sets dialog is now two buttons — "Finish anyway" and "Keep editing". The copy reads "{N} sets are missing… Clicking Finish will delete your sets." The old middle "Delete N unfinished sets" button ran the identical operation and is gone.
+- #305 (user): sign-out now kills the Supabase session even when the logout network call fails — it signs out with local scope (no network call) and the wipe removes any lingering sb-*-auth-token keys, so a dead session can no longer silently re-adopt the cloud copy after the reload.
+
+## v1.036 (2026-09-13)
+- #326 (user): after signing in inside the share dialog, the header now switches from "Sign in to share" to the regular share copy ("Share link" / "Send this shared workout with the link below.") instead of staying stuck on the signed-out text.
+
+## v1.035 (2026-09-13)
+- #322 (user): the set-count chips under the Stats muscle map are gone — the map stands alone.
+- #323 (user): "Weight by muscle" is now "Volume by muscle" (it shows volume), and the volume option reads "Volume" — not "Weight" — on the muscle-map, by-muscle, and top-exercise toggles, plus the Settings default-tracking-metric pill.
+- #324 (user): saved workouts get the same inline × delete as program rows when swipe-to-delete is off (desktop always), opening the same confirmation; hovering the × tints that part of the card the swipe-rail red.
+- #318 refinement (user): the 1RM/Heaviest toggle now centers against the whole kicker+headline block instead of floating on the kicker row alone.
+- #325 (user): the Workout tab no longer stays accent-colored while a session is live — it reads active only on its own page (the header Live chip remains the way back).
+
+## v1.034 (2026-09-13)
+- #321 (user): deloads are now an **Auto Deload toggle** — it sits at the bottom of the program setup screen and in Settings → progression defaults (new programs inherit it). Turning it on reveals the "every N weeks" and "deload intensity" fields; it's off by default, and existing programs that had a deload schedule keep it.
+
+## v1.033 (2026-09-13)
+- #314: exercise-add mode no longer shows the "Tap to add · N selected" hint — it's fully hidden so it leaves no empty space (swap mode keeps its "Tap an exercise to swap it in" hint); the tapped exercise row no longer jumps when the rule content changes.
+- #318: the exercise chart's kicker/headline block sits higher, beside the 1RM/Heaviest toggle, with a hairline above the volume chart.
+- #319: the muscle map gets its own independent Weight/Sets toggle (it used to follow the chart's), and "Volume" is now called "Weight" on the map, muscle, and top-exercise toggles.
+- #244 revision (user): the share-link screen now reads "Send this shared workout with the link below." above the link, and Copy link is the first of the two centered buttons.
+
+## v1.032 (2026-09-13)
+Easy-win UX batch (user):
+- #313: the top-bar "Workout" title is now always dead-center — the live-session dot used to sit in the layout flow and nudge the title left of center on the live workout screen.
+- #308: the volume-per-session bar chart no longer shows the day ordinal ("Sep 2 (2)") — same plain session labels as the heaviest-set chart (#249).
+- #309: the 1RM / Heaviest toggle now sits on the chart's own header line ("Estimated 1RM" / "Heaviest weight"), right-justified, instead of up in the section head.
+- #310: saved-workout cards get their corners back — same iOS wrapper fix the program cards received.
+- #311: the logs list count note shows just the count for the period ("7 sessions"), never "7 of 24 sessions".
+- #312: adding a saved workout to a program no longer shows it twice in the saved list — the template card already carries the program chip, so the program copy doesn't render as a second card.
+
+## v1.031 (2026-09-13)
+Phone QA follow-ups:
+- #254: the Continue-program card's shadow also follows the Rosé accent — the last element still glowing blue.
+- #305: signing out now actually signs out — local workout data is wiped from the device (the cloud copy comes back on the next sign-in).
+- #244: share modal per the user's pick — no copy on the share screen, no Done button (the × closes it), two centered buttons; the sign-in prompt reads "Sharing needs an account. It’s free to sign up."
+- #232: the "clearing the search" link is now plain text (regular color, not bold, not underlined); clearing scrolls the list into view instead of jumping; filter "Clear all" drops the modal, then scrolls.
+- #238: the filter dialog's PROGRAM chip row now has breathing room below the muscle chips.
+- Signed-out share landings show a clean first-run header — just the Start button, no bookmark ribbon, no ×.
+- #306: boot no longer pre-renders the Stats tab (it renders on first visit instead).
+Fixes found in the v1.029 browser QA pass:
+- #295: the program form's "% of 1RM" row no longer flashes visible on first load with RPE-based selected.
+- #254: the Continue-program card's halo around the card also follows the Rosé accent (pink) under the Rosé theme.
+- #301: the completed-workout summary card now reads "1 exercise" / "1 completed set" for a single exercise/set.
+- #283: the exercise Configure dialog now rejects an inverted range (e.g. Min sec 90 / Max sec 60) with an error instead of saving it.
+
+## v1.029 (2026-09-12)
+Easy-win batch 2:
+- #249: the heaviest-weight chart's labels no longer show the day ordinal in parentheses.
+- #238: removed the duplicative Less/More heatmap legend.
+- #254: the Continue-program card's border/glow follows the Rosé accent (pink) under the Rosé theme.
+- #234: numeric set inputs have a light, theme-matched caret again.
+- #232: "clearing the search" in the saved-workouts empty state is now a tappable link that clears the search and filters.
+- #295: the program form's "% of 1RM" row and help text show only for the %1RM scheme; the saved percent value now loads into the field.
+- #301: singular "1 set" in recent workouts (also fixed in muscle-stat pills, exercise stats, and the continue-workout card).
+- #302: timed-only workout summaries show total time instead of a meaningless "total volume: 0 lb".
+- #303: cold-opening a share link keeps the /s/<slug> deep link in the address bar.
+
+## v1.028 (2026-09-12)
 - #296: opening a shared workout link now lands directly on the share landing (with a loading state) instead of flashing the home tab first.
 - #297: the share landing's header start control is a green Start button, not a bare play icon.
 
-## v1.1 (2026-09-12)
-First minor release after v1.000. Highlights since v1.000: short share links for workouts (app.cruciferousgreens.com/s/…), in-modal sign-in to share, Rosé theme, the review-sets dialog (Finish anyway / Delete N unfinished sets / Keep editing), completed sets keep their other fields frozen while the checkbox stays tappable to uncheck, saving a completed workout as a template now offers Start, opaque PR toast, program sharing temporarily removed (returns with working short links), a progression guard so rep-range changes can't recommend less than the current top-set weight, the new app icon, and the home share card. Full detail in the v1.001–v1.026 entries below.
+## v1.027 (2026-09-12)
+Batch 1 of post-v1.1 fixes (14 small, safe changes):
+- #269: the completed-workout view's Start button now asks first when a workout is in progress (it used to silently replace the live draft).
+- #264: the share sign-in cooldown timer no longer leaks if the dialog is dismissed with Esc.
+- #268: sets with no RPE recorded (legacy/imported) no longer trip the review-sets check — RPE is optional.
+- #271: the saved-workouts empty state now names the real button ("Save as template on a completed workout").
+- #272: deleting an exercise no longer leaves a stale superset tag behind.
+- #273: Home's recent workouts are sorted by recency, matching the Logs list.
+- #275: finishing an edit from the Logs list returns to the Logs list, not the Workout page.
+- #283: time-based rules can't be saved with Min sec above Max sec anymore.
+- #292: old sync delete-records are pruned after 90 days.
+- #260: saved-workout rows can be swiped to delete (with the usual confirmation).
+- #261: already in place — the saved-workout page has Share to the left of Start.
+- #266: the PR toast fires once per exercise per workout, not once per set.
+- #270: the inline set-delete × now asks for confirmation (the swipe delete stays instant).
+- #285: suggestion cards no longer show a "0 sec" old target for exercises just flipped to time tracking.
 
 ## v1.026 (2026-09-12)
 - #242 (corrected): a completed set's checkbox is tappable again — tapping it un-checks (uncompletes) the set. The set's other fields (weight, reps, RPE) stay frozen while it is complete.

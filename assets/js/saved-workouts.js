@@ -48,7 +48,9 @@
       if(btn){
         const start=document.createElement('button');
         start.type='button';start.id='saveCompletedWorkoutTop';start.className=btn.className;start.textContent='Start';
-        start.addEventListener('click',()=>startWorkoutFromTemplate(template.id));
+        /* #269: the replacement Start button gets the same conflict guard — it
+           must not silently destroy the session it was just saved from. */
+        start.addEventListener('click',()=>requestStartWithConflict(template.name,()=>startWorkoutFromTemplate(template.id)));
         btn.replaceWith(start);
       }
     }
@@ -106,10 +108,18 @@
       const items=[];
       (workoutState.templates||[]).filter(t=>!t.archivedAt).forEach(t=>{
         items.push({kind:'template',id:t.id,name:t.name||'Untitled',builtIn:!!t.builtIn,
+          shared:!!t.shared,
           exercises:t.exercises||[],programNames:templateProgramNames(t.id),
           muscles:savedItemMuscles(t.exercises||[])});
       });
+      /* #312 (user 2026-09-12): a program shell copied FROM a live saved
+         workout is not a second card — the template card already carries
+         the program chip, so the shell would read as a duplicate. Program-
+         only workouts (no source template, or the template is gone) still
+         show as their own cards. */
+      const liveTemplateIds=new Set((workoutState.templates||[]).filter(t=>!t.archivedAt).map(t=>t.id));
       (program?.workouts||[]).forEach(w=>{
+        if(w.sourceTemplateId&&liveTemplateIds.has(w.sourceTemplateId))return;
         items.push({kind:'program',uid:w.uid,name:w.name||'Untitled',
           exercises:w.template?.exercises||[],programNames:[program.name],
           muscles:savedItemMuscles(w.template?.exercises||[])});
@@ -125,22 +135,52 @@
       };
       const shown=items.filter(matches).sort((a,b)=>a.name.localeCompare(b.name));
       const card=item=>{
-        const chips=`${item.kind==='template'&&item.builtIn?'<span class="built-in-label">Built-in</span>':''}${item.programNames.map(n=>`<span class="built-in-label">${escapeHtml(n)}</span>`).join('')}`;
+        /* #315 (user 2026-09-13): shared workouts carry a SHARED chip, not a
+           "(shared)" name suffix. */
+        const chips=`${item.kind==='template'&&item.builtIn?'<span class="built-in-label">Built-in</span>':''}${item.kind==='template'&&item.shared?'<span class="built-in-label">Shared</span>':''}${item.programNames.map(n=>`<span class="built-in-label">${escapeHtml(n)}</span>`).join('')}`;
         const count=item.exercises.length;
-        const attr=item.kind==='template'?`data-saved-id="${escapeHtml(item.id)}"`:`data-program-workout="${escapeHtml(item.uid)}"`;
-        return `<button class="picker-item saved-workout-card" type="button" ${attr} aria-label="Open ${escapeHtml(item.name)}"><span><strong>${escapeHtml(item.name)} ${chips}</strong><span>${count} exercise${count===1?'':'s'}</span></span><span class="picker-state">›</span></button>`;
+        const body=`<span><strong>${escapeHtml(item.name)} ${chips}</strong><span>${count} exercise${count===1?'':'s'}</span></span><span class="picker-state" aria-hidden="true">›</span>`;
+        if(item.kind!=='template'){
+          /* Program workouts in this list keep the plain card. */
+          return `<button class="picker-item saved-workout-card" type="button" data-program-workout="${escapeHtml(item.uid)}" aria-label="Open ${escapeHtml(item.name)}">${body}</button>`;
+        }
+        /* #260 (user 2026-09-12): swipe-to-delete on saved-workout rows,
+           mirroring the program rows — the rail opens the standard delete
+           confirmation (with sync tombstone). Built-ins can't be deleted, so
+           they get no rail. */
+        const swipeOn=typeof swipeDeleteSetsEnabled==='function'?swipeDeleteSetsEnabled():true;
+        const rail=swipeOn&&!item.builtIn?`<button class="swipe-delete-action delete-saved-row" type="button" data-saved-id="${escapeHtml(item.id)}" aria-label="Delete ${escapeHtml(item.name)}" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/></svg></button>`:'';
+        /* #324 (user 2026-09-12): inline × delete when swipe-to-delete is off
+           (desktop always) — same UI as the program workout rows. */
+        const inlineDel=!swipeOn&&!item.builtIn?`<button class="saved-workout-del" type="button" data-del-saved-id="${escapeHtml(item.id)}" aria-label="Delete ${escapeHtml(item.name)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`:'';
+        return `<div class="swipe-item saved-swipe">${rail}<div class="picker-item saved-workout-card swipe-content saved-workout-row"><button class="saved-workout-open" type="button" data-saved-id="${escapeHtml(item.id)}" aria-label="Open ${escapeHtml(item.name)}">${body}</button>${inlineDel}</div></div>`;
       };
       const archived=(workoutState.templates||[]).filter(t=>t.archivedAt);
       const archivedCard=t=>card({kind:'template',id:t.id,name:t.name||'Untitled',builtIn:!!t.builtIn,exercises:t.exercises||[],programNames:[],muscles:[]});
       const filtering=query||filter.muscles.length||filter.inProgram;
       host.innerHTML=(shown.length?`<div class="saved-workout-cards">${shown.map(card).join('')}</div>`
-        :filtering?'<div class="dialog-empty"><strong>No saved workouts match.</strong><br>Try clearing the search or filters.</div>'
-        :'<div class="dialog-empty"><strong>No saved workouts yet.</strong><br>Build a workout, then choose Save workout.</div>')
+        :filtering?'<div class="dialog-empty"><strong>No saved workouts match.</strong><br>Try <button type="button" class="text-link dialog-empty-link" data-clear-saved-search>clearing the search</button> or filters.</div>'
+        :'<div class="dialog-empty"><strong>No saved workouts yet.</strong><br>Build a workout, then choose Save as template on a completed workout.</div>')
         +(archived.length?`<details class="archived-saved-disclosure"><summary>Archived (${archived.length})</summary><div class="saved-workout-cards">${archived.map(archivedCard).join('')}</div></details>`:'')
         +`<button class="new-template-button" id="addSavedWorkoutButton" type="button">+ Add saved workout</button>`;
-      host.querySelectorAll('[data-saved-id]').forEach(b=>b.addEventListener('click',()=>openSavedWorkoutEditor(b.dataset.savedId)));
+      host.querySelectorAll('.saved-workout-open[data-saved-id]').forEach(b=>b.addEventListener('click',()=>openSavedWorkoutEditor(b.dataset.savedId)));
       host.querySelectorAll('[data-program-workout]').forEach(b=>b.addEventListener('click',()=>openProgramWorkoutPage(b.dataset.programWorkout)));
+      /* #260: the swipe rail's delete opens the standard confirmation modal
+         (with sync tombstone) instead of deleting instantly. #324: the
+         inline × opens the same confirmation. */
+      const confirmDeleteSaved=id=>{
+        const t=workoutState.templates.find(x=>x.id===id);if(!t||t.builtIn)return;
+        pendingDeleteTemplateId=t.id;
+        $('#deleteTemplateDesc').textContent=`Delete "${t.name}"? This cannot be undone.`;
+        $('#deleteTemplateDialog').showModal();
+      };
+      host.querySelectorAll('.delete-saved-row').forEach(b=>b.addEventListener('click',()=>confirmDeleteSaved(b.dataset.savedId)));
+      host.querySelectorAll('[data-del-saved-id]').forEach(b=>b.addEventListener('click',()=>confirmDeleteSaved(b.dataset.delSavedId)));
+      attachSwipeDelete(host);
       $('#addSavedWorkoutButton')?.addEventListener('click',()=>startSavedBuilder());
+      /* #232 (user 2026-09-12): the empty state's "clearing the search" is a
+         tappable link — same clear as the filter dialog's Clear button. */
+      host.querySelector('[data-clear-saved-search]')?.addEventListener('click',()=>clearSavedSearchAndFilters());
       updateSavedFilterBadge();
     }
     function updateSavedFilterBadge(){
@@ -171,6 +211,18 @@
       renderSavedFilterDialog();
       $('#savedFilterDialog').showModal();
     }
+    /* User 2026-09-12: clearing search/filters scrolls the saved-workouts
+       section into view (a controlled scroll instead of a disorienting jump
+       when the list height changes). "Clear all" in the filter modal also
+       drops the modal — one-shot modal actions dismiss the modal. */
+    function clearSavedSearchAndFilters(dropDialog){
+      const f=savedFilterState();f.muscles=[];f.inProgram=false;
+      const s=$('#savedSearch');if(s)s.value='';
+      renderSavedFilterDialog();renderWorkoutTemplateList();schedulePersist();
+      if(dropDialog)$('#savedFilterDialog').close();
+      const sec=$('#savedWorkoutList')?.closest('section');
+      if(sec)sec.scrollIntoView({behavior:'smooth',block:'start'});
+    }
     /* One-time wiring for the saved-list search + filter (user 2026-09-12). */
     (function wireSavedListControls(){
       $('#savedSearch')?.addEventListener('input',()=>renderWorkoutTemplateList());
@@ -178,7 +230,7 @@
       $('#closeSavedFilter')?.addEventListener('click',()=>$('#savedFilterDialog').close());
       $('#clearSavedMuscles')?.addEventListener('click',()=>{savedFilterState().muscles=[];renderSavedFilterDialog();updateSavedFilterBadge();schedulePersist();});
       $('#savedInProgramToggle')?.addEventListener('click',e=>{const f=savedFilterState();f.inProgram=!f.inProgram;e.currentTarget.setAttribute('aria-pressed',String(f.inProgram));updateSavedFilterBadge();schedulePersist();});
-      $('#clearSavedFilters')?.addEventListener('click',()=>{const f=savedFilterState();f.muscles=[];f.inProgram=false;const s=$('#savedSearch');if(s)s.value='';renderSavedFilterDialog();renderWorkoutTemplateList();schedulePersist();});
+      $('#clearSavedFilters')?.addEventListener('click',()=>clearSavedSearchAndFilters(true));
       $('#applySavedFilters')?.addEventListener('click',()=>{$('#savedFilterDialog').close();renderWorkoutTemplateList();});
     })();
     /* Saved-workout editor page (user 2026-09-12): view/edit/start a saved
@@ -213,8 +265,9 @@
          Edit opens the builder in edit mode (the creation page reused);
          built-in templates show Edit as disabled. Bottom row is Edit +
          Duplicate; Archive is a dashed button beneath. */
-      const badges=`${t.builtIn?'<span class="built-in-label">Built-in</span>':''}${t.archivedAt?' <span class="built-in-label">Archived</span>':''}`;
-      host.innerHTML=`<div class="completed-card"><span class="continue-kicker">Saved workout</span><div class="detail-title-row"><h2>${escapeHtml(t.name)} ${badges}</h2><span class="title-actions"><button class="icon-button" id="shareSavedWorkoutBtn" type="button" aria-label="Share ${escapeHtml(t.name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 14.5v-11"/><path d="M7.6 7.4L12 3l4.4 4.4"/><path d="M6 11.5V19a1.6 1.6 0 0 0 1.6 1.6h8.8A1.6 1.6 0 0 0 18 19v-7.5"/></svg></button><button class="start-inline-button" id="startSavedWorkoutBtn" type="button">Start</button></span></div><p class="completed-meta">${t.exercises.length} exercise${t.exercises.length===1?'':'s'} · ${totalSets} set${totalSets===1?'':'s'}${focusLabel?` · Focus: ${escapeHtml(focusLabel)}`:''}</p>
+      /* #315 (user 2026-09-13): SHARED chip instead of a "(shared)" suffix. */
+      const badges=`${t.builtIn?'<span class="built-in-label">Built-in</span>':''}${t.shared?' <span class="built-in-label">Shared</span>':''}${t.archivedAt?' <span class="built-in-label">Archived</span>':''}`;
+      host.innerHTML=`<div class="completed-card"><span class="continue-kicker">Saved workout</span><div class="detail-title-row"><h2>${escapeHtml(t.name)} ${badges}</h2><span class="title-actions"><button class="icon-button" id="shareSavedWorkoutBtn" type="button" aria-label="Share ${escapeHtml(t.name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 14.5v-11"/><path d="M7.6 7.4L12 3l4.4 4.4"/><path d="M6 11.5V19a1.6 1.6 0 0 0 1.6 1.6h8.8A1.6 1.6 0 0 0 18 19v-7.5"/></svg></button><button class="start-inline-button" id="startSavedWorkoutBtn" type="button">Start</button></span></div><div class="meta-chips" role="list" aria-label="Workout summary"><span class="tag" role="listitem">${t.exercises.length} exercise${t.exercises.length===1?'':'s'}</span><span class="tag" role="listitem">${totalSets} set${totalSets===1?'':'s'}</span>${focusLabel?`<span class="tag" role="listitem">Focus: ${escapeHtml(focusLabel)}</span>`:''}</div>
       ${muscles.length?`<div class="section-head"><h3>Muscles worked</h3></div>${workoutBodyMapMarkup(muscles)}<div class="workout-muscles">${muscles.map(m=>musclePill(m)).join('')}</div>`:''}
       <div class="section-head"><h3>Exercises</h3></div>${rows||'<p class="section-note">No exercises yet — add some below.</p>'}
       <div class="detail-action-buttons"><div class="detail-action-row"><button class="secondary-button" id="editSavedWorkoutBtn" type="button" ${t.builtIn?'disabled aria-disabled="true" title="Built-in workouts can\'t be edited — duplicate one to customize it"':''}>Edit</button><button class="secondary-button" id="duplicateSavedWorkoutBtn" type="button">Duplicate</button></div>
@@ -427,7 +480,7 @@
       host.querySelectorAll('.advanced-options').forEach(det=>det.addEventListener('toggle',()=>{const item=findItem(det.closest('[data-builder-exercise]')?.dataset.builderExercise);if(item){item.optionsOpen=det.open;schedulePersist();}}));
     }
     function wireBuilderDeleteExercise(host,b){
-      host.querySelectorAll('[data-builder-del-ex]').forEach(btn=>btn.addEventListener('click',()=>{b.exercises=b.exercises.filter(x=>x.uid!==btn.dataset.builderDelEx);schedulePersist();renderSavedBuilder();}));
+      host.querySelectorAll('[data-builder-del-ex]').forEach(btn=>btn.addEventListener('click',()=>{b.exercises=b.exercises.filter(x=>x.uid!==btn.dataset.builderDelEx);/* #272: same orphan cleanup as the live editor. */normalizeSupersets();schedulePersist();renderSavedBuilder();}));
       /* #142: swap an exercise while its set structure carries over. */
       host.querySelectorAll('[data-builder-swap-ex]').forEach(btn=>btn.addEventListener('click',()=>startExerciseSwap(btn.dataset.builderSwapEx,'template')));
     }
@@ -593,13 +646,28 @@
       $('#builderConfigureMin').focus({preventScroll:true});
     }
     $('#cancelBuilderConfigure')?.addEventListener('click',()=>{$('#builderConfigureDialog').close();pendingBuilderConfigureUid=null;});
+    /* #283 (agent 2026-09-12): the Configure dialog must not accept an
+       inverted range (e.g. Min sec 90 / Max sec 60). Pure so it's
+       unit-testable: returns an error string, or null when the range is
+       fine. Blank max stays valid (AMRAP for reps; timeMax=timeMin for
+       time), matching the apply handler's defaults. */
+    function validateBuilderConfigureRange(time,minVal,maxVal){
+      const min=minVal===''?null:Number(minVal), max=maxVal===''?null:Number(maxVal);
+      if(min==null||max==null||!(min>0)||!(max>0))return null;
+      if(min>max)return time?'Min sec can\u2019t be above Max sec.':'Min reps can\u2019t be above Max reps.';
+      return null;
+    }
     $('#applyBuilderConfigure')?.addEventListener('click',()=>{
       const b=state.savedBuilder;const item=b?.exercises.find(x=>x.uid===pendingBuilderConfigureUid);
-      $('#builderConfigureDialog').close();
-      if(!item){pendingBuilderConfigureUid=null;return;}
+      if(!item){$('#builderConfigureDialog').close();pendingBuilderConfigureUid=null;return;}
       const ex=exercises.find(e=>e.id===item.exerciseId);
       const time=exerciseTracking(item,ex)==='time';
       const minVal=$('#builderConfigureMin').value.trim(),maxVal=$('#builderConfigureMax').value.trim();
+      /* #283: reject inverted ranges before closing — the dialog stays open
+         with the values intact so they can be fixed. */
+      const rangeError=validateBuilderConfigureRange(time,minVal,maxVal);
+      if(rangeError){showToast(rangeError,'error');return;}
+      $('#builderConfigureDialog').close();
       const p={...(item.progression||{}),custom:true};
       if(time){
         p.timeMin=minVal?Number(minVal):30;p.timeMax=maxVal?Number(maxVal):p.timeMin;

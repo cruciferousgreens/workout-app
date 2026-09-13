@@ -2,6 +2,12 @@
 /* ===== module: set-tags.js ===== */
     /** Handles set annotations and exercise-level tags used by templates, live logging, and history. */
     /* Module map (v1.006) — Key: openTagDialog(), openExerciseTagDialog(), renderTagDialog(), addTag(). Depends on: workoutState.tags/exerciseTagTarget, state draft + builder, workout-builder picker context. */
+    /* #329 (user 2026-09-13): tag toggles must not full re-render the exercise
+       list behind the open dialog — it causes jumping/expanding/re-firing
+       animations. Tag changes persist immediately but the re-render is deferred
+       until the dialog closes (single catch-up render). */
+    let pendingLiveTagRender=false;
+    let pendingLiveExerciseTagRender=false;
     function exerciseTagTargetItem() {
       const target=workoutState.exerciseTagTarget;
       if(!target)return null;
@@ -28,10 +34,10 @@
         renderExerciseTagDialog();
         /* The tag target lives on workoutState, so route the re-render to the
            screen that owns the item: template picker, saved builder,
-           or the live draft. */
+           or the live draft (deferred until dialog close, #329). */
         if(workoutState.exerciseTagTarget?.mode==='template'){schedulePersist();renderPickerRules();}
         else if(workoutState.exerciseTagTarget?.mode==='builder'){schedulePersist();renderSavedBuilder();}
-        else{renderWorkoutExercises();markDraftSaved();}
+        else{markDraftSaved();pendingLiveExerciseTagRender=true;}
       }));
     }
     function addExerciseTag() {
@@ -45,7 +51,7 @@
       renderExerciseTagDialog();
       if(workoutState.exerciseTagTarget?.mode==='template'){schedulePersist();renderPickerRules();}
       else if(workoutState.exerciseTagTarget?.mode==='builder'){schedulePersist();renderSavedBuilder();}
-      else{renderWorkoutExercises();markDraftSaved();}
+      else{markDraftSaved();pendingLiveExerciseTagRender=true;}
     }
 
     function findDraftSet(exerciseUid, setUid) {
@@ -62,10 +68,11 @@
     }
 
     /* Tag edits land on whichever screen owns the target: the live draft
-       re-renders its exercises; the saved builder persists + re-renders. */
+       persists immediately but defers its exercise re-render until the dialog
+       closes (#329); the saved builder persists + re-renders. */
     function afterTagChange() {
       if (workoutState.tagTarget?.mode === 'builder') { schedulePersist(); renderSavedBuilder(); }
-      else { renderWorkoutExercises(); markDraftSaved(); }
+      else { markDraftSaved(); pendingLiveTagRender=true; }
     }
 
     function openTagDialog(exerciseUid, setUid, mode) {
@@ -119,5 +126,15 @@
       renderTagDialog();
       afterTagChange();
     }
+
+    /* #329: the deferred catch-up renders — one re-render per dialog close,
+       no matter how many toggles happened while it was open. The close event
+       fires for every dismissal path (Done/×/ESC/backdrop). */
+    $('#setTagsDialog')?.addEventListener('close',()=>{
+      if(pendingLiveTagRender){pendingLiveTagRender=false;renderWorkoutExercises();}
+    });
+    $('#exerciseTagsDialog')?.addEventListener('close',()=>{
+      if(pendingLiveExerciseTagRender){pendingLiveExerciseTagRender=false;renderWorkoutExercises();}
+    });
 
     

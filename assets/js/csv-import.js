@@ -1077,6 +1077,17 @@ function obPlanMfTemplateImport(sheets){
 }
 /* Writes a MacroFactor program spreadsheet as saved-workout templates instead of
    completed history. */
+/* #290: the MF template id derives from the FILE content, keyed on the CSV
+   exercise names — not the resolved exercise ids, which mint per-device
+   custom-exercise ids. The same file imported on two devices mints the same
+   template id, so sync dedups instead of surfacing two copies. */
+function mfTemplateContentKey(workout){
+  return JSON.stringify({n:workout.name,e:(workout.exercises||[]).map(function(item){
+    return {n:item.csvName,t:item.timed?1:0,r:item.range||null,
+      s:(item.sets||[]).map(function(s){return {tags:(s.tags||[]).slice(),rpe:s.rpe==null?null:s.rpe};}),
+      notes:item.notes||[]};
+  })});
+}
 function obExecuteMfTemplateImport(){
   const plan=obState.csvPlan;
   if(!plan||plan.errors.length||plan.kind!=='templates')return;
@@ -1105,7 +1116,11 @@ function obExecuteMfTemplateImport(){
       items.push(newExerciseItem({exerciseId:exerciseId,tracking:tracking,note:item.notes.join('; '),exerciseTags:[],supersetId:null,progression:progression,sets:sets}));
     });
     if(!items.length)return;
-    built.push({id:newTemplateId(),name:workout.name,exercises:items});
+    /* #290: stable content-derived id (see mfTemplateContentKey). Already
+       present = an explicit second import past the batch guard: fresh id. */
+    const stableId=stableTemplateId(mfTemplateContentKey(workout));
+    const tid=workoutState.templates.some(function(t){return t.id===stableId;})?newTemplateId():stableId;
+    built.push({id:tid,name:workout.name,exercises:items});
   });
   built.forEach(function(t){workoutState.templates.unshift(t);});
   schedulePersist();
