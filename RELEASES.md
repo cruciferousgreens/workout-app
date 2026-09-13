@@ -2,6 +2,12 @@
 
 Newest first. Only user-facing milestones.
 
+## v1.49 (2026-09-13)
+- (user): the two built-in StrongLifts 5×5 saved workouts (Workout A / Workout B) are deleted — the saved-workout list now shows only the user's own templates.
+
+## v1.48 (2026-09-13)
+- #336 (user): deleted saved workouts no longer come back — the cross-tab blob merge is now tombstone-aware, so a stale tab's autosave can't resurrect a just-deleted workout, log, or program (it used to, and the zombie then permanently defeated the sync tombstone).
+
 ## v1.47 (2026-09-13)
 - #315 (pre-prod caution, resolved): the shared-workout-chip boot migration no longer collapses legacy names — "Leg Day (shared)" + "Leg Day (shared 2)" become "Leg Day" + "Leg Day (2)" instead of two "Leg Day"s. Version renumbered from 1.047 → 1.47 for the production push.
 

@@ -62,25 +62,72 @@ if(typeof window!=='undefined'&&typeof window.addEventListener==='function'){
    merge by id — the newer (external) version wins an id conflict, because a
    stale tab must not clobber fresher state. Tags/favorites union. Scalars
    adopt the newer values. The local-only draft, builder draft, and list
-   filter stay this tab's (ephemeral per-tab state, unchanged behavior). */
+   filter stay this tab's (ephemeral per-tab state, unchanged behavior).
+   Tombstone-aware (#336): registry keys (completed/templates/
+   archivedPrograms) never resurrect a tombstoned id from the incoming blob —
+   the delete lives in the sync tombstone registry, which is not part of the
+   persist blob, so a plain union would bring back a record the user just
+   deleted the moment a stale tab's autosave lands (and the resurrected copy
+   would then earn a fresh updatedAt stamp, permanently defeating the sync
+   tombstone too). The check reads the persisted registry fresh, so a tab
+   that didn't record the delete still honors it. A record strictly newer
+   than its tombstone survives (same last-write-wins as the sync merge);
+   otherwise the delete stands on both sides. customExercises keeps in-array
+   tombstone records: a local tombstone record beats an incoming live copy
+   of the same id. */
 function mergeExternalBlob(blob){
   if(!blob||typeof blob!=='object'||blob.version!==SCHEMA_VERSION)return false;
-  const unionById=function(local,incoming){
-    const base=Array.isArray(local)?local:[];
+  const tombTs=(typeof tombstoneTsFresh==='function')?tombstoneTsFresh:null;
+  const tombstoned=typeof isTombstoned==='function'?isTombstoned:function(){return false;};
+  /* Numeric per-item revision, mirroring the sync engine's itemRevisionMs. */
+  const revMs=function(r){
+    if(!r||typeof r!=='object')return null;
+    const u=r.updatedAt;
+    if(typeof u==='number'&&isFinite(u))return u;
+    if(typeof u==='string'){const t=Date.parse(u);return isNaN(t)?null:t;}
+    return null;
+  };
+  /* True when the id's delete stands over this record: tombstoned and not
+     strictly newer than the delete. */
+  const deletedStands=function(key,r){
+    if(!tombTs||!(r&&r.id!=null))return false;
+    const ts=tombTs(key,r.id);
+    if(!ts)return false;
+    const rev=revMs(r);
+    return !(rev!=null&&rev>ts);
+  };
+  const unionById=function(key,local,incoming){
+    let base=Array.isArray(local)?local:[];
+    /* Drop local records whose delete stands (a stale tab learning of a
+       delete another tab recorded). */
+    if(tombTs)base=base.filter(function(r){return !deletedStands(key,r);});
     if(!Array.isArray(incoming)||!incoming.length)return base;
     const localIds=new Set(base.map(function(r){return r&&r.id;}));
     const incomingById={};
     incoming.forEach(function(r){if(r&&r.id!=null)incomingById[r.id]=r;});
     const merged=base.map(function(r){
-      return (r&&r.id!=null&&incomingById[r.id])?incomingById[r.id]:r;
+      if(!(r&&r.id!=null&&incomingById[r.id]))return r;
+      const inc=incomingById[r.id];
+      /* customExercises: a local tombstone record beats an incoming live
+         copy; an incoming tombstone propagates over a local live copy. */
+      if(key==='customExercises'){
+        if(tombstoned(r)&&!tombstoned(inc))return r;
+        return inc;
+      }
+      return inc;
     });
-    incoming.forEach(function(r){if(r&&r.id!=null&&!localIds.has(r.id))merged.push(r);});
+    incoming.forEach(function(r){
+      if(!(r&&r.id!=null)||localIds.has(r.id))return;
+      /* Never resurrect a tombstoned id from a stale tab's blob. */
+      if(deletedStands(key,r))return;
+      merged.push(r);
+    });
     return merged;
   };
-  workoutState.completed=unionById(workoutState.completed,blob.completed);
-  workoutState.templates=unionById(workoutState.templates,blob.templates);
-  workoutState.archivedPrograms=unionById(workoutState.archivedPrograms,blob.archivedPrograms);
-  state.customExercises=unionById(state.customExercises,blob.customExercises);
+  workoutState.completed=unionById('completed',workoutState.completed,blob.completed);
+  workoutState.templates=unionById('templates',workoutState.templates,blob.templates);
+  workoutState.archivedPrograms=unionById('archivedPrograms',workoutState.archivedPrograms,blob.archivedPrograms);
+  state.customExercises=unionById('customExercises',state.customExercises,blob.customExercises);
   if(blob.activeProgram&&typeof blob.activeProgram==='object')workoutState.activeProgram=blob.activeProgram;
   if(Array.isArray(blob.tags))workoutState.tags=mergeTagLists(workoutState.tags,blob.tags);
   if(Array.isArray(blob.exerciseTagPresets))workoutState.exerciseTagPresets=mergeTagLists(workoutState.exerciseTagPresets,blob.exerciseTagPresets);
@@ -328,8 +375,8 @@ function setSyncableValue(key,value){
   switch(key){
     case 'completed':if(Array.isArray(value))workoutState.completed=value;break;
     case 'templates':
-      /* Templates: built-ins are always present; only the user's own saved
-         templates merge in. */
+      /* Templates: built-ins were removed 2026-09-13 — only the user's own
+         saved templates merge in; any persisted built-ins are dropped. */
       if(Array.isArray(value)){
         const savedUser=value.filter(t=>t&&!t.builtIn);
         const ids=new Set(savedUser.map(t=>t.id));

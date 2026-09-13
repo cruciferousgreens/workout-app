@@ -41,7 +41,7 @@
      *  Everything below runs inside one IIFE and talks to the other sync
      *  pieces through the single `Sync` namespace. Global shims at the bottom
      *  keep pre-existing call sites working (markSyncDirty, wipeRemoteData,
-     *  noteTombstone, tombstoneAllForSync, pushDeleteAllRemote, isTombstoned,
+     *  noteTombstone, tombstoneAllForSync, tombstoneTsFresh, pushDeleteAllRemote, isTombstoned,
      *  liveItems).
      */
      /* Module map (v1.006) — Key: scheduleSyncPush(), mergeCollectionKey()/mergeStamp(), stampChangedItems(), noteTombstone()/liveItems(), pushDeleteAllRemote(). Depends on: sync-adapter (Supabase client), persistence SYNCABLE_KEYS, state shapes. */
@@ -190,6 +190,26 @@
         const map=getTombstoneMap(key), sid=String(id), now=Date.now();
         map.set(sid,Math.max(map.get(sid)||0,now));
         setTombstoneMap(key,map);
+      }
+      /** Cross-tab delete-memory check for the local read-before-write merge
+          (persistence.js mergeExternalBlob, #289). Reads the PERSISTED
+          tombstone registry fresh from localStorage instead of the in-memory
+          cache: the tab doing the merge is often NOT the tab that recorded
+          the delete (stale tab, or the PWA + Safari sharing one
+          localStorage), so its in-memory registry is empty. Without this, a
+          stale tab's blob resurrects a deleted id — and the resurrected copy
+          then earns a fresh updatedAt stamp that permanently defeats the sync
+          tombstone too (mergeCollectionKey's last-write-wins). Returns the
+          deletedAt ms, or 0 when the id is not tombstoned / unavailable.
+          Read-only: never prunes, never writes. */
+      function tombstoneTsFresh(key,id){
+        if(id==null||!REGISTRY_KEYS.has(key))return 0;
+        try{
+          const raw=localStorage.getItem(SYNC_META_KEY);
+          const d=raw?JSON.parse(raw):null;
+          const ts=d&&d.tombstones&&d.tombstones[key]?Number(d.tombstones[key][String(id)]):0;
+          return ts>0?ts:0;
+        }catch(_){return 0;}
       }
       /** "Delete all data": tombstone every item in the registry keys BEFORE
           the local wipe empties the arrays, so the wipe propagates to the
@@ -689,8 +709,8 @@
       Sync.wipeRemoteData=wipeRemoteData;
       Sync.pushDeleteAllRemote=pushDeleteAllRemote;
       Sync.noteTombstone=noteTombstone;
-      Sync.tombstoneAllForSync=tombstoneAllForSync;
-      Sync.clearTombstoneRegistry=clearTombstoneRegistry;
+      Sync.tombstoneTsFresh=tombstoneTsFresh;
+      Sync.tombstoneAllForSync=tombstoneAllForSync;      Sync.clearTombstoneRegistry=clearTombstoneRegistry;
       Sync.rerenderCurrentView=rerenderCurrentView;
       Sync.isTombstoned=isTombstoned;
       Sync.liveItems=liveItems;
@@ -704,6 +724,7 @@
     function wipeRemoteData(){return Sync.wipeRemoteData();}
     function pushDeleteAllRemote(){return Sync.pushDeleteAllRemote();}
     function noteTombstone(key,id){return Sync.noteTombstone(key,id);}
+    function tombstoneTsFresh(key,id){return Sync.tombstoneTsFresh(key,id);}
     function tombstoneAllForSync(){return Sync.tombstoneAllForSync();}
     function isTombstoned(item){return Sync.isTombstoned(item);}
     function liveItems(arr){return Sync.liveItems(arr);}
