@@ -1,0 +1,5 @@
+title,start_time,exercise_title,set_index,set_type,weight_lbs,reps,rpe
+"Morning Push","2024-01-05 08:00:00","Bench Press (Barbell)",0,warm up,135,10,
+"Morning Push","2024-01-05 08:00:00","Bench Press (Barbell)",1,normal,185,8,8
+"Morning Push","2024-01-05 08:00:00","Bench Press (Barbell)",2,failure,185,6,9.5
+"Morning Push","2024-01-05 08:00:00","Squat (Barbell)",0,normal,225,5,8

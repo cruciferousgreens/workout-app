@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cruciferous Greens Workout</title>
+<!-- #211 (user 2026-09-12): share-appropriate preview tags for /s/<slug>
+     short links. Crawlers don't run the redirect script below, so they read
+     these static tags; the app itself ignores them. Per-share titles need a
+     server piece (tracked in the issue) — this is the static best effort. -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Cruciferous Greens" />
+<meta property="og:title" content="Cruciferous Greens" />
+<meta property="og:description" content="Someone shared a workout with you — open it to view, save, or start it." />
+<meta property="og:image" content="https://app.cruciferousgreens.com/share-card-home-1200.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Cruciferous Greens" />
+<meta name="twitter:description" content="Someone shared a workout with you — open it to view, save, or start it." />
+<meta name="twitter:image" content="https://app.cruciferousgreens.com/share-card-home-1200.png" />
+<script>
+/* GitHub Pages SPA fallback (#177): the static host has no rewrite rules,
+   so /s/<slug> short-share links would 404. Stash the requested path in
+   sessionStorage and hand off to index.html, which consumes it at boot
+   (one-shot). Only /s/<slug> paths are acted on there; everything else
+   boots normally. This file is intentionally NOT in the service-worker
+   asset list (see make-sw.py): the host serves it for unknown paths, and
+   caching it as an app-shell asset could serve stale redirect logic. */
+(function(){
+  try{sessionStorage.setItem('cg-spa-redirect',location.pathname+location.search+location.hash);}catch(e){}
+  var p=location.pathname;
+  /* Keep in sync with spaBaseForPath() in assets/js/share-shortlinks.js:
+     project Pages serves under /workout-app-accounts/, prod at the root. */
+  var base=p.indexOf('/workout-app-accounts/')===0?'/workout-app-accounts/':'/';
+  location.replace(base);
+})();
+</script>
+</head>
+<body></body>
+</html>

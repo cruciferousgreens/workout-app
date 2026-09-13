@@ -1,0 +1,5 @@
+# GitHub Pages builds this branch with Jekyll (there is no .nojekyll).
+# The unit-test harness in tests/ stays in the repo but must never be
+# published to the site.
+exclude:
+  - tests
