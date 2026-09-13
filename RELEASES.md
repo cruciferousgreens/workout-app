@@ -2,6 +2,12 @@
 
 Newest first. Only user-facing milestones.
 
+## v1.51 (2026-09-13)
+- #307 (user): no × on the share-link loading skeleton for anyone — signed-in included. If a resolve hangs, system Back exits via the pushed history entry.
+
+## v1.50 (2026-09-13)
+- #307 (user): the share-link landing no longer shows the weird "Loading…" intermediate page — it renders the real card layout immediately with shimmer skeleton placeholders (title, muscles, exercise rows, action buttons) that hydrate in place when the payload resolves.
+
 ## v1.49 (2026-09-13)
 - (user): the two built-in StrongLifts 5×5 saved workouts (Workout A / Workout B) are deleted — the saved-workout list now shows only the user's own templates.
 

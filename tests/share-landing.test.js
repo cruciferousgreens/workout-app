@@ -148,10 +148,14 @@ describe('#296: cold-open share links land directly on the landing',()=>{
     assert.ok(fn.includes('showWorkouts(false,true)'),'landing renders on the workout tab');
     assert.ok(!fn.includes('workoutEditorOpen'),'live editor flag untouched');
   });
-  it('the loading sentinel renders a loading card with a dismiss escape hatch',()=>{
+  it('the loading sentinel renders a skeleton card with no dismiss button',()=>{
     const fn=shareSrc.match(/function renderSharePreview\(\)\{([\s\S]*?)\n    \}/)[1];
     assert.ok(fn.includes('payload.loading'),'loading branch present');
-    assert.ok(fn.includes('shareLoadingDismiss'),'dismiss escape hatch on the loading card');
+    assert.ok(fn.includes('sharePreviewSkeletonHtml()'),'skeleton renders while loading (#307)');
+    assert.ok(!fn.includes('shareLoadingDismiss'),'no dismiss button on the loading skeleton (user 2026-09-13)');
+    const skel=shareSrc.match(/function sharePreviewSkeletonHtml\(\)\{([\s\S]*?)\n    \}/)[1];
+    assert.ok(!skel.includes('shareLoadingDismiss'),'skeleton markup carries no dismiss control');
+    assert.ok(skel.includes('aria-busy'),'skeleton is marked busy for assistive tech');
   });
   it('the normal initial route is skipped on a share boot',()=>{
     const initial=bootstrapSrc.indexOf("const initialId = decodeURIComponent(location.hash.slice(1));");

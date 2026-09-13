@@ -354,15 +354,29 @@
       root.querySelectorAll('[data-share-act="start"]').forEach(b=>b.addEventListener('click',startSharedWorkout));
       root.querySelectorAll('[data-share-act="add"]').forEach(b=>b.addEventListener('click',()=>{isTemplate?saveSharedWorkout():saveSharedProgram();}));
     }
+    /* #307 (user 2026-09-13): the old "Loading…" intermediate page is gone.
+       The landing renders the real card layout immediately with skeleton
+       placeholders that hydrate in place when the payload resolves — no
+       weird intermediate, no layout jump. No × during loading for anyone
+       (user 2026-09-13): if a resolve hangs, system Back exits via the
+       pushed history entry. Header skeletons mirror the template landing
+       (the common case); kind-specific details fill in on hydrate. */
+    function sharePreviewSkeletonHtml(){
+      const signedIn=shareSignedIn();
+      const headerBtns=signedIn
+        ?'<span class="skel skel-circle"></span><span class="skel skel-start"></span>'
+        :'<span class="skel skel-start"></span>';
+      return `<div class="completed-card" aria-busy="true" aria-label="Loading shared link"><span class="continue-kicker">Shared link</span><div class="detail-title-row"><span class="skel skel-title"></span><div class="share-header-actions">${headerBtns}</div></div><p class="share-context"><span class="skel skel-line" style="width:55%"></span></p><p class="completed-meta"><span class="skel skel-line" style="width:40%"></span></p>
+      <div class="section-head"><span class="skel skel-line" style="width:130px"></span></div><div class="skel skel-map"></div><div class="workout-muscles"><span class="skel skel-pill"></span><span class="skel skel-pill"></span><span class="skel skel-pill"></span><span class="skel skel-pill"></span></div>
+      <div class="section-head"><span class="skel skel-line" style="width:100px"></span></div><div class="skel skel-row" style="margin-bottom:8px"></div><div class="skel skel-row" style="margin-bottom:8px"></div><div class="skel skel-row"></div>
+      <div class="share-footer-actions"><div class="share-actions"><span class="skel skel-btn"></span><span class="skel skel-line" style="width:150px;margin-top:8px"></span></div><p class="section-note"><span class="skel skel-line" style="width:60%;margin:0 auto"></span></p></div></div>`;
+    }
     function renderSharePreview(){
       const host=$('#sharePreviewBody');if(!host)return;
       const payload=state.sharePreview;
       if(!payload){host.innerHTML='';return;}
-      /* #296: boot-time loading sentinel — the resolved payload fills this
-         in. The × is an escape hatch if the resolve hangs. */
       if(payload.loading){
-        host.innerHTML='<div class="completed-card"><span class="continue-kicker">Shared link</span><div class="detail-title-row"><h2>Loading…</h2><button class="dialog-close" id="shareLoadingDismiss" type="button" aria-label="Dismiss">×</button></div><p class="share-context">Opening the shared link.</p></div>';
-        host.querySelector('#shareLoadingDismiss')?.addEventListener('click',()=>{dismissSharePreview();showDashboard(false);});
+        host.innerHTML=sharePreviewSkeletonHtml();
         return;
       }
       host.innerHTML=sharePreviewCardHtml(payload);

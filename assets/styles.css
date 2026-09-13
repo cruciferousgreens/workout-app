@@ -321,6 +321,21 @@
     .share-alt-action:active { opacity: .6; }
     #sharePreviewBody { display: flex; flex-direction: column; min-height: calc(100dvh - var(--top-bar-clearance) - var(--bottom-nav-clearance)); }
     #sharePreviewBody .completed-card { margin-top: auto; margin-bottom: auto; }
+    /* #307 (user 2026-09-13): the share landing no longer shows a bare
+       "Loading…" card while the payload resolves — it renders the real card
+       layout immediately with shimmer skeleton placeholders that hydrate in
+       place, so nothing jumps when the content arrives. */
+    @keyframes skel-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+    .skel { display: block; border-radius: 8px; background: linear-gradient(100deg, var(--surface-2) 40%, var(--line) 50%, var(--surface-2) 60%); background-size: 200% 100%; animation: skel-shimmer 1.4s linear infinite; pointer-events: none; user-select: none; }
+    .skel-title { height: 34px; width: 62%; border-radius: 10px; }
+    .skel-line { height: 14px; border-radius: 7px; }
+    .skel-pill { height: 28px; width: 84px; border-radius: 999px; }
+    .skel-row { min-height: 58px; border-radius: var(--radius-sm); }
+    .skel-btn { min-height: 52px; width: 100%; border-radius: 999px; }
+    .skel-map { height: 190px; border-radius: var(--radius-sm); margin-bottom: 12px; }
+    .skel-circle { width: 40px; height: 40px; border-radius: 50%; }
+    .skel-start { width: 88px; height: 40px; border-radius: 999px; }
+    @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
     .custom-form { padding: 24px; }
     .custom-form-head { display: flex; align-items: start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
     .custom-form-head h2 { margin: 0 0 5px; font: 700 24px/1.15 var(--font-sans); letter-spacing: -.02em; }
